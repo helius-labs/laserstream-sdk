@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let req = SubscribeRequest {
         slots: slots_map,
-        commitment: Some(CommitmentLevel::Confirmed as i32),
+        commitment: Some(CommitmentLevel::Processed as i32),
         ..Default::default()
     };
 

@@ -12,8 +12,8 @@ async function main() {
 
   // Laserstream stream (under test)
   const config: LaserstreamConfig = {
-    apiKey: '',
-    endpoint: ''
+    apiKey: process.env.LASER_API_KEY || '',
+    endpoint: process.env.LASER_ENDPOINT || ''
   };
 
 
@@ -27,7 +27,7 @@ async function main() {
         failed: false
       }
     },
-    commitment: CommitmentLevel.CONFIRMED,
+    commitment: CommitmentLevel.PROCESSED,
     accounts: {},
     slots: {},
     transactionsStatus: {},

@@ -4,7 +4,6 @@ import { randomInt } from 'crypto';
 /* dial the proxy in your test script */
 const LOCAL_PORT  = 4003;
 
-/* real plaintext Laserstream edge */
 const REMOTE_HOST = '';
 const REMOTE_PORT = 4001;
 

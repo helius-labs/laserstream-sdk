@@ -27,6 +27,7 @@ pub fn subscribe(
     try_stream! {
         let mut reconnect_attempts = 0;
         let mut tracked_slot: u64 = 0;
+        let mut confirmed_slot: u64 = 0;
 
         // Determine the effective max reconnect attempts
         let effective_max_attempts = config
@@ -44,17 +45,22 @@ pub fn subscribe(
 
             let mut attempt_request = current_request.clone();
 
-            // Add slot tracking if not present
-            if attempt_request.slots.is_empty() {
-                attempt_request.slots.insert(
-                    internal_slot_sub_id.clone(),
-                    SubscribeRequestFilterSlots::default()
-                );
+            // Ensure our dedicated internal slot subscription is present for tracking purposes
+            {
+                let confirmed_slot_filter = SubscribeRequestFilterSlots {
+                    filter_by_commitment: Some(true),
+                    interslot_updates: Some(true),
+                    ..Default::default()
+                };
+                attempt_request.slots.entry(internal_slot_sub_id.clone()).or_insert(confirmed_slot_filter);
             }
 
-            // On reconnection, use the last tracked slot
-            if reconnect_attempts > 0 && tracked_slot > 0 {
-                attempt_request.from_slot = Some(tracked_slot);
+            // On reconnection, resume from last confirmed slot if available, else last processed slot
+            if reconnect_attempts > 0 {
+                let resume_slot = if confirmed_slot > 0 { confirmed_slot } else { tracked_slot };
+                if resume_slot > 0 {
+                    attempt_request.from_slot = Some(resume_slot);
+                }
             }
 
             match connect_and_subscribe_once(&config, attempt_request, api_key_string.clone()).await { // Pass String API key
@@ -83,9 +89,12 @@ pub fn subscribe(
                                     continue;
                                 }
 
-                                // Always track the latest slot if the update is a Slot update
+                                // Always track latest observed slot
                                 if let Some(UpdateOneof::Slot(s)) = &update.update_oneof {
                                     tracked_slot = s.slot;
+                                    if s.status == 1 || s.status == 2 {
+                                        confirmed_slot = s.slot;
+                                    }
                                 }
 
                                 // For non-internal updates:
@@ -94,18 +103,14 @@ pub fn subscribe(
                             Err(status) => {
                                 // status is now tonic::Status due to map_err above
                                 warn!(error = %status, "Stream error, attempting reconnection");
-                                eprintln!("Stream error, attempting reconnection: {}", status);
-                                break;
                             }
                         }
                     }
                     warn!("Stream ended, preparing to reconnect...");
-                    eprintln!("Stream ended, preparing to reconnect...");
                 }
                 Err(err) => {
                     // Error from connect_and_subscribe_once (GeyserGrpcClientError)
                     warn!(error = %err, "Failed to connect/subscribe, preparing to reconnect...");
-                    eprintln!("Failed to connect/subscribe, preparing to reconnect: {}", err);
                 }
             }
 

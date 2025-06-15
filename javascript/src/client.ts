@@ -16,12 +16,12 @@ const FIXED_RECONNECT_INTERVAL_MS = 5000; // 5 seconds fixed interval
 interface State {
   config: LaserstreamConfig;
   reconnectAttempts: number;
-  trackedSlot: number;
+  trackedSlot: number;      // last processed slot observed
+  confirmedSlot: number;    // last slot whose status is >= CONFIRMED
   subscription: SubscribeRequest;
   onData: (data: SubscribeUpdate) => void;
   onError: (error: Error) => void;
-  autoAddedSlotId?: string;
-  internalSub?: boolean;
+  internalSlotId: string;   // id of internal tracking subscription
 }
 
 /**
@@ -85,29 +85,25 @@ async function subscribeWithReplayTracking(
       reconnectAttempts,
       // On initial connection, use fromSlot from request if provided, otherwise start from 0
       trackedSlot: subscriptionRequest.fromSlot ? parseInt(subscriptionRequest.fromSlot) : 0,
+      confirmedSlot: 0,
       subscription: subscriptionRequest,
       onData,
-      onError
+      onError,
+      internalSlotId: Math.random().toString(36).substring(2, 15)
     };
 
     // Ensure we have a slot subscription for tracking purposes
-    if (!subscriptionRequest.slots || Object.keys(subscriptionRequest.slots).length === 0) {
-      const slotSubscriptionId = Math.random().toString(36).substring(2, 15);
-      state.internalSub = true;
-      state.autoAddedSlotId = slotSubscriptionId;
-      subscriptionRequest.slots = {
-        [slotSubscriptionId]: {
-          filterByCommitment: true,
-          interslotUpdates: true
-        }
-      };
-    } else {
-      state.internalSub = false;
+    if (!subscriptionRequest.slots) {
+      subscriptionRequest.slots = {};
     }
+    subscriptionRequest.slots[state.internalSlotId] = {
+      filterByCommitment: true,
+      interslotUpdates: true
+    };
 
     // On reconnection attempts, always use the last tracked slot to ensure we resume from where we left off
-    if (state.reconnectAttempts > 0 && state.trackedSlot > 0) {
-      subscriptionRequest.fromSlot = state.trackedSlot.toString();
+    if (state.reconnectAttempts > 0 && state.confirmedSlot > 0) {
+      subscriptionRequest.fromSlot = state.confirmedSlot.toString();
     }
 
     // Set up handlers for various stream lifecycle events
@@ -151,20 +147,19 @@ async function subscribeWithReplayTracking(
 
     // Set up data handler
     subscription.on('data', (data) => {
-      // Track slot number for reconnection purposes regardless of subscription type
       if (data.slot) {
-        state.trackedSlot = parseInt(data.slot.slot);
-        
-        // Don't forward internal tracking slot data
-        if (state.internalSub) {
-          return;
+        const slotNumber = parseInt(data.slot.slot);
+        state.trackedSlot = slotNumber;
+
+        const st = (data.slot as any).status as number | string | undefined;
+        if (st === 1 || st === 2 || st === 'CONFIRMED' || st === 'FINALIZED') {
+          state.confirmedSlot = slotNumber;
         }
       }
-      
-      // Reset reconnect attempts on successful message
+
+      // Reset reconnect attempts on any successful message
       state.reconnectAttempts = 0;
-      
-      // Forward all other data unchanged
+
       onData(data);
     });
 
@@ -196,8 +191,9 @@ function handleReconnection(state: State, error: Error) {
   state.reconnectAttempts += 1;
 
   // Ensure we resume from last tracked slot on next attempt
-  if (state.trackedSlot > 0) {
-    state.subscription.fromSlot = state.trackedSlot.toString();
+  const resumeSlot = state.confirmedSlot > 0 ? state.confirmedSlot : state.trackedSlot;
+  if (resumeSlot > 0) {
+    state.subscription.fromSlot = resumeSlot.toString();
   }
 
   setTimeout(() => {
