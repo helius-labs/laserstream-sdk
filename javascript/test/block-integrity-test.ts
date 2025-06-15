@@ -4,8 +4,8 @@ import fetch from 'node-fetch';
 async function main() {
   // Configuration for the Laserstream service
   const config: LaserstreamConfig = {
-    apiKey: '', // Replace with your actual API key if needed
-    endpoint: '' // Replace with the appropriate endpoint
+    apiKey: process.env.LASER_API_KEY || '',
+    endpoint: process.env.LASER_ENDPOINT || ''
   };
 
   // Subscription request for blocks
@@ -13,7 +13,7 @@ async function main() {
   const subscriptionRequest: SubscribeRequest = {
     accounts: {},
     accountsDataSlice: [],
-    commitment: CommitmentLevel.CONFIRMED,
+    commitment: CommitmentLevel.PROCESSED,
     slots: {
         slotSubscribe: {
             filterByCommitment: true,

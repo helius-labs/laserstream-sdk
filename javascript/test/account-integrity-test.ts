@@ -7,9 +7,9 @@ const ACCOUNTS = [
   'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA', // SPL Token program
 ];
 
-const laserstreamCfg: LaserstreamConfig = {
-  apiKey: '',
-  endpoint: ''
+const config: LaserstreamConfig = {
+  apiKey: process.env.LASER_API_KEY || '',
+  endpoint: process.env.LASER_ENDPOINT || ''
 };
 
 //Yellowstone node for comparing with Laserstream
@@ -27,7 +27,7 @@ const subscribeReq: any = {
     },
   },
   accountsDataSlice: [],
-  commitment: CommitmentLevel.CONFIRMED,
+  commitment: CommitmentLevel.PROCESSED,
   slots: {},
   transactions: {},
   transactionsStatus: {},
@@ -89,7 +89,7 @@ function normaliseAccountUpdate(u: any): any {
 
 async function startLaserstream() {
   await subscribe(
-    laserstreamCfg,
+    config,
     subscribeReq,
     (u) => {
       const { key, slot } = extractKeyAndSlot(u);
