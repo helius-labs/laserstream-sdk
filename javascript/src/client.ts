@@ -22,6 +22,7 @@ interface State {
   onData: (data: SubscribeUpdate) => void;
   onError: (error: Error) => void;
   internalSlotId: string;   // id of internal tracking subscription
+  userHasSlotSubscriptions: boolean; // whether user originally had slot subscriptions
 }
 
 /**
@@ -79,6 +80,9 @@ async function subscribeWithReplayTracking(
     // Create subscription to the gRPC service
     const subscription = await client.subscribe();
     
+    // Check if user originally had slot subscriptions
+    const userHasSlotSubscriptions = subscriptionRequest.slots && Object.keys(subscriptionRequest.slots).length > 0;
+
     // Initialize internal state for tracking and reconnection
     const state: State = {
       config,
@@ -89,7 +93,8 @@ async function subscribeWithReplayTracking(
       subscription: subscriptionRequest,
       onData,
       onError,
-      internalSlotId: Math.random().toString(36).substring(2, 15)
+      internalSlotId: Math.random().toString(36).substring(2, 15),
+      userHasSlotSubscriptions
     };
 
     // Ensure we have a slot subscription for tracking purposes
@@ -147,7 +152,8 @@ async function subscribeWithReplayTracking(
 
     // Set up data handler
     subscription.on('data', (data) => {
-      if (data.slot) {
+      // Handle slot updates - check if our internal slot ID is present
+      if (data.slot && data.filters && data.filters.includes(state.internalSlotId)) {
         const slotNumber = parseInt(data.slot.slot);
         state.trackedSlot = slotNumber;
 
@@ -155,6 +161,24 @@ async function subscribeWithReplayTracking(
         if (st === 1 || st === 2 || st === 'CONFIRMED' || st === 'FINALIZED') {
           state.confirmedSlot = slotNumber;
         }
+
+        // If user has slot subscriptions, clean the filters and pass through
+        if (state.userHasSlotSubscriptions) {
+          // Remove internal slot ID from filters and pass to user with only their filter IDs
+          const userFilters = data.filters.filter((filterId: string) => filterId !== state.internalSlotId);
+          if (userFilters.length > 0) {
+            // Pass clean slot update to user with only their filter IDs
+            const cleanData = { ...data, filters: userFilters };
+            
+            // Reset reconnect attempts on any successful message
+            state.reconnectAttempts = 0;
+            
+            onData(cleanData);
+          }
+        }
+        
+        // Don't pass purely internal slot updates to user
+        return;
       }
 
       // Reset reconnect attempts on any successful message
