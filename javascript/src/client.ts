@@ -152,6 +152,28 @@ async function subscribeWithReplayTracking(
 
     // Set up data handler
     subscription.on('data', (data) => {
+      // Handle ping/pong messages
+      if (data.ping) {
+        const pongRequest = {
+          ping: { id: 1 },
+          accounts: {},
+          accountsDataSlice: [],
+          slots: {},
+          transactions: {},
+          transactionsStatus: {},
+          blocks: {},
+          blocksMeta: {},
+          entry: {}
+        };
+        
+        subscription.write(pongRequest, (err: Error | null | undefined) => {
+          if (err) {
+            console.error('Failed to send pong:', err);
+          }
+        });
+        return;
+      }
+
       // Handle slot updates - check if our internal slot ID is present
       if (data.slot && data.filters && data.filters.includes(state.internalSlotId)) {
         const slotNumber = parseInt(data.slot.slot);

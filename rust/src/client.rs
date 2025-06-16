@@ -115,6 +115,10 @@ pub fn subscribe(
                                                 // Create clean update with only user filter IDs
                                                 let mut clean_update = update.clone();
                                                 clean_update.filters = user_filters;
+                                                
+                                                // Reset reconnect attempts on successful data
+                                                reconnect_attempts = 0;
+                                                
                                                 yield clean_update;
                                             }
                                         }
@@ -122,6 +126,9 @@ pub fn subscribe(
                                         continue;
                                     }
                                 }
+
+                                // Reset reconnect attempts on any successful data
+                                reconnect_attempts = 0;
 
                                 // For all other updates (non-slot or slot without internal ID):
                                 yield update;
