@@ -38,6 +38,9 @@ pub fn subscribe(
         // Keep original request for reconnection attempts
         let current_request = request.clone();
         let internal_slot_sub_id = format!("internal-{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap());
+        
+        // Check if user originally had slot subscriptions
+        let user_has_slot_subscriptions = !current_request.slots.is_empty();
 
         let api_key_string = config.api_key.clone(); 
 
@@ -89,15 +92,38 @@ pub fn subscribe(
                                     continue;
                                 }
 
-                                // Always track latest observed slot
+                                // Handle slot updates - check if our internal slot ID is present
                                 if let Some(UpdateOneof::Slot(s)) = &update.update_oneof {
+                                    // Always track slots for reconnection purposes
                                     tracked_slot = s.slot;
                                     if s.status == 1 || s.status == 2 {
                                         confirmed_slot = s.slot;
                                     }
+
+                                    // Check if this slot update contains our internal slot ID
+                                    if update.filters.contains(&internal_slot_sub_id) {
+                                        // If user has slot subscriptions, clean the filters and pass through
+                                        if user_has_slot_subscriptions {
+                                            // Remove internal slot ID from filters
+                                            let user_filters: Vec<String> = update.filters
+                                                .iter()
+                                                .filter(|&filter_id| filter_id != &internal_slot_sub_id)
+                                                .cloned()
+                                                .collect();
+                                            
+                                            if !user_filters.is_empty() {
+                                                // Create clean update with only user filter IDs
+                                                let mut clean_update = update.clone();
+                                                clean_update.filters = user_filters;
+                                                yield clean_update;
+                                            }
+                                        }
+                                        // Don't pass purely internal slot updates to user
+                                        continue;
+                                    }
                                 }
 
-                                // For non-internal updates:
+                                // For all other updates (non-slot or slot without internal ID):
                                 yield update;
                             }
                             Err(status) => {
