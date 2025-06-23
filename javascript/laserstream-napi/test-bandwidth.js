@@ -1,9 +1,26 @@
 const { helloWorld, LaserStreamClient } = require("./laserstream-napi.node");
 const { Connection, clusterApiUrl } = require("@solana/web3.js");
+const protobuf = require("protobufjs");
 
 let messageCount = 0;
 let totalBytes = 0;
 let startTime = 0;
+let messageStats = {
+  account: 0,
+  slot: 0,
+  transaction: 0,
+  block: 0,
+  ping: 0,
+  other: 0,
+};
+
+// Load protobuf definitions
+let SubscribeUpdate = null;
+
+async function loadProto() {
+  const root = await protobuf.load("proto/geyser.proto");
+  SubscribeUpdate = root.lookupType("geyser.SubscribeUpdate");
+}
 
 async function getLatestSlot() {
   const rpcUrl =
@@ -24,6 +41,9 @@ async function getLatestSlot() {
 async function runBandwidthTest() {
   console.log("🚀 NAPI + Tonic Real Bandwidth Testing");
   console.log("=".repeat(50));
+
+  console.log("\n📋 Loading protobuf definitions...");
+  await loadProto();
 
   console.log("\n🔍 Fetching latest Solana slot...");
   const slot = await getLatestSlot();
@@ -78,6 +98,16 @@ async function runBandwidthTest() {
     console.log(`MB/sec:         ${(bytesPerSec / 1024 / 1024).toFixed(2)}`);
     console.log(`Bandwidth:      ${mbps.toFixed(2)} Mbps`);
 
+    console.log("\n📋 Message Type Breakdown:");
+    console.log(`Account updates: ${messageStats.account.toLocaleString()}`);
+    console.log(`Slot updates:    ${messageStats.slot.toLocaleString()}`);
+    console.log(
+      `Transactions:    ${messageStats.transaction.toLocaleString()}`,
+    );
+    console.log(`Blocks:          ${messageStats.block.toLocaleString()}`);
+    console.log(`Pings:           ${messageStats.ping.toLocaleString()}`);
+    console.log(`Other:           ${messageStats.other.toLocaleString()}`);
+
     // Performance assessment
     console.log("\n🏆 Performance Assessment:");
     if (mbps > 1000) {
@@ -121,6 +151,28 @@ function onMessage(buffer) {
   messageCount++;
   totalBytes += buffer.length;
 
+  // Parse the protobuf message
+  try {
+    const message = SubscribeUpdate.decode(buffer);
+
+    if (message.account) {
+      messageStats.account++;
+    } else if (message.slot) {
+      messageStats.slot++;
+    } else if (message.transaction) {
+      messageStats.transaction++;
+    } else if (message.block) {
+      messageStats.block++;
+    } else if (message.ping) {
+      messageStats.ping++;
+    } else {
+      messageStats.other++;
+    }
+  } catch (error) {
+    messageStats.other++;
+    console.error(`\n❌ Failed to parse message: ${error.message}`);
+  }
+
   // Log progress every 1000 messages
   if (messageCount % 1000 === 0) {
     const elapsed = (Date.now() - startTime) / 1000;
@@ -132,125 +184,3 @@ function onMessage(buffer) {
 }
 
 runBandwidthTest().catch(console.error);
-
-// const { helloWorld, LaserStreamClient } = require("./laserstream-napi.node");
-//
-// let messageCount = 0;
-// let totalBytes = 0;
-// let startTime = Date.now();
-// let batchStartTime = Date.now();
-// let batchMessageCount = 0;
-// let batchBytes = 0;
-// let activeStream = null;
-//
-// async function runBandwidthTest() {
-//   console.log("🚀 NAPI + Tonic Continuous Bandwidth Testing");
-//   console.log("=".repeat(50));
-//
-//   const endpoint = process.env.ENDPOINT || "http://dev-morgan:9443";
-//   const token = process.env.TOKEN || "76307907-092e-49da-b626-819c63fca112";
-//
-//   const client = new LaserStreamClient(endpoint, token);
-//   console.log("✅ Client initialized, starting continuous stream...");
-//
-//   try {
-//     // Subscribe to account updates
-//     const stream = await client.subscribe(
-//       {
-//         accounts: {}, // Subscribe to all account updates
-//       },
-//       onMessage,
-//     );
-//
-//     console.log("📡 Stream started, collecting data continuously...");
-//     console.log("Stream ID:", stream.id);
-//     console.log("Press Ctrl+C to stop");
-//
-//     // Keep the stream handle alive
-//     activeStream = stream;
-//
-//     // Set up graceful shutdown
-//     process.on("SIGINT", () => {
-//       console.log("\n\n🛑 Shutting down...");
-//       if (global.activeStream) {
-//         global.activeStream.cancel();
-//       }
-//       process.exit(0);
-//     });
-//
-//     // Keep running until interrupted
-//     await new Promise(() => {}); // Never resolves - runs forever
-//   } catch (error) {
-//     console.error("Bandwidth test failed:", error);
-//   }
-// }
-//
-// function onMessage(buffer) {
-//   console.log(`📥 Received message of size ${buffer.length} bytes`);
-//   console.log(activeStream);
-//   messageCount++;
-//   totalBytes += buffer.length;
-//   batchMessageCount++;
-//   batchBytes += buffer.length;
-//
-//   // Log progress every 5000 messages for real-time feedback
-//   if (messageCount % 5000 === 0) {
-//     printBatchStats();
-//     const elapsed = (Date.now() - startTime) / 1000;
-//     const rate = messageCount / elapsed;
-//     process.stdout.write(
-//       `\r📊 Messages: ${messageCount.toLocaleString()}, Rate: ${rate.toFixed(0)}/sec`,
-//     );
-//   }
-// }
-//
-// function printBatchStats() {
-//   const now = Date.now();
-//   const batchDuration = (now - batchStartTime) / 1000;
-//   const totalDuration = (now - startTime) / 1000;
-//
-//   // Batch stats
-//   const batchRate = batchMessageCount / batchDuration;
-//   const batchBytesPerSec = batchBytes / batchDuration;
-//   const batchMbps = (batchBytesPerSec * 8) / (1024 * 1024);
-//
-//   // Total stats
-//   const totalRate = messageCount / totalDuration;
-//   const totalBytesPerSec = totalBytes / totalDuration;
-//   const totalMbps = (totalBytesPerSec * 8) / (1024 * 1024);
-//
-//   console.log("\n" + "=".repeat(60));
-//   console.log(`📊 BATCH STATS (last ${batchDuration.toFixed(1)}s):`);
-//   console.log(
-//     `  Messages:    ${batchMessageCount.toLocaleString()} (${batchRate.toFixed(0)}/sec)`,
-//   );
-//   console.log(
-//     `  Data:        ${(batchBytes / 1024 / 1024).toFixed(2)} MB (${(batchBytesPerSec / 1024 / 1024).toFixed(2)} MB/sec)`,
-//   );
-//   console.log(`  Bandwidth:   ${batchMbps.toFixed(2)} Mbps`);
-//
-//   console.log(`\n🌍 TOTAL STATS (${totalDuration.toFixed(0)}s):`);
-//   console.log(
-//     `  Messages:    ${messageCount.toLocaleString()} (${totalRate.toFixed(0)}/sec avg)`,
-//   );
-//   console.log(
-//     `  Data:        ${(totalBytes / 1024 / 1024).toFixed(2)} MB (${(totalBytesPerSec / 1024 / 1024).toFixed(2)} MB/sec avg)`,
-//   );
-//   console.log(`  Bandwidth:   ${totalMbps.toFixed(2)} Mbps avg`);
-//
-//   // Performance indicator
-//   let indicator = "🔴 LOW";
-//   if (batchMbps > 1000) indicator = "🟢 EXCELLENT";
-//   else if (batchMbps > 100) indicator = "🟡 GOOD";
-//   else if (batchMbps > 10) indicator = "🟠 OK";
-//
-//   console.log(`  Performance: ${indicator} (${batchMbps.toFixed(0)} Mbps)`);
-//   console.log("=".repeat(60));
-//
-//   // Reset batch counters
-//   batchStartTime = now;
-//   batchMessageCount = 0;
-//   batchBytes = 0;
-// }
-//
-// runBandwidthTest().catch(console.error);
