@@ -58,12 +58,12 @@ async function main(): Promise<void> {
     {},
     // blocks
     {
-      blocks: {
-        includeAccounts: false,
-        includeEntries: false,
-        includeTransactions: false,
-        accountInclude: [],
-      },
+      // blocks: {
+      //   includeAccounts: false,
+      //   includeEntries: false,
+      //   includeTransactions: false,
+      //   accountInclude: [],
+      // },
     },
     // blocksMeta
     { meta: { includeAccounts: false } },
@@ -94,21 +94,53 @@ async function main(): Promise<void> {
     lastUpdateCount = updateCount;
   }, 5000);
 
-  stream.on("data", (data: grpc.SubscribeUpdate) => {
+  // Helper function for optional decoding
+  function decodeMessage(rawData: any): grpc.SubscribeUpdate | null {
+    if (rawData._isRaw && rawData._rawBytes) {
+      try {
+        return grpc.SubscribeUpdate.decode(rawData._rawBytes);
+      } catch (error) {
+        console.error("Failed to decode message:", error);
+        return null;
+      }
+    }
+    return rawData; // Already decoded
+  }
+
+  stream.on("data", (data: any) => {
     updateCount++;
-    
-    // Estimate size without re-encoding (much faster)
-    // This is a rough estimate based on typical message sizes
-    const estimatedSize = JSON.stringify(data).length;
-    totalBytes += estimatedSize;
+
+    let messageSize = 0;
+    let messageType = "unknown";
+
+    if (data._isRaw) {
+      // const decoded = decodeMessage(data);
+
+      // Use raw bytes directly - no decoding overhead!
+      messageSize = data._rawBytes.length;
+
+      totalBytes += messageSize;
+    } else {
+      // Fallback for unmodified gRPC (shouldn't happen)
+      // console.warn("Received decoded message - gRPC modification not working");
+      // messageSize = grpc.SubscribeUpdate.encode(data).finish().length;
+      totalBytes += messageSize;
+
+      // Determine type from decoded object
+      if (data.transaction) messageType = "transaction";
+      else if (data.account) messageType = "account";
+      else if (data.slot) messageType = "slot";
+      else if (data.block || data.blockMeta) messageType = "block";
+    }
 
     if (updateCount % 10000 === 0) {
       console.log(`Total messages: ${updateCount}`);
-      console.log(`Total bytes (estimated): ${formatBytes(totalBytes)}`);
+      console.log(`Total bytes: ${formatBytes(totalBytes)}`);
+      console.log(`Last message type: ${messageType} (${messageSize} bytes)`);
       let timeTaken = (Date.now() - startTime) / 1000;
       console.log(`Time taken: ${timeTaken}s`);
       console.log(
-        `Bytes per second: ${totalBytes / timeTaken / 1024 / 1024} MB/s`,
+        `Bytes per second: ${(totalBytes / timeTaken / 1024 / 1024).toFixed(2)} MB/s`,
       );
       console.log(
         `Average messages per second: ${(updateCount / timeTaken).toFixed(2)}`,
@@ -131,4 +163,3 @@ main().catch((error: Error) => {
   console.error("Fatal error:", error);
   process.exit(1);
 });
-
