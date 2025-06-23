@@ -61,6 +61,7 @@ impl StreamInner {
                                 
                                 // Serialize message to bytes
                                 let mut buf = Vec::new();
+                                // TODO don't re-encode just pass raw bytes from stream
                                 if let Err(e) = message.encode(&mut buf) {
                                     eprintln!("Failed to encode message: {}", e);
                                     continue;

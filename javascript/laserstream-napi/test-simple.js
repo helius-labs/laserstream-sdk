@@ -14,7 +14,7 @@ try {
   console.log("✅ LaserStream wrapper created successfully");
   console.log("Metrics:", client.getMetrics());
 
-  client.subscribe({ slots: {} }, console.log);
+  client.subscribe({ accounts: {} }, console.log);
 } catch (error) {
   console.error("❌ LaserStream wrapper creation failed:", error.message);
 }
