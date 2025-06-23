@@ -141,8 +141,18 @@ async fn connect_and_subscribe_once(
         .x_token(Some(api_key))
         .map_err(|e| tonic::Status::unauthenticated(format!("Failed to set API key: {}", e)))?
         .connect_timeout(Duration::from_secs(10))
-        .max_decoding_message_size(1_000_000_000)
-        .timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(30))
+        .max_decoding_message_size(1_000_000_000) // 1GB max
+        .max_encoding_message_size(32_000_000)    // 32MB max
+        .http2_keep_alive_interval(Duration::from_secs(30))
+        .keep_alive_timeout(Duration::from_secs(5))  
+        .keep_alive_while_idle(true)
+        .initial_stream_window_size(Some(1024 * 1024 * 4))      // 4MB per stream
+        .initial_connection_window_size(Some(1024 * 1024 * 8))  // 8MB total
+        .http2_adaptive_window(true)                             // Dynamic window sizing
+        .tcp_nodelay(true)                                       // Disable Nagle's algorithm
+        .tcp_keepalive(Some(Duration::from_secs(60)))           // TCP keepalive
+        .buffer_size(Some(1024 * 64))                           // 64KB buffer
         .tls_config(ClientTlsConfig::new().with_enabled_roots())
         .map_err(|e| tonic::Status::internal(format!("TLS config error: {}", e)))?
         .connect()
