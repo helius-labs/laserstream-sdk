@@ -1,25 +1,39 @@
 const { helloWorld, LaserStreamClient } = require("./laserstream-napi.node");
+const { Connection, clusterApiUrl } = require("@solana/web3.js");
 
 let messageCount = 0;
 let totalBytes = 0;
 let startTime = 0;
 
+async function getLatestSlot() {
+  const rpcUrl =
+    process.env.SOLANA_RPC_URL ||
+    "https://mainnet.helius-rpc.com?api-key=76307907-092e-49da-b626-819c63fca112";
+  const connection = new Connection(rpcUrl);
+
+  try {
+    const slot = await connection.getSlot();
+    console.log(`🎯 Latest Solana slot: ${slot}`);
+    return slot;
+  } catch (error) {
+    console.error("Failed to fetch latest slot:", error.message);
+    return null;
+  }
+}
+
 async function runBandwidthTest() {
   console.log("🚀 NAPI + Tonic Real Bandwidth Testing");
   console.log("=".repeat(50));
 
-  // Test 1: Basic functionality
-  console.log("\n✅ Test 1: Basic NAPI Functions");
-  console.log("Hello World:", helloWorld());
+  console.log("\n🔍 Fetching latest Solana slot...");
+  const slot = await getLatestSlot();
 
-  // Test 2: Client initialization
-  console.log("\n✅ Test 2: Client Initialization");
   const endpoint = process.env.ENDPOINT || "http://dev-morgan:9443";
   const token = process.env.TOKEN || "76307907-092e-49da-b626-819c63fca112";
 
   const client = new LaserStreamClient(endpoint, token);
 
-  const testDurationSeconds = 120;
+  const testDurationSeconds = 10;
 
   // Test 3: Real bandwidth test with subscribe
   console.log("\n✅ Test 3: Real Subscribe Bandwidth Test");
@@ -30,14 +44,14 @@ async function runBandwidthTest() {
   startTime = Date.now();
 
   try {
-    // Subscribe to account updates
-    const stream = await client.subscribe(
-      {
-        accounts: {},
-        // transactions: {},
-      },
-      onMessage,
-    );
+    // Subscribe to account updates with slot filter if available
+    const subscribeRequest = {
+      accounts: {},
+      // transactions: {},
+      from_slot: slot - 450,
+    };
+
+    const stream = await client.subscribe(subscribeRequest, onMessage);
 
     console.log("Stream started, collecting data...");
 

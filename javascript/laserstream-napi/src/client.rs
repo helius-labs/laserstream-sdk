@@ -1,5 +1,5 @@
 use dashmap::DashMap;
-use napi::bindgen_prelude::*;
+use napi::{bindgen_prelude::*, JsNumber};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -107,6 +107,16 @@ impl ClientInner {
                 geyser::SubscribeRequestFilterSlots::default(),
             );
             request.slots = slots_map;
+        }
+
+        if js_obj.has_named_property("from_slot")? {
+            let from_slot = js_obj
+                .get_named_property::<JsNumber>("from_slot")?
+                .get_int64()
+                .ok()
+                .map(|v| v as u64);
+
+            request.from_slot = from_slot;
         }
 
         Ok(request)
