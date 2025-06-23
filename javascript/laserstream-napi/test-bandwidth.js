@@ -19,9 +19,11 @@ async function runBandwidthTest() {
 
   const client = new LaserStreamClient(endpoint, token);
 
+  const testDurationSeconds = 120;
+
   // Test 3: Real bandwidth test with subscribe
   console.log("\n✅ Test 3: Real Subscribe Bandwidth Test");
-  console.log("Starting subscription for 10 seconds...");
+  console.log(`Starting subscription for ${testDurationSeconds} seconds...`);
 
   messageCount = 0;
   totalBytes = 0;
@@ -40,7 +42,9 @@ async function runBandwidthTest() {
     console.log("Stream started, collecting data...");
 
     // Let it run for 10 seconds
-    await new Promise((resolve) => setTimeout(resolve, 20000));
+    await new Promise((resolve) =>
+      setTimeout(resolve, testDurationSeconds * 1000),
+    );
 
     // Stop the stream
     stream.cancel();
