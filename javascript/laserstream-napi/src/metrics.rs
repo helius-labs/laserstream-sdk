@@ -1,10 +1,10 @@
 use dashmap::DashMap;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use parking_lot::RwLock;
 
-use crate::{GlobalMetrics, StreamMetrics};
+// No longer need to import these as we use crate:: prefixes
 
 #[derive(Debug)]
 pub struct StreamStats {
@@ -49,8 +49,8 @@ impl StreamStats {
         }
     }
 
-    pub fn get_metrics(&self) -> StreamMetrics {
-        StreamMetrics {
+    pub fn get_metrics(&self) -> crate::StreamMetrics {
+        crate::StreamMetrics {
             messages_per_sec: *self.messages_per_sec.read(),
             bytes_per_sec: *self.bytes_per_sec.read(),
             total_messages: self.messages_count.load(Ordering::Relaxed) as f64,
@@ -121,11 +121,11 @@ impl MetricsCollector {
         }
     }
 
-    pub fn get_stream_metrics(&self, stream_id: &str) -> StreamMetrics {
+    pub fn get_stream_metrics(&self, stream_id: &str) -> crate::StreamMetrics {
         if let Some(stats) = self.streams.get(stream_id) {
             stats.get_metrics()
         } else {
-            StreamMetrics {
+            crate::StreamMetrics {
                 messages_per_sec: 0.0,
                 bytes_per_sec: 0.0,
                 total_messages: 0.0,
@@ -135,7 +135,7 @@ impl MetricsCollector {
         }
     }
 
-    pub fn get_global_metrics(&self, active_streams: u32) -> GlobalMetrics {
+    pub fn get_global_metrics(&self, active_streams: u32) -> crate::GlobalMetrics {
         // Aggregate all stream metrics
         let mut total_messages_per_sec = 0.0;
         let mut total_bytes_per_sec = 0.0;
@@ -150,7 +150,7 @@ impl MetricsCollector {
             total_bytes += metrics.total_bytes;
         }
 
-        GlobalMetrics {
+        crate::GlobalMetrics {
             active_streams,
             total_messages_per_sec,
             total_bytes_per_sec,

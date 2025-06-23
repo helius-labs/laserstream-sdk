@@ -1,20 +1,18 @@
 use napi::bindgen_prelude::*;
+use napi::threadsafe_function::{ThreadsafeFunction, ErrorStrategy, ThreadsafeFunctionCallMode};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
 use tonic::Streaming;
-use crossbeam_channel::{bounded, Receiver, Sender};
+// Remove unused crossbeam imports
 use parking_lot::Mutex;
 use prost::Message;
 
 use crate::buffer_pool::BufferPool;
-use crate::metrics::{MetricsCollector, StreamMetrics};
+use crate::metrics::MetricsCollector;
 
-// Generated protobuf code will be available after build
-pub mod geyser {
-    tonic::include_proto!("geyser");
-}
+use crate::proto::geyser;
 
 const BATCH_SIZE: usize = 100;
 const BATCH_TIMEOUT_MS: u64 = 10;
@@ -27,26 +25,21 @@ pub struct StreamInner {
 }
 
 impl StreamInner {
-    pub fn new(
+    pub fn new_with_tsfn(
         id: String,
         mut stream: Streaming<geyser::SubscribeUpdate>,
-        callback: JsFunction,
+        ts_callback: ThreadsafeFunction<Vec<u8>, ErrorStrategy::Fatal>,
         runtime: Arc<Runtime>,
         metrics: Arc<MetricsCollector>,
     ) -> Result<Self> {
-        let (cancel_tx, cancel_rx) = oneshot::channel();
+        let (cancel_tx, mut cancel_rx) = oneshot::channel();
         let buffer_pool = Arc::new(BufferPool::new());
         
         let stream_metrics = metrics.clone();
         let stream_id = id.clone();
-        let stream_buffer_pool = buffer_pool.clone();
+        let _stream_buffer_pool = buffer_pool.clone();
         
-        // Create threadsafe callback  
-        let ts_callback: ThreadsafeFunction<Vec<u8>, ErrorStrategy::Fatal> = callback
-            .create_threadsafe_function(0, |ctx| {
-                let buffer = ctx.env.create_buffer_with_data(ctx.value)?;
-                Ok(vec![buffer.into_unknown()])
-            })?;
+        // ThreadsafeFunction is already created and passed in
 
         // Spawn stream processing task
         runtime.spawn(async move {
@@ -156,7 +149,7 @@ impl StreamInner {
         Ok(())
     }
 
-    pub fn get_metrics(&self) -> StreamMetrics {
+    pub fn get_metrics(&self) -> crate::StreamMetrics {
         self.metrics.get_stream_metrics(&self.id)
     }
 }

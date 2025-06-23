@@ -9,12 +9,17 @@ npm install
 
 # Build the Rust library
 echo "🦀 Building Rust NAPI library..."
-cargo build --release
+cargo build
+
+# # Copy the native library
+# echo "📂 Setting up native library..."
+# DYLIB_PATH="$HOME/.cargo/target/release/liblaserstream_napi.dylib"
+# SO_PATH="$HOME/.cargo/target/release/liblaserstream_napi.so"
 
 # Copy the native library
 echo "📂 Setting up native library..."
-DYLIB_PATH="$HOME/.cargo/target/release/liblaserstream_napi.dylib"
-SO_PATH="$HOME/.cargo/target/release/liblaserstream_napi.so"
+DYLIB_PATH="$HOME/.cargo/target/debug/liblaserstream_napi.dylib"
+SO_PATH="$HOME/.cargo/target/debug/liblaserstream_napi.so"
 
 if [ -f "$DYLIB_PATH" ]; then
     cp "$DYLIB_PATH" ./laserstream-napi.node

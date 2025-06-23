@@ -12,7 +12,8 @@
       "Bash(npm run build:*)",
       "Bash(node test-simple.js)",
       "Bash(node:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }

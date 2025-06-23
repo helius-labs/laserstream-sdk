@@ -1,80 +1,110 @@
-// Full NAPI + Tonic implementation
-use napi::bindgen_prelude::*;
-use napi_derive::napi;
+// Remove unused macro import
 
-// Simple test function
+mod buffer_pool;
+mod client;
+mod metrics;
+mod proto;
+mod stream;
+
+use napi::bindgen_prelude::*;
+use napi::threadsafe_function::{ErrorStrategy, ThreadsafeFunction};
+use napi::{Env, JsObject};
+use napi_derive::napi;
+use std::sync::Arc;
+
+// Re-export the generated protobuf types
+pub use proto::*;
+
+// Simple test function for basic verification
 #[napi]
 pub fn hello_world() -> String {
-    "Hello from NAPI + Tonic!".to_string()
+    "Hello from LaserStream NAPI + Tonic!".to_string()
 }
 
-// Simplified client for basic testing
+// Main client struct that wraps the real implementation
 #[napi]
 pub struct LaserStreamClient {
-    endpoint: String,
-    token: Option<String>,
+    inner: Arc<client::ClientInner>,
 }
 
 #[napi]
 impl LaserStreamClient {
     #[napi(constructor)]
-    pub fn new(endpoint: String, token: Option<String>) -> Self {
-        Self { endpoint, token }
+    pub fn new(endpoint: String, token: Option<String>) -> Result<Self> {
+        let inner = Arc::new(client::ClientInner::new(endpoint, token)?);
+        Ok(Self { inner })
     }
 
-    #[napi]
-    pub fn get_endpoint(&self) -> String {
-        self.endpoint.clone()
-    }
+    #[napi(ts_return_type = "Promise<StreamHandle>")]
+    pub fn subscribe(&self, env: Env, request: Object, callback: JsFunction) -> Result<JsObject> {
+        // Extract all needed data from JS objects synchronously
+        let subscribe_request = self.inner.js_to_subscribe_request(request)?;
 
-    #[napi]
-    pub async fn test_connection(&self) -> Result<String> {
-        // Basic connection test
-        Ok(format!("Would connect to {} with token: {}", 
-            self.endpoint, 
-            self.token.as_deref().unwrap_or("none")))
-    }
+        // Create threadsafe function immediately (while we have access to JS context)
+        let ts_callback: ThreadsafeFunction<Vec<u8>, ErrorStrategy::Fatal> = callback
+            .create_threadsafe_function(0, |ctx| {
+                let buffer = ctx.env.create_buffer_with_data(ctx.value)?;
+                Ok(vec![buffer.into_unknown()])
+            })?;
 
-    #[napi]
-    pub async fn mock_bandwidth_test(&self, duration_ms: u32) -> Result<MockBandwidthResult> {
-        // Mock bandwidth test that simulates high throughput
-        use tokio::time::{sleep, Duration};
-        
-        let start = std::time::Instant::now();
-        let mut total_messages = 0u64;
-        let mut total_bytes = 0u64;
-        
-        // Simulate processing messages for the given duration
-        while start.elapsed().as_millis() < duration_ms as u128 {
-            // Simulate batch of messages
-            total_messages += 1000;
-            total_bytes += 1024 * 1024; // 1MB per batch
-            
-            sleep(Duration::from_millis(1)).await;
-        }
-        
-        let actual_duration = start.elapsed().as_secs_f64();
-        let messages_per_sec = total_messages as f64 / actual_duration;
-        let bytes_per_sec = total_bytes as f64 / actual_duration;
-        
-        Ok(MockBandwidthResult {
-            duration_seconds: actual_duration,
-            total_messages: total_messages as f64,
-            total_bytes: total_bytes as f64,
-            messages_per_sec,
-            bytes_per_sec,
-            bandwidth_mbps: (bytes_per_sec * 8.0) / (1024.0 * 1024.0),
+        let client_inner = self.inner.clone();
+
+        // Create async task
+        env.spawn_future(async move {
+            client_inner
+                .subscribe_internal_with_tsfn(subscribe_request, ts_callback)
+                .await
         })
+    }
+
+    #[napi(getter)]
+    pub fn metrics(&self) -> GlobalMetrics {
+        self.inner.get_metrics()
     }
 }
 
+// Stream handle for managing individual streams
 #[napi]
+pub struct StreamHandle {
+    id: String,
+    inner: Arc<stream::StreamInner>,
+}
+
+#[napi]
+impl StreamHandle {
+    #[napi(getter)]
+    pub fn id(&self) -> String {
+        self.id.clone()
+    }
+
+    #[napi]
+    pub fn cancel(&self) -> Result<()> {
+        self.inner.cancel()
+    }
+
+    #[napi(getter)]
+    pub fn metrics(&self) -> StreamMetrics {
+        self.inner.get_metrics()
+    }
+}
+
+// Metrics types with NAPI attributes
+#[napi(object)]
 #[derive(Clone)]
-pub struct MockBandwidthResult {
-    pub duration_seconds: f64,
-    pub total_messages: f64,
-    pub total_bytes: f64,
+pub struct StreamMetrics {
     pub messages_per_sec: f64,
     pub bytes_per_sec: f64,
-    pub bandwidth_mbps: f64,
+    pub total_messages: f64,
+    pub total_bytes: f64,
+    pub avg_latency_ms: f64,
+}
+
+#[napi(object)]
+#[derive(Clone)]
+pub struct GlobalMetrics {
+    pub active_streams: u32,
+    pub total_messages_per_sec: f64,
+    pub total_bytes_per_sec: f64,
+    pub total_messages: f64,
+    pub total_bytes: f64,
 }

@@ -1,4 +1,4 @@
-use bytes::{Bytes, BytesMut};
+use bytes::BytesMut;
 use parking_lot::Mutex;
 use std::collections::VecDeque;
 
