@@ -57,7 +57,7 @@ pub fn subscribe(
                 attempt_request.from_slot = Some(tracked_slot);
             }
 
-            match connect_and_subscribe_once(&config, attempt_request, api_key_string.clone()).await { // Pass String API key
+            match connect_and_subscribe_once(&config, attempt_request, api_key_string.clone()).await {
                 Ok((sender, stream)) => {
 
                     // Box sender and stream here before processing
@@ -92,16 +92,18 @@ pub fn subscribe(
                                 yield update;
                             }
                             Err(status) => {
-                                // status is now tonic::Status due to map_err above
+                                // Pass through the error as-is
                                 warn!(error = %status, "Stream error, attempting reconnection");
+                                break;
                             }
                         }
                     }
                     warn!("Stream ended, preparing to reconnect...");
                 }
                 Err(err) => {
-                    // Error from connect_and_subscribe_once (GeyserGrpcClientError)
-                    warn!(error = %err, "Failed to connect/subscribe, preparing to reconnect...");
+                    // Pass through connection/subscription errors as-is
+                    error!(error = %err, "Failed to connect/subscribe");
+                    Err(LaserstreamError::Status(err))?;
                 }
             }
 
@@ -134,10 +136,10 @@ async fn connect_and_subscribe_once(
     ),
     tonic::Status,
 > {
-    let mut builder = GeyserGrpcClient::build_from_shared(config.endpoint.clone()) // Use endpoint String directly
-        .map_err(|e| tonic::Status::internal(format!("Build client error: {}", e)))?
+    let mut builder = GeyserGrpcClient::build_from_shared(config.endpoint.clone())
+        .map_err(|e| tonic::Status::internal(format!("Failed to build client: {}", e)))?
         .x_token(Some(api_key))
-        .map_err(|e| tonic::Status::internal(format!("Set token error: {}", e)))?
+        .map_err(|e| tonic::Status::unauthenticated(format!("Failed to set API key: {}", e)))?
         .connect_timeout(Duration::from_secs(10))
         .max_decoding_message_size(1_000_000_000)
         .timeout(Duration::from_secs(10))
@@ -145,12 +147,12 @@ async fn connect_and_subscribe_once(
         .map_err(|e| tonic::Status::internal(format!("TLS config error: {}", e)))?
         .connect()
         .await
-        .map_err(|e| tonic::Status::internal(format!("Connect error: {}", e)))?;
+        .map_err(|e| tonic::Status::unavailable(format!("Connection failed: {}", e)))?;
 
     let (sender, stream) = builder
         .subscribe_with_request(Some(request))
         .await
-        .map_err(|e| tonic::Status::internal(format!("Subscribe error: {}", e)))?;
+        .map_err(|e| tonic::Status::internal(format!("Subscription failed: {}", e)))?;
 
     Ok((sender, stream))
 }
