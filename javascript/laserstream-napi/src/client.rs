@@ -34,14 +34,15 @@ impl ClientInner {
             let mut endpoint = Endpoint::from_shared(endpoint)
                 .map_err(|e| Error::new(Status::InvalidArg, format!("Invalid endpoint: {}", e)))?;
 
-            // Configure channel with optimized settings
+            // Configure channel with optimized settings for high throughput
             endpoint = endpoint
                 .http2_keep_alive_interval(Duration::from_secs(30))
                 .keep_alive_timeout(Duration::from_secs(10))
                 .keep_alive_while_idle(true)
                 .http2_adaptive_window(true)
-                .initial_stream_window_size(Some(65 * 1024 * 1024)) // 65MB
-                .initial_connection_window_size(Some(65 * 1024 * 1024)); // 65MB
+                .initial_stream_window_size(Some(256 * 1024 * 1024)) // 256MB - larger window
+                .initial_connection_window_size(Some(256 * 1024 * 1024)) // 256MB
+                .concurrency_limit(4); // Allow multiple concurrent streams
 
             // Add TLS if endpoint is HTTPS
             if endpoint.uri().scheme_str() == Some("https") {
@@ -121,8 +122,10 @@ impl ClientInner {
     ) -> Result<crate::StreamHandle> {
         let stream_id = Uuid::new_v4().to_string();
 
-        // Create gRPC client
-        let mut client = geyser::geyser_client::GeyserClient::new(self.channel.clone());
+        // Create gRPC client with increased message size limits
+        let mut client = geyser::geyser_client::GeyserClient::new(self.channel.clone())
+            .max_decoding_message_size(64 * 1024 * 1024) // 64MB max message size
+            .max_encoding_message_size(64 * 1024 * 1024); // 64MB max message size
 
         // Create a channel to send subscription requests
         let (tx, rx) = tokio::sync::mpsc::channel(1);
@@ -141,6 +144,7 @@ impl ClientInner {
             request.metadata_mut().insert("x-token", auth_value);
         }
 
+        // Configure the request with optimizations
         let response = client
             .subscribe(request)
             .await
@@ -169,4 +173,3 @@ impl ClientInner {
         self.metrics.get_global_metrics(self.streams.len() as u32)
     }
 }
-
