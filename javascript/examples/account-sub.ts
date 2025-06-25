@@ -1,35 +1,41 @@
-import { subscribe, CommitmentLevel, LaserstreamConfig, SubscribeRequest } from '../src';
+import { LaserstreamClient, CommitmentLevel } from '../index';
+import { SubscribeUpdate } from '@triton-one/yellowstone-grpc';
+const config = require('../test-config');
 
 async function main() {
-  const subscriptionRequest = {
-    accounts: {
-        accountSubscribe: {
-            account: [],
-            owner: ["pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA", "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo", "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"],
-            filters: []
-        }
+  console.log('LaserStream Account Subscription Example\n');
+  
+  const client = new LaserstreamClient(
+    config.laserstreamProduction.endpoint,
+    config.laserstreamProduction.apiKey
+  );
+
+  const subscribeRequest = {
+    accounts: { 
+      "pump": {
+        account: ["pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"],
+        owner: [],
+        filters: []
+      }
     },
-    accountsDataSlice: [],
-    commitment: CommitmentLevel.PROCESSED,
-    slots: {},
-    transactions: {},
-    transactionsStatus: {},
-    blocks: {},
-    blocksMeta: {},
-    entry: {}
-};
+    commitment: CommitmentLevel.Processed
+  };
 
-const config = {
-  apiKey: '',
-  endpoint: ''
-}
+  console.log('Starting subscription...');
+  
+  try {
+    const stream = await client.subscribe(subscribeRequest, (error: Error | null, buffer: Buffer) => {
+      if (error) {
+        console.error('Stream error:', error);
+        return;
+      }
 
-  await subscribe(config, subscriptionRequest, async (data) => {
-
-    console.log(data)
-  }, async (error) => {
-    console.error(error);
-  });
-}
+      console.log(buffer);
+    });
+  } catch (error) {
+    console.error('Subscription failed:', error);
+    process.exit(1);
+  }
+} 
 
 main().catch(console.error);

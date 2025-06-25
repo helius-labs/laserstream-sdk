@@ -1,20 +1,16 @@
-import { subscribe, CommitmentLevel, LaserstreamConfig } from '../src';
+import { LaserstreamClient, CommitmentLevel } from '../index';
+import { SubscribeUpdate } from '@triton-one/yellowstone-grpc';
 import Client from '@triton-one/yellowstone-grpc';
-
 import bs58 from 'bs58';
 
-type Seen = { slotA?: string; slotB?: string };
-const seen = new Map<string, Seen>();
+// Load test configuration
+const testConfig = require('../test-config.js');
 
 async function main() {
-
   const PUMP = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA';
 
   // Laserstream stream (under test)
-  const config: LaserstreamConfig = {
-    apiKey: '',
-    endpoint: ''
-  };
+  const client = new LaserstreamClient(testConfig.laserstream.endpoint, testConfig.laserstream.apiKey);
 
 
   const subscriptionRequest: any = {
@@ -27,7 +23,7 @@ async function main() {
         failed: false
       }
     },
-    commitment: CommitmentLevel.CONFIRMED,
+    commitment: CommitmentLevel.Confirmed,
     accounts: {},
     slots: {},
     transactionsStatus: {},
@@ -39,8 +35,8 @@ async function main() {
 
   // Yellowstone node for comparing with Laserstream
   const yellowstoneConfig = {
-    endpoint: '',
-    xToken: ''
+    endpoint: testConfig.yellowstone.endpoint,
+    xToken: testConfig.yellowstone.apiKey
   } as const;
 
 
@@ -104,7 +100,7 @@ async function main() {
     newYS = 0;
   }, INTEGRITY_CHECK_INTERVAL_MS);
 
-  console.log('Starting transaction integrity test…');
+  // Transaction integrity test started
 
   // Helper: narrow update to transaction variant – we work with `any` here to avoid heavy protobuf typings(idk how to do this better)
   function isTransactionUpdate(update: any): update is { transaction: any } {
@@ -139,14 +135,26 @@ async function main() {
 
   // ---------- helper to start a stream ----------
   const startLaserstreamStream = async (
-    cfg: LaserstreamConfig,
+    client: LaserstreamClient,
     onSig: (sig: string) => void,
     label: string
-  ) => {
-    await subscribe(
-      cfg,
-      subscriptionRequest,
-      (u) => {
+  ): Promise<{ client: any; streamHandle: any }> => {
+    // Create client with endpoint and token
+
+    // Subscribe with request and callback for raw protobuf buffer
+    const streamHandle = await client.subscribe(subscriptionRequest, (error: Error | null, rawBuffer: Buffer) => {
+      if (error) {
+        console.error('🚨 LASERSTREAM ERROR:', error.message);
+        console.error('   Error type:', error.name);
+        console.error('   Full error:', error);
+        errLS += 1;
+        return;
+      }
+      
+      try {
+        // Decode the raw protobuf buffer
+        const u = SubscribeUpdate.decode(rawBuffer);
+
         const {sig, slot} = extractSigAndSlot(u);
         if (!sig || !slot) return;
         onSig(sig);
@@ -162,16 +170,18 @@ async function main() {
         entry.slotLS = slot ?? 'unknown';
         statusMap.set(sig, entry);
         maybePrint(sig);
-      },
-      (err) => {
+      } catch (decodeError) {
+        console.error('Failed to decode Laserstream protobuf:', decodeError);
         errLS += 1;
-        console.error(`${label} error:`, err);
       }
-    );
+    });
+
+    // Return both client and stream handle to keep them alive
+    return { client, streamHandle };
   };
 
   // Reference stream using raw Yellowstone gRPC client
-  const startYellowstoneStream = async () => {
+  const startYellowstoneStream = async (): Promise<{ client: any; stream: any }> => {
     const client = new Client(yellowstoneConfig.endpoint, yellowstoneConfig.xToken, {
       "grpc.max_receive_message_length": 64 * 1024 * 1024,
     });
@@ -207,16 +217,42 @@ async function main() {
 
     stream.on('error', (e: Error) => { errYS += 1; console.error('YELLOWSTONE stream error:', e); });
     stream.on('end', () => { errYS += 1; console.error('YELLOWSTONE stream ended'); });
+
+    // Return both client and stream to keep them alive
+    return { client, stream };
   };
 
+  // Global variables to keep streams alive
+  let laserstreamClient: any = null;
+  let laserstreamStream: any = null;
+  let yellowstoneClient: any = null;
+  let yellowstoneStream: any = null;
+
   // Start both streams concurrently
-  await Promise.all([
-    startLaserstreamStream(config, (sig) => {
+  const [laserstreamConnection, yellowstoneConnection] = await Promise.all([
+    startLaserstreamStream(client, (sig) => {
       gotLS.add(sig);
       newLS += 1;
     }, 'LASERSTREAM'),
     startYellowstoneStream(),
   ]);
+
+  // Store references globally to prevent garbage collection
+  laserstreamClient = laserstreamConnection.client;
+  laserstreamStream = laserstreamConnection.streamHandle;
+  yellowstoneClient = yellowstoneConnection.client;
+  yellowstoneStream = yellowstoneConnection.stream;
+
+  // Cleanup on exit
+  process.on('SIGINT', () => {
+    if (laserstreamStream && typeof laserstreamStream.cancel === 'function') {
+      laserstreamStream.cancel();
+    }
+    if (yellowstoneStream && typeof yellowstoneStream.end === 'function') {
+      yellowstoneStream.end();
+    }
+    process.exit(0);
+  });
 
   // Keep the script alive indefinitely so we can continue to receive updates.
   await new Promise(() => {});

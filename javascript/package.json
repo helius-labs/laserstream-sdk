@@ -1,14 +1,20 @@
 {
   "name": "helius-laserstream",
   "version": "0.0.7",
-  "description": "TypeScript client for LaserStream gRPC with robust reconnection and slot tracking",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "description": "High-performance Solana gRPC streaming client using Rust NAPI bindings with enhanced features",
+  "main": "index.js",
+  "types": "index.d.ts",
   "scripts": {
-    "build": "tsc",
-    "example:basic": "ts-node examples/basic-usage.ts",
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "build:ts": "tsc",
     "example:account-sub": "ts-node examples/account-sub.ts",
-    "lint": "eslint src/**/*.ts",
+    "example:slot-sub": "ts-node examples/slot-sub.ts",
+    "example:transaction-sub": "ts-node examples/transaction-sub.ts",
+    "example:transaction-status-sub": "ts-node examples/transaction-status-sub.ts",
+    "example:block-sub": "ts-node examples/block-sub.ts",
+    "example:block-meta-sub": "ts-node examples/block-meta-sub.ts",
+    "example:entry-sub": "ts-node examples/entry-sub.ts",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -16,8 +22,7 @@
     "laserstream",
     "yellowstone",
     "grpc",
-    "blockchain",
-    "helius"
+    "blockchain"
   ],
   "author": "Helius",
   "license": "MIT",
@@ -30,22 +35,37 @@
   },
   "homepage": "https://github.com/helius-labs/laserstream/tree/main/javascript#readme",
   "files": [
-    "dist",
+    "index.js",
+    "index.d.ts", 
+    "laserstream-napi.*.node",
+    "examples/",
     "README.md"
   ],
+  "napi": {
+    "name": "laserstream-napi",
+    "triples": {
+      "defaults": true,
+      "additional": [
+        "x86_64-pc-windows-msvc",
+        "aarch64-apple-darwin",
+        "x86_64-unknown-linux-gnu",
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
+  },
   "dependencies": {
+    "@solana/web3.js": "^1.98.2",
     "@triton-one/yellowstone-grpc": "^4.0.0",
-    "bs58": "^5.0.0",
-    "node-fetch": "^3.3.2",
-    "uuid": "^9.0.0"
+    "@triton-one/yellowstone-grpc-proto": "^4.0.0",
+    "bs58": "^5.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20.4.5",
+    "@napi-rs/cli": "^2.18.4",
     "@types/bs58": "^5.0.0",
+    "@types/node": "^20.0.0",
     "@types/node-fetch": "^2.6.12",
-    "@types/uuid": "^9.0.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.1.6"
+    "typescript": "^5.0.0"
   },
   "jest": {
     "preset": "ts-jest",

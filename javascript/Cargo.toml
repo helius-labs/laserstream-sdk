@@ -1,0 +1,36 @@
+[package]
+name = "laserstream-napi"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+path = "napi-src/lib.rs"
+
+[dependencies]
+napi = { version = "2", features = ["async", "tokio_rt", "serde-json"] }
+napi-derive = "2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+base64 = "0.21"
+tokio = { version = "1", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+tonic = { version = "0.11", features = ["transport", "tls"] }
+bytes = "1"
+futures = "0.3"
+futures-util = "0.3"
+parking_lot = "0.12"
+uuid = { version = "1", features = ["v4"] }
+yellowstone-grpc-client = "6.1.0"
+yellowstone-grpc-proto = "6.1.0"
+fastrand = "2.0"
+
+[build-dependencies]
+napi-build = "2"
+
+[profile.release]
+lto = true
+opt-level = 3
+
+[package.metadata.napi]
+name = "laserstream-napi"

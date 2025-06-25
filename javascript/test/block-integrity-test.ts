@@ -1,19 +1,27 @@
-import { subscribe, CommitmentLevel, LaserstreamConfig, SubscribeRequest } from '../src';
+import { LaserstreamClient, CommitmentLevel } from '../index';
+import { SubscribeUpdate } from '@triton-one/yellowstone-grpc';
 import fetch from 'node-fetch';
+
+// Load test configuration
+const testConfig = require('../test-config.js');
+
+interface LaserstreamConfig {
+  apiKey: string;
+  endpoint: string;
+  maxReconnectAttempts?: number;
+}
 
 async function main() {
   // Configuration for the Laserstream service
   const config: LaserstreamConfig = {
-    apiKey: '', // Replace with your actual API key if needed
-    endpoint: '' // Replace with the appropriate endpoint
+    apiKey: testConfig.laserstream.apiKey,
+    endpoint: testConfig.laserstream.endpoint
   };
 
-  // Subscription request for blocks
-  // We will leave accounts, transactions etc. empty as we are only interested in blocks.
-  const subscriptionRequest: SubscribeRequest = {
+  const subscriptionRequest: any = {
     accounts: {},
     accountsDataSlice: [],
-    commitment: CommitmentLevel.CONFIRMED,
+    commitment: CommitmentLevel.Processed, 
     slots: {
         slotSubscribe: {
             filterByCommitment: true,
@@ -27,10 +35,15 @@ async function main() {
     entry: {}
   };
 
-  // Track last seen slot number to check ordering
+  // Track reconnection behavior
   let lastSlotNumber: number | null = null;
+  let highestSlotSeen: number | null = null;  // Track the highest slot we've seen
+  let reconnectionCount = 0;
+  let lastConnectionTime = Date.now();
+  let totalMessages = 0;
+  let errCount = 0;
 
-  const rpcEndpoint = 'https://mainnet.helius-rpc.com';
+  const rpcEndpoint = testConfig.blockRpc.endpoint;
 
   async function blockExists(slot: number): Promise<boolean> {
     const body = {
@@ -49,7 +62,7 @@ async function main() {
     };
 
     try {
-      const resp = await fetch(`${rpcEndpoint}?api-key=${config.apiKey}`, {
+      const resp = await fetch(`${rpcEndpoint}?api-key=${testConfig.blockRpc.apiKey}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -57,6 +70,7 @@ async function main() {
         },
         body: JSON.stringify(body)
       });
+
       const json: any = await resp.json();
       if (json.error && json.error.code === -32007) {
         // Slot was skipped – no block expected
@@ -69,48 +83,111 @@ async function main() {
     }
   }
 
-  console.log("Starting block integrity test. Subscribing to slots...");
+  // Global variables to keep streams alive
+  let laserstreamClient: any = null;
+  let laserstreamStream: any = null;
 
-  await subscribe(config, subscriptionRequest, async (data) => {
-    if (data.slot) {
-       const currentSlotInfo = data.slot;
-       const currentSlotNumber = Number(currentSlotInfo.slot);
+  // Create client with endpoint and token
+  const client = new LaserstreamClient(config.endpoint, config.apiKey);
 
-       if (!isNaN(currentSlotNumber)) {
-         if (lastSlotNumber !== null && currentSlotNumber !== lastSlotNumber + 1) {
-           // Iterate through each gap slot and verify if a block exists
-           for (let missing = lastSlotNumber + 1; missing < currentSlotNumber; missing++) {
-             const exists = await blockExists(missing);
-             if (exists) {
-               console.error(`ERROR: Missed slot ${missing} – block exists but was not received.`);
-             } else {
-               process.stdout.write(`Skipped slot ${missing} (no block produced)\n`);
-             }
-           }
-         }
-
-         process.stdout.write(`Received slot: ${currentSlotNumber}\n`);
-         lastSlotNumber = currentSlotNumber;
-       } else {
-         console.warn("Received slot update, but slot number is undefined.", currentSlotInfo);
-       }
-    } else {
-      // Handle other update types (ping, pong, etc.) if needed.
-      // For now, we ignore them.
+  // Subscribe with request and callback for raw protobuf buffer
+  const streamHandle = await client.subscribe(subscriptionRequest, async (error: Error | null, rawBuffer: Buffer) => {
+    if (error) {
+      console.error('🚨 LASERSTREAM ERROR:', error.message);
+      errCount += 1;
+      reconnectionCount += 1;
+      lastConnectionTime = Date.now();
+      return;
     }
-  }, async (error) => {
-    console.error("Subscription error:", error);
-    // Potentially attempt to reconnect or handle the error appropriately.
+    
+    try {
+      totalMessages++;
+      const currentTime = Date.now();
+      
+      // Detect potential reconnection (gap in messages > 10 seconds)
+      if (currentTime - lastConnectionTime > 10000) {
+        reconnectionCount++;
+      }
+      lastConnectionTime = currentTime;
+
+      // Decode the raw protobuf buffer
+      const data = SubscribeUpdate.decode(rawBuffer);
+
+      if (data.slot) {
+         const currentSlotInfo = data.slot;
+         const currentSlotNumber = Number(currentSlotInfo.slot);
+
+         if (!isNaN(currentSlotNumber)) {
+           // Check if this is a new highest slot (only check gaps for new highs)
+           if (highestSlotSeen === null || currentSlotNumber > highestSlotSeen) {
+             // We have a new highest slot - check for gaps from previous highest
+             if (highestSlotSeen !== null && currentSlotNumber > highestSlotSeen + 1) {
+               const gapSize = currentSlotNumber - highestSlotSeen - 1;
+               
+               // Large gap might indicate reconnection
+               if (gapSize > 20) {
+                 console.log(`🚨 LARGE SLOT GAP: ${gapSize} slots (${highestSlotSeen} → ${currentSlotNumber})`);
+               }
+               
+               // Iterate through each gap slot and verify if a block exists
+               for (let missing = highestSlotSeen + 1; missing < currentSlotNumber; missing++) {
+                 const exists = await blockExists(missing);
+                 if (exists) {
+                   console.error(`❌ ERROR: Missed slot ${missing} – block exists but was not received.`);
+                 } else {
+                   // Only log every 10th skipped slot to reduce noise
+                   if (missing % 10 === 0) {
+                     process.stdout.write(`⏭️  Skipped slot ${missing} (no block produced)\n`);
+                   }
+                 }
+               }
+             }
+             
+             // Update highest slot seen
+             highestSlotSeen = currentSlotNumber;
+           } else if (currentSlotNumber < (highestSlotSeen || 0)) {
+             // This is an out-of-order slot (older than highest seen)
+           }
+           
+           lastSlotNumber = currentSlotNumber;
+         } else {
+           console.warn("⚠️  Received slot update, but slot number is undefined.", currentSlotInfo);
+         }
+      } else {
+        // Handle other update types (ping, pong, etc.) if needed.
+        // For now, we ignore them but count the messages
+      }
+    } catch (decodeError) {
+      console.error("💥 Decode error:", decodeError);
+      reconnectionCount++;
+    }
   });
 
-  console.log("Subscription started. Waiting for slots...");
-  // Keep the script running to receive slots.
-  // In a real test, you might have a timeout or a certain number of slots to receive.
-  // For this simple script, it will run indefinitely until manually stopped.
-  await new Promise(() => {}); // Keep alive
+  // Store references globally to prevent garbage collection
+  laserstreamClient = client;
+  laserstreamStream = streamHandle;
+
+  // Cleanup on exit
+  process.on('SIGINT', () => {
+    if (laserstreamStream && typeof laserstreamStream.cancel === 'function') {
+      laserstreamStream.cancel();
+    }
+    process.exit(0);
+  });
+
+  // Block integrity test started
+  
+  // Print periodic status
+  setInterval(() => {
+    const now = new Date().toISOString();
+    console.log(`[${now}] 📊 Status: Last slot: ${lastSlotNumber} | Highest slot: ${highestSlotSeen} | Reconnections: ${reconnectionCount} | Total messages: ${totalMessages}`);
+  }, 30000); // Every 30 seconds
+
+  // Keep alive
+  await new Promise(() => {}); 
 }
 
 main().catch(error => {
-  console.error("Unhandled error in main:", error);
-  process.exit(1); // Exit with an error code
+  console.error("💥 Unhandled error in main:", error);
+  process.exit(1); 
 }); 

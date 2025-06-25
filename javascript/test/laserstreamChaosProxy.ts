@@ -1,12 +1,14 @@
 import net from 'net';
 import { randomInt } from 'crypto';
 
-/* dial the proxy in your test script */
-const LOCAL_PORT  = 4003;
+// Load test configuration
+const testConfig = require('../test-config.js');
 
-/* real plaintext Laserstream edge */
-const REMOTE_HOST = '';
-const REMOTE_PORT = 4001;
+/* dial the proxy in your test script */
+const LOCAL_PORT = testConfig.localProxyPort;
+
+const REMOTE_HOST = testConfig.proxy.endpoint;
+const REMOTE_PORT = testConfig.proxy.port;
 
 /* online / offline windows */
 const MIN_UP  = 20_000, MAX_UP  = 60_000;
