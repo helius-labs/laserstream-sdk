@@ -149,16 +149,24 @@ impl StreamInner {
                     if let Some(geyser::subscribe_update::UpdateOneof::Slot(slot)) = &message.update_oneof {
                         tracked_slot.store(slot.slot, Ordering::SeqCst);
                         
-                        // Check if this slot update is from our internal subscription
-                        // Internal slot messages will have the internal filter ID in their filters array
-                        if message.filters.contains(&internal_slot_sub_id) {
+                        // Check if this slot update is EXCLUSIVELY from our internal subscription
+                        // Only skip if the message contains ONLY the internal filter ID (not mixed with user subscriptions)
+                        if message.filters.len() == 1 && message.filters.contains(&internal_slot_sub_id) {
                             continue; // Skip forwarding this message
                         }
+                        
+                        // For slot messages that reach here, clean up internal filter ID if present
+                        // (since we know user has slot subscriptions if we reach this point)
+                        let mut clean_message = message;
+                        clean_message.filters.retain(|filter_id| filter_id != &internal_slot_sub_id);
+                        
+                        let wrapper = crate::SubscribeUpdateWrapper(clean_message);
+                        let _ = ts_callback.call(Ok(wrapper), ThreadsafeFunctionCallMode::NonBlocking);
+                    } else {
+                        // For non-slot messages, forward as-is (no internal filter cleanup needed)
+                        let wrapper = crate::SubscribeUpdateWrapper(message);
+                        let _ = ts_callback.call(Ok(wrapper), ThreadsafeFunctionCallMode::NonBlocking);
                     }
-                    
-                    // Forward message to user (internal messages already filtered out above)
-                    let wrapper = crate::SubscribeUpdateWrapper(message);
-                    let _ = ts_callback.call(Ok(wrapper), ThreadsafeFunctionCallMode::NonBlocking);
                 }
                 Err(e) => {
                     return Err(Box::new(e));
