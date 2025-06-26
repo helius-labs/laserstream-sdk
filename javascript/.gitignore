@@ -2,3 +2,50 @@ node_modules/
 dist/
 tests/
 package-lock.json
+target/
+test-config.js
+
+# Build outputs
+*.node
+build/
+out/
+
+# Development files
+.env
+.env.local
+.env.*.local
+*.log
+logs/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+Thumbs.db
+
+# Test artifacts
+coverage/
+.nyc_output/
+junit.xml
+*.tgz
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Configuration overrides
+*config.local.*
+test-config.local.js
