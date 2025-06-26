@@ -56,8 +56,9 @@ function calculateMetrics(messages: Map<string, TimingData>, durationSeconds: nu
     : 0;
   const standardDeviation = Math.sqrt(variance);
   
-  const laserstreamWins = timingDifferences.filter(diff => diff < 0).length;
-  const yellowstoneWins = timingDifferences.filter(diff => diff > 0).length;
+  // If timeDifference > 0, then yellowstoneTime > laserstreamTime, so Laserstream was faster
+  const laserstreamWins = timingDifferences.filter(diff => diff > 0).length;
+  const yellowstoneWins = timingDifferences.filter(diff => diff < 0).length;
   
   return {
     laserstreamMessages: allMessages.filter(m => m.laserstreamTime).length,
@@ -254,7 +255,7 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
     console.log(`🔍 LS-only: ${lsOnlyMessages} | YS-only: ${ysOnlyMessages} | Share rate: ${shareRate.toFixed(1)}%`);
     
     if (metrics.sharedMessages > 0) {
-      console.log(`⚡ Avg timing diff: ${metrics.averageTimeDiff.toFixed(2)}ms ${metrics.averageTimeDiff < 0 ? '(LS faster)' : '(YS faster)'}`);
+      console.log(`⚡ Avg timing diff: ${metrics.averageTimeDiff.toFixed(2)}ms ${metrics.averageTimeDiff > 0 ? '(LS faster)' : '(YS faster)'}`);
       console.log(`🏆 Win rate: LS ${(metrics.laserstreamWins/metrics.sharedMessages*100).toFixed(1)}% vs YS ${(metrics.yellowstoneWins/metrics.sharedMessages*100).toFixed(1)}%`);
     }
   }, 15000); // Less frequent updates to reduce noise
@@ -334,7 +335,8 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
     if (metrics.sharedMessages > 10) { // Require minimum sample size
       console.log('⚡ TIMING ANALYSIS (CORE METRIC):');
       console.log(`📊 Sample size: ${metrics.sharedMessages.toLocaleString()} shared messages`);
-      console.log(`📊 Average difference: ${metrics.averageTimeDiff.toFixed(3)}ms ${metrics.averageTimeDiff < 0 ? '(🟦 LS faster)' : '(🟨 YS faster)'}`);
+      // CORRECTED: If averageTimeDiff > 0, then yellowstoneTime > laserstreamTime on average, so LS is faster
+      console.log(`📊 Average difference: ${metrics.averageTimeDiff.toFixed(3)}ms ${metrics.averageTimeDiff > 0 ? '(🟦 LS faster)' : '(🟨 YS faster)'}`);
       console.log(`📊 Median difference: ${metrics.medianTimeDiff.toFixed(3)}ms`);
       console.log(`📊 Standard deviation: ${metrics.standardDeviation.toFixed(3)}ms`);
       
@@ -369,7 +371,7 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
       console.log(`📊 Sample size adequacy: ${metrics.sharedMessages >= 100 ? '✅ Good' : '⚠️ Small'} (${metrics.sharedMessages} samples)`);
       
       if (Math.abs(metrics.averageTimeDiff) > marginOfError && metrics.sharedMessages >= 30) {
-        const fasterClient = metrics.averageTimeDiff < 0 ? 'Laserstream' : 'Yellowstone';
+        const fasterClient = metrics.averageTimeDiff > 0 ? 'Laserstream' : 'Yellowstone';
         const advantage = Math.abs(metrics.averageTimeDiff).toFixed(3);
         console.log(`✅ STATISTICALLY SIGNIFICANT: ${fasterClient} is ${advantage}ms faster on average`);
       } else {
@@ -393,17 +395,17 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
         console.log('🤝 PERFORMANCE TIE - Both clients perform similarly');
         console.log(`   Win rates within 5% (${Math.abs(lsWinRate - ysWinRate).toFixed(1)}% difference)`);
         console.log(`   Average timing difference within margin of error`);
-      } else if (lsWinRate > ysWinRate && metrics.averageTimeDiff < -marginOfError) {
+      } else if (lsWinRate > ysWinRate && metrics.averageTimeDiff > marginOfError) {
         console.log(`🥇 LASERSTREAM WINS! (${lsWinRate.toFixed(1)}% vs ${ysWinRate.toFixed(1)}%)`);
         console.log(`   Average advantage: ${Math.abs(metrics.averageTimeDiff).toFixed(3)}ms faster`);
         console.log(`   Throughput advantage: ${((metrics.laserstreamThroughput / metrics.yellowstoneThroughput - 1) * 100).toFixed(1)}%`);
-      } else if (ysWinRate > lsWinRate && metrics.averageTimeDiff > marginOfError) {
+      } else if (ysWinRate > lsWinRate && metrics.averageTimeDiff < -marginOfError) {
         console.log(`🥇 YELLOWSTONE WINS! (${ysWinRate.toFixed(1)}% vs ${lsWinRate.toFixed(1)}%)`);
         console.log(`   Average advantage: ${Math.abs(metrics.averageTimeDiff).toFixed(3)}ms faster`);
       } else {
         console.log('🤔 MIXED RESULTS - Conflicting metrics detected');
         console.log(`   Win rates favor: ${lsWinRate > ysWinRate ? 'Laserstream' : 'Yellowstone'}`);
-        console.log(`   Average timing favors: ${metrics.averageTimeDiff < 0 ? 'Laserstream' : 'Yellowstone'}`);
+        console.log(`   Average timing favors: ${metrics.averageTimeDiff > 0 ? 'Laserstream' : 'Yellowstone'}`);
         console.log('💡 Consider longer test duration for clearer results');
       }
     } else {
