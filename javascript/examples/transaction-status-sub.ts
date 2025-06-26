@@ -25,7 +25,6 @@ async function main() {
   console.log('Starting subscription...');
   
   try {
-    // Just subscribe - lifecycle management is handled automatically!
     const stream = await client.subscribe(subscribeRequest, (error: Error | null, update: SubscribeUpdate) => {
       if (error) {
         console.error('Stream error:', error);

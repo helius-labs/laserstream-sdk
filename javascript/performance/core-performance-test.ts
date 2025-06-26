@@ -76,8 +76,8 @@ function calculateMetrics(messages: Map<string, TimingData>, durationSeconds: nu
 }
 
 async function runCorePerformanceTest(testDurationSeconds: number = 60) {
-  console.log('🎯 CORE PERFORMANCE TEST - Laserstream vs Yellowstone (FIXED VERSION)');
-  console.log(`Duration: ${testDurationSeconds}s | Focus: Fair timing comparison for shared messages\n`);
+  console.log('🎯 CORE PERFORMANCE TEST - Laserstream vs Yellowstone (CORRECTED VERSION)');
+  console.log(`Duration: ${testDurationSeconds}s | Focus: Fair comparison with identical configurations\n`);
 
   // Simplified high-volume programs for consistent results
   const PROGRAMS = [
@@ -94,11 +94,14 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
     failed: false
   };
 
+  // Use IDENTICAL requests for both clients
+  const COMMITMENT_LEVEL = 1; // Confirmed
+  
   const subscriptionRequest = {
     transactions: {
       test: commonSubscriptionConfig
     },
-    commitment: CommitmentLevel.Confirmed,
+    commitment: COMMITMENT_LEVEL,
     accounts: {},
     slots: {},
     transactionsStatus: {},
@@ -112,7 +115,7 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
     transactions: {
       test: commonSubscriptionConfig
     },
-    commitment: 1, // Confirmed (same as CommitmentLevel.Confirmed)
+    commitment: COMMITMENT_LEVEL, // IDENTICAL to Laserstream
     accounts: {},
     slots: {},
     transactionsStatus: {},
@@ -124,7 +127,7 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
 
   const messages = new Map<string, TimingData>();
   const startTime = Date.now();
-  let connectionDelayMs = 0; // Track connection time difference
+  let connectionDelayMs = 0; // Track connection time difference for reporting only
 
   function extractSignature(update: any): { sig: string | null; slot: string | null } {
     try {
@@ -137,8 +140,14 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
     }
   }
 
+  // Use shared timing baseline for fair comparison
+  const timingBaseline = performance.now();
+
   // Start Laserstream
   console.log('🟦 Starting Laserstream...');
+  console.log(`🔧 Using SAME endpoint: ${testConfig.laserstreamProduction.endpoint}`);
+  console.log(`🔧 Using SAME commitment: ${COMMITMENT_LEVEL} (Confirmed)`);
+  
   const laserstreamStartTime = performance.now();
   const laserstreamClient = new LaserstreamClient(
     testConfig.laserstreamProduction.endpoint,
@@ -156,8 +165,8 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
       const { sig, slot } = extractSignature(update);
       if (!sig) return;
 
-      // Use high-precision timing adjusted for connection delay
-      const now = performance.now() - connectionDelayMs;
+      // Use consistent timing baseline for both clients
+      const now = performance.now() - timingBaseline;
       
       let message = messages.get(sig);
       if (!message) {
@@ -180,10 +189,10 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
     }
   );
   
-  // Start Yellowstone with timing adjustment
+  // Start Yellowstone
   console.log('🟨 Starting Yellowstone...');
   const yellowstoneStartTime = performance.now();
-  connectionDelayMs = yellowstoneStartTime - laserstreamStartTime; // Adjust for start time difference
+  connectionDelayMs = yellowstoneStartTime - laserstreamStartTime; // For reporting only
   
   const yellowstoneClient = new Client(testConfig.laserstreamProduction.endpoint, testConfig.laserstreamProduction.apiKey, {
     "grpc.max_receive_message_length": 64 * 1024 * 1024,
@@ -201,8 +210,8 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
     const { sig, slot } = extractSignature(update);
     if (!sig) return;
 
-    // Use high-precision timing
-    const now = performance.now();
+    // Use SAME timing baseline as Laserstream for fair comparison
+    const now = performance.now() - timingBaseline;
     
     let message = messages.get(sig);
     if (!message) {
@@ -266,10 +275,17 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
     const elapsed = (Date.now() - startTime) / 1000;
     const metrics = calculateMetrics(messages, elapsed);
 
-    console.log('\n\n🏁 FINAL PERFORMANCE REPORT (ENHANCED)');
+    console.log('\n\n🏁 FINAL PERFORMANCE REPORT (CORRECTED)');
     console.log('═'.repeat(60));
     console.log(`⏱️  Test Duration: ${elapsed.toFixed(1)}s`);
-    console.log(`🔧 Connection Delay Adjustment: ${connectionDelayMs.toFixed(1)}ms`);
+    console.log(`🔧 Connection Start Delay: ${connectionDelayMs.toFixed(1)}ms (reporting only)`);
+    console.log();
+    
+    console.log('⚙️  TEST CONFIGURATION:');
+    console.log(`🟦 Laserstream Endpoint: ${testConfig.laserstreamProduction.endpoint}`);
+    console.log(`🟨 Yellowstone Endpoint: ${testConfig.laserstreamProduction.endpoint} (SAME)`);
+    console.log(`📡 Commitment Level: ${COMMITMENT_LEVEL} (Confirmed) for BOTH clients`);
+    console.log(`🕒 Timing Baseline: Shared baseline for fair comparison`);
     console.log();
 
     // Message Counts with Enhanced Analysis
@@ -407,10 +423,10 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
     process.exit(0);
   }
 
-  console.log('✅ Both clients connected! Starting enhanced performance measurement...');
+  console.log('✅ Both clients connected! Starting FAIR performance measurement...');
   console.log(`⏱️  Test will run for ${testDurationSeconds} seconds`);
-  console.log('🎯 Focus: Fair timing comparison with enhanced diagnostics');
-  console.log('🔧 Improvements: Connection delay adjustment, noise reduction, better statistics');
+  console.log('🎯 Focus: Fair timing comparison with identical configurations');
+  console.log('🔧 Fixes: Same endpoints, same commitment, same timing baseline');
   console.log('⏹️  Press Ctrl+C to stop early\n');
 
   // Keep running

@@ -50,6 +50,7 @@ pub struct JsAccountFilter {
     pub account: Option<Vec<String>>,
     pub owner: Option<Vec<String>>,
     pub filters: Option<Vec<JsAccountsFilter>>,
+    #[serde(alias = "nonemptyTxnSignature")]
     pub nonempty_txn_signature: Option<bool>,
 }
 
@@ -57,6 +58,7 @@ pub struct JsAccountFilter {
 pub struct JsAccountsFilter {
     pub memcmp: Option<JsMemcmpFilter>,
     pub datasize: Option<u64>,
+    #[serde(alias = "tokenAccountState")]
     pub token_account_state: Option<bool>,
     pub lamports: Option<JsLamportsFilter>,
 }
@@ -79,7 +81,9 @@ pub struct JsLamportsFilter {
 
 #[derive(Deserialize, Debug)]
 pub struct JsSlotFilter {
+    #[serde(alias = "filterByCommitment")]
     pub filter_by_commitment: Option<bool>,
+    #[serde(alias = "interslotUpdates")]
     pub interslot_updates: Option<bool>,
 }
 
@@ -88,16 +92,23 @@ pub struct JsTransactionFilter {
     pub vote: Option<bool>,
     pub failed: Option<bool>,
     pub signature: Option<String>,
+    #[serde(alias = "accountInclude")]
     pub account_include: Option<Vec<String>>,
+    #[serde(alias = "accountExclude")]
     pub account_exclude: Option<Vec<String>>,
+    #[serde(alias = "accountRequired")]
     pub account_required: Option<Vec<String>>,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct JsBlockFilter {
+    #[serde(alias = "accountInclude")]
     pub account_include: Option<Vec<String>>,
+    #[serde(alias = "includeTransactions")]
     pub include_transactions: Option<bool>,
+    #[serde(alias = "includeAccounts")]
     pub include_accounts: Option<bool>,
+    #[serde(alias = "includeEntries")]
     pub include_entries: Option<bool>,
 }
 
