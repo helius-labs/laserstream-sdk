@@ -42,6 +42,7 @@ impl StreamInner {
             ..Default::default()
         });
 
+        let id_for_cleanup = id.clone();
         tokio::spawn(async move {
             let mut current_request = initial_request;
             let mut reconnect_attempts = 0;
@@ -100,8 +101,6 @@ impl StreamInner {
                             };
                             
                             current_request.from_slot = Some(from_slot);
-                            println!("[Stream {}] Reconnecting from slot {} (commitment: {}, tracked: {})", 
-                                     id_clone, from_slot, commitment_level, last_tracked_slot);
                         }
 
                         // Fixed interval delay between reconnections
@@ -109,6 +108,9 @@ impl StreamInner {
                     }
                 }
             }
+            
+            // Unregister from global registry when stream ends
+            crate::unregister_stream(&id_for_cleanup);
         });
 
         Ok(Self {

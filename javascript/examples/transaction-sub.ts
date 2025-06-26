@@ -33,6 +33,8 @@ async function main() {
 
       console.log(update);
     });
+    
+    console.log(`✅ Transaction subscription started (${stream.id})! Press Ctrl+C to exit.`);
   } catch (error) {
     console.error('Subscription failed:', error);
     process.exit(1);

@@ -31,13 +31,17 @@ pub struct JsSubscribeRequest {
     pub accounts: Option<HashMap<String, JsAccountFilter>>,
     pub slots: Option<HashMap<String, JsSlotFilter>>,
     pub transactions: Option<HashMap<String, JsTransactionFilter>>,
+    #[serde(alias = "transactionsStatus")]
     pub transactions_status: Option<HashMap<String, JsTransactionFilter>>,
     pub blocks: Option<HashMap<String, JsBlockFilter>>,
+    #[serde(alias = "blocksMeta")]
     pub blocks_meta: Option<HashMap<String, JsBlockMetaFilter>>,
     pub entry: Option<HashMap<String, JsEntryFilter>>,
     pub commitment: Option<i32>,
+    #[serde(alias = "accountsDataSlice")]
     pub accounts_data_slice: Option<Vec<JsAccountsDataSlice>>,
     pub ping: Option<JsPing>,
+    #[serde(alias = "fromSlot")]
     pub from_slot: Option<u64>,
 }
 
@@ -373,6 +377,9 @@ impl ClientInner {
             ts_callback,
             self.max_reconnect_attempts,
         )?);
+
+        // Register stream in global registry for lifecycle management
+        crate::register_stream(stream_id.clone(), stream_inner.clone());
 
         Ok(crate::StreamHandle {
             id: stream_id,

@@ -19,6 +19,7 @@ async function main() {
   console.log('Starting subscription...');
   
   try {
+    // Just subscribe - lifecycle management is handled automatically!
     const stream = await client.subscribe(subscribeRequest, (error: Error | null, update: SubscribeUpdate) => {
       if (error) {
         console.error('Stream error:', error);
@@ -27,6 +28,8 @@ async function main() {
 
       console.log(update);
     });
+    
+    console.log(`✅ Entry subscription started (${stream.id})! Press Ctrl+C to exit.`);
   } catch (error) {
     console.error('Subscription failed:', error);
     process.exit(1);

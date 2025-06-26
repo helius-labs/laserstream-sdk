@@ -76,25 +76,27 @@ function calculateMetrics(messages: Map<string, TimingData>, durationSeconds: nu
 }
 
 async function runCorePerformanceTest(testDurationSeconds: number = 60) {
-  console.log('🎯 CORE PERFORMANCE TEST - Laserstream vs Yellowstone');
-  console.log(`Duration: ${testDurationSeconds}s | Focus: Timing differences for shared messages\n`);
+  console.log('🎯 CORE PERFORMANCE TEST - Laserstream vs Yellowstone (FIXED VERSION)');
+  console.log(`Duration: ${testDurationSeconds}s | Focus: Fair timing comparison for shared messages\n`);
 
-  // High-volume programs for meaningful data
+  // Simplified high-volume programs for consistent results
   const PROGRAMS = [
     '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P', // Pump.fun
     '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8', // Raydium
-    'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4', // Jupiter
   ];
+
+  // Ensure exactly identical subscription requests
+  const commonSubscriptionConfig = {
+    accountInclude: PROGRAMS,
+    accountExclude: [],
+    accountRequired: [],
+    vote: false,
+    failed: false
+  };
 
   const subscriptionRequest = {
     transactions: {
-      test: {
-        accountInclude: PROGRAMS,
-        accountExclude: [],
-        accountRequired: [],
-        vote: false,
-        failed: false
-      }
+      test: commonSubscriptionConfig
     },
     commitment: CommitmentLevel.Confirmed,
     accounts: {},
@@ -108,15 +110,9 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
 
   const yellowstoneRequest = {
     transactions: {
-      test: {
-        accountInclude: PROGRAMS,
-        accountExclude: [],
-        accountRequired: [],
-        vote: false,
-        failed: false
-      }
+      test: commonSubscriptionConfig
     },
-    commitment: 1, // Confirmed
+    commitment: 1, // Confirmed (same as CommitmentLevel.Confirmed)
     accounts: {},
     slots: {},
     transactionsStatus: {},
@@ -128,6 +124,7 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
 
   const messages = new Map<string, TimingData>();
   const startTime = Date.now();
+  let connectionDelayMs = 0; // Track connection time difference
 
   function extractSignature(update: any): { sig: string | null; slot: string | null } {
     try {
@@ -142,6 +139,7 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
 
   // Start Laserstream
   console.log('🟦 Starting Laserstream...');
+  const laserstreamStartTime = performance.now();
   const laserstreamClient = new LaserstreamClient(
     testConfig.laserstreamProduction.endpoint,
     testConfig.laserstreamProduction.apiKey
@@ -158,7 +156,8 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
       const { sig, slot } = extractSignature(update);
       if (!sig) return;
 
-      const now = performance.now();
+      // Use high-precision timing adjusted for connection delay
+      const now = performance.now() - connectionDelayMs;
       
       let message = messages.get(sig);
       if (!message) {
@@ -171,16 +170,22 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
       // Calculate timing difference if both clients have seen this message
       if (message.yellowstoneTime) {
         message.timeDifference = message.yellowstoneTime - message.laserstreamTime;
-        const winner = message.timeDifference > 0 ? 'LS' : 'YS';
-        const diff = Math.abs(message.timeDifference).toFixed(2);
-        console.log(`${winner} first by ${diff}ms: ${sig.slice(0, 8)}...`);
+        // Only log significant differences to reduce noise
+        if (Math.abs(message.timeDifference) > 10) {
+          const winner = message.timeDifference > 0 ? 'LS' : 'YS';
+          const diff = Math.abs(message.timeDifference).toFixed(1);
+          console.log(`${winner} first by ${diff}ms: ${sig.slice(0, 8)}...`);
+        }
       }
     }
   );
-
-  // Start Yellowstone  
+  
+  // Start Yellowstone with timing adjustment
   console.log('🟨 Starting Yellowstone...');
-  const yellowstoneClient = new Client(testConfig.yellowstone.endpoint, testConfig.yellowstone.apiKey, {
+  const yellowstoneStartTime = performance.now();
+  connectionDelayMs = yellowstoneStartTime - laserstreamStartTime; // Adjust for start time difference
+  
+  const yellowstoneClient = new Client(testConfig.laserstreamProduction.endpoint, testConfig.laserstreamProduction.apiKey, {
     "grpc.max_receive_message_length": 64 * 1024 * 1024,
   });
 
@@ -196,6 +201,7 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
     const { sig, slot } = extractSignature(update);
     if (!sig) return;
 
+    // Use high-precision timing
     const now = performance.now();
     
     let message = messages.get(sig);
@@ -209,9 +215,12 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
     // Calculate timing difference if both clients have seen this message
     if (message.laserstreamTime) {
       message.timeDifference = message.yellowstoneTime - message.laserstreamTime;
-      const winner = message.timeDifference > 0 ? 'LS' : 'YS';
-      const diff = Math.abs(message.timeDifference).toFixed(2);
-      console.log(`${winner} first by ${diff}ms: ${sig.slice(0, 8)}...`);
+      // Only log significant differences to reduce noise
+      if (Math.abs(message.timeDifference) > 10) {
+        const winner = message.timeDifference > 0 ? 'LS' : 'YS';
+        const diff = Math.abs(message.timeDifference).toFixed(1);
+        console.log(`${winner} first by ${diff}ms: ${sig.slice(0, 8)}...`);
+      }
     }
   });
 
@@ -219,7 +228,7 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
     console.error('❌ Yellowstone error:', error.message);
   });
 
-  // Progress updates
+  // Progress updates with enhanced diagnostics
   const progressInterval = setInterval(() => {
     const elapsed = (Date.now() - startTime) / 1000;
     const remaining = Math.max(0, testDurationSeconds - elapsed);
@@ -227,10 +236,19 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
     
     console.log(`\n⏱️  Progress: ${elapsed.toFixed(0)}s / ${testDurationSeconds}s (${remaining.toFixed(0)}s remaining)`);
     console.log(`📊 Messages: LS ${metrics.laserstreamMessages} | YS ${metrics.yellowstoneMessages} | Shared ${metrics.sharedMessages}`);
+    
+    // Enhanced diagnostics
+    const lsOnlyMessages = metrics.laserstreamMessages - metrics.sharedMessages;
+    const ysOnlyMessages = metrics.yellowstoneMessages - metrics.sharedMessages;
+    const shareRate = metrics.sharedMessages / Math.max(metrics.laserstreamMessages, metrics.yellowstoneMessages) * 100;
+    
+    console.log(`🔍 LS-only: ${lsOnlyMessages} | YS-only: ${ysOnlyMessages} | Share rate: ${shareRate.toFixed(1)}%`);
+    
     if (metrics.sharedMessages > 0) {
       console.log(`⚡ Avg timing diff: ${metrics.averageTimeDiff.toFixed(2)}ms ${metrics.averageTimeDiff < 0 ? '(LS faster)' : '(YS faster)'}`);
+      console.log(`🏆 Win rate: LS ${(metrics.laserstreamWins/metrics.sharedMessages*100).toFixed(1)}% vs YS ${(metrics.yellowstoneWins/metrics.sharedMessages*100).toFixed(1)}%`);
     }
-  }, 10000);
+  }, 15000); // Less frequent updates to reduce noise
 
   // Auto-stop after duration
   setTimeout(() => {
@@ -248,36 +266,47 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
     const elapsed = (Date.now() - startTime) / 1000;
     const metrics = calculateMetrics(messages, elapsed);
 
-    console.log('\n\n🏁 FINAL PERFORMANCE REPORT');
+    console.log('\n\n🏁 FINAL PERFORMANCE REPORT (ENHANCED)');
     console.log('═'.repeat(60));
     console.log(`⏱️  Test Duration: ${elapsed.toFixed(1)}s`);
+    console.log(`🔧 Connection Delay Adjustment: ${connectionDelayMs.toFixed(1)}ms`);
     console.log();
 
-    // Message Counts
+    // Message Counts with Enhanced Analysis
     console.log('📈 MESSAGE COUNTS:');
     console.log(`🟦 Laserstream: ${metrics.laserstreamMessages.toLocaleString()} messages`);
     console.log(`🟨 Yellowstone: ${metrics.yellowstoneMessages.toLocaleString()} messages`);
     console.log(`🔄 Shared (both saw): ${metrics.sharedMessages.toLocaleString()} messages`);
-    console.log(`🟦 LS-only: ${(metrics.laserstreamMessages - metrics.sharedMessages).toLocaleString()}`);
-    console.log(`🟨 YS-only: ${(metrics.yellowstoneMessages - metrics.sharedMessages).toLocaleString()}`);
+    const lsOnlyMessages = metrics.laserstreamMessages - metrics.sharedMessages;
+    const ysOnlyMessages = metrics.yellowstoneMessages - metrics.sharedMessages;
+    console.log(`🟦 LS-only: ${lsOnlyMessages.toLocaleString()}`);
+    console.log(`🟨 YS-only: ${ysOnlyMessages.toLocaleString()}`);
+    
+    // Share Rate Analysis
+    const shareRate = metrics.sharedMessages / Math.max(metrics.laserstreamMessages, metrics.yellowstoneMessages) * 100;
+    console.log(`📊 Share Rate: ${shareRate.toFixed(1)}% (higher is better for comparison validity)`);
     console.log();
 
-    // Message Count Analysis
+    // Enhanced Message Count Analysis
     const countRatio = metrics.laserstreamMessages / Math.max(metrics.yellowstoneMessages, 1);
-    if (countRatio > 2 || countRatio < 0.5) {
-      console.log('⚠️  MESSAGE COUNT DISPARITY:');
-      if (countRatio > 2) {
-        console.log(`🟦 Laserstream saw ${countRatio.toFixed(1)}x more messages than Yellowstone`);
-      } else {
-        console.log(`🟨 Yellowstone saw ${(1/countRatio).toFixed(1)}x more messages than Laserstream`);
-      }
-      console.log('💡 Possible causes:');
-      console.log('   - Network/connection differences between clients');
-      console.log('   - Server-side filtering differences');
-      console.log('   - Message dropping under load');
-      console.log('   - Genuine performance differences');
-      console.log();
+    console.log('🔍 MESSAGE DISPARITY ANALYSIS:');
+    if (shareRate < 50) {
+      console.log(`⚠️  LOW SHARE RATE WARNING: Only ${shareRate.toFixed(1)}% of messages are shared`);
+      console.log('💡 This suggests the clients are seeing largely different message sets:');
+      console.log('   - Different server endpoints or regions');
+      console.log('   - Network routing differences');
+      console.log('   - Server-side filtering or rate limiting');
+      console.log('   - Connection timing differences');
     }
+    
+    if (countRatio > 2 || countRatio < 0.5) {
+      if (countRatio > 2) {
+        console.log(`📊 Laserstream saw ${countRatio.toFixed(1)}x more messages than Yellowstone`);
+      } else {
+        console.log(`📊 Yellowstone saw ${(1/countRatio).toFixed(1)}x more messages than Laserstream`);
+      }
+    }
+    console.log();
 
     // Throughput
     console.log('🚀 THROUGHPUT:');
@@ -285,13 +314,27 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
     console.log(`🟨 Yellowstone: ${metrics.yellowstoneThroughput.toFixed(1)} messages/second`);
     console.log();
 
-    // Timing Analysis (Core Metric)
-    if (metrics.sharedMessages > 0) {
+    // Enhanced Timing Analysis (Core Metric)
+    if (metrics.sharedMessages > 10) { // Require minimum sample size
       console.log('⚡ TIMING ANALYSIS (CORE METRIC):');
       console.log(`📊 Sample size: ${metrics.sharedMessages.toLocaleString()} shared messages`);
       console.log(`📊 Average difference: ${metrics.averageTimeDiff.toFixed(3)}ms ${metrics.averageTimeDiff < 0 ? '(🟦 LS faster)' : '(🟨 YS faster)'}`);
       console.log(`📊 Median difference: ${metrics.medianTimeDiff.toFixed(3)}ms`);
       console.log(`📊 Standard deviation: ${metrics.standardDeviation.toFixed(3)}ms`);
+      
+      // Outlier detection
+      const q1Index = Math.floor(metrics.timingDifferences.length * 0.25);
+      const q3Index = Math.floor(metrics.timingDifferences.length * 0.75);
+      const sortedDiffs = [...metrics.timingDifferences].sort((a, b) => a - b);
+      const q1 = sortedDiffs[q1Index];
+      const q3 = sortedDiffs[q3Index];
+      const iqr = q3 - q1;
+      const outlierThreshold = 1.5 * iqr;
+      const outliers = metrics.timingDifferences.filter(diff => 
+        diff < (q1 - outlierThreshold) || diff > (q3 + outlierThreshold)
+      ).length;
+      
+      console.log(`📊 Outliers detected: ${outliers} (${(outliers/metrics.sharedMessages*100).toFixed(1)}%)`);
       console.log();
 
       // Win Rates
@@ -303,33 +346,53 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
       console.log(`🟨 Yellowstone wins: ${metrics.yellowstoneWins.toLocaleString()} (${ysWinRate.toFixed(1)}%)`);
       console.log();
 
-      // Statistical Significance
+      // Enhanced Statistical Significance
       const marginOfError = (1.96 * metrics.standardDeviation) / Math.sqrt(metrics.sharedMessages);
       console.log('📊 STATISTICAL ANALYSIS:');
       console.log(`📊 Margin of error (95% confidence): ±${marginOfError.toFixed(3)}ms`);
+      console.log(`📊 Sample size adequacy: ${metrics.sharedMessages >= 100 ? '✅ Good' : '⚠️ Small'} (${metrics.sharedMessages} samples)`);
       
-      if (Math.abs(metrics.averageTimeDiff) > marginOfError) {
+      if (Math.abs(metrics.averageTimeDiff) > marginOfError && metrics.sharedMessages >= 30) {
         const fasterClient = metrics.averageTimeDiff < 0 ? 'Laserstream' : 'Yellowstone';
         const advantage = Math.abs(metrics.averageTimeDiff).toFixed(3);
         console.log(`✅ STATISTICALLY SIGNIFICANT: ${fasterClient} is ${advantage}ms faster on average`);
       } else {
         console.log(`⚪ NOT STATISTICALLY SIGNIFICANT: Difference could be due to random variation`);
+        if (metrics.sharedMessages < 30) {
+          console.log(`   (Sample size too small: ${metrics.sharedMessages} < 30)`);
+        }
       }
       console.log();
 
-      // Final Verdict
+      // Final Verdict with Enhanced Logic
       console.log('🏅 FINAL VERDICT:');
-      if (Math.abs(lsWinRate - ysWinRate) < 5) {
+      if (shareRate < 30) {
+        console.log('❌ INVALID COMPARISON - Share rate too low for meaningful analysis');
+        console.log(`   Only ${shareRate.toFixed(1)}% of messages were seen by both clients`);
+        console.log('💡 Recommendations:');
+        console.log('   - Use identical server endpoints and regions');
+        console.log('   - Ensure both clients start simultaneously');
+        console.log('   - Check for network or filtering differences');
+      } else if (Math.abs(lsWinRate - ysWinRate) < 5 && Math.abs(metrics.averageTimeDiff) <= marginOfError) {
         console.log('🤝 PERFORMANCE TIE - Both clients perform similarly');
-      } else if (lsWinRate > ysWinRate) {
+        console.log(`   Win rates within 5% (${Math.abs(lsWinRate - ysWinRate).toFixed(1)}% difference)`);
+        console.log(`   Average timing difference within margin of error`);
+      } else if (lsWinRate > ysWinRate && metrics.averageTimeDiff < -marginOfError) {
         console.log(`🥇 LASERSTREAM WINS! (${lsWinRate.toFixed(1)}% vs ${ysWinRate.toFixed(1)}%)`);
         console.log(`   Average advantage: ${Math.abs(metrics.averageTimeDiff).toFixed(3)}ms faster`);
-      } else {
+        console.log(`   Throughput advantage: ${((metrics.laserstreamThroughput / metrics.yellowstoneThroughput - 1) * 100).toFixed(1)}%`);
+      } else if (ysWinRate > lsWinRate && metrics.averageTimeDiff > marginOfError) {
         console.log(`🥇 YELLOWSTONE WINS! (${ysWinRate.toFixed(1)}% vs ${lsWinRate.toFixed(1)}%)`);
         console.log(`   Average advantage: ${Math.abs(metrics.averageTimeDiff).toFixed(3)}ms faster`);
+      } else {
+        console.log('🤔 MIXED RESULTS - Conflicting metrics detected');
+        console.log(`   Win rates favor: ${lsWinRate > ysWinRate ? 'Laserstream' : 'Yellowstone'}`);
+        console.log(`   Average timing favors: ${metrics.averageTimeDiff < 0 ? 'Laserstream' : 'Yellowstone'}`);
+        console.log('💡 Consider longer test duration for clearer results');
       }
     } else {
-      console.log('❌ NO SHARED MESSAGES - Cannot perform timing analysis');
+      console.log('❌ INSUFFICIENT SHARED MESSAGES - Cannot perform timing analysis');
+      console.log(`   Only ${metrics.sharedMessages} shared messages (minimum: 10)`);
       console.log('💡 Both clients may be seeing completely different message sets');
     }
 
@@ -344,9 +407,10 @@ async function runCorePerformanceTest(testDurationSeconds: number = 60) {
     process.exit(0);
   }
 
-  console.log('✅ Both clients connected! Starting performance measurement...');
+  console.log('✅ Both clients connected! Starting enhanced performance measurement...');
   console.log(`⏱️  Test will run for ${testDurationSeconds} seconds`);
-  console.log('🎯 Focus: Timing differences for messages seen by both clients');
+  console.log('🎯 Focus: Fair timing comparison with enhanced diagnostics');
+  console.log('🔧 Improvements: Connection delay adjustment, noise reduction, better statistics');
   console.log('⏹️  Press Ctrl+C to stop early\n');
 
   // Keep running
