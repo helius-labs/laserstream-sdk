@@ -8,9 +8,12 @@ export const enum CommitmentLevel {
   Confirmed = 1,
   Finalized = 2
 }
+
+// Type alias for SubscribeUpdate from Yellowstone gRPC to ensure exact compatibility
+export type SubscribeUpdate = import('@triton-one/yellowstone-grpc').SubscribeUpdate;
 export declare class LaserstreamClient {
   constructor(endpoint: string, token?: string | undefined | null, maxReconnectAttempts?: number | undefined | null)
-  subscribe(request: any, callback: (error: Error | null, buffer: Buffer) => void): Promise<StreamHandle>
+  subscribe(request: any, callback: (error: Error | null, update: SubscribeUpdate) => void): Promise<StreamHandle>
 }
 export declare class StreamHandle {
   id: string

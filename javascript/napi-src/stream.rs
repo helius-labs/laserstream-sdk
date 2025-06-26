@@ -8,7 +8,6 @@ use std::time::Duration;
 use tokio::sync::oneshot;
 use yellowstone_grpc_client::{GeyserGrpcClient, ClientTlsConfig};
 use yellowstone_grpc_proto::geyser;
-use yellowstone_grpc_proto::prost::Message;
 use uuid;
 
 // Constants for reconnect logic
@@ -26,7 +25,7 @@ impl StreamInner {
         endpoint: String,
         token: Option<String>,
         mut initial_request: geyser::SubscribeRequest,
-        ts_callback: ThreadsafeFunction<Vec<u8>, ErrorStrategy::CalleeHandled>,
+        ts_callback: ThreadsafeFunction<crate::SubscribeUpdateWrapper, ErrorStrategy::CalleeHandled>,
         max_reconnect_attempts: u32,
     ) -> Result<Self> {
         let (cancel_tx, mut cancel_rx) = oneshot::channel();
@@ -92,7 +91,7 @@ impl StreamInner {
                         if last_tracked_slot > 0 {
                             let from_slot = match commitment_level {
                                 0 => { // Processed - replay from tracked_slot - 31 for fork safety
-                                    last_tracked_slot - FORK_DEPTH_SAFETY_MARGIN
+                                    last_tracked_slot.saturating_sub(FORK_DEPTH_SAFETY_MARGIN)
                                 }
                                 1 | 2 => { // Confirmed or Finalized - replay from tracked_slot
                                     last_tracked_slot
@@ -121,7 +120,7 @@ impl StreamInner {
         endpoint: &str,
         token: &Option<String>,
         request: &geyser::SubscribeRequest,
-        ts_callback: ThreadsafeFunction<Vec<u8>, ErrorStrategy::CalleeHandled>,
+        ts_callback: ThreadsafeFunction<crate::SubscribeUpdateWrapper, ErrorStrategy::CalleeHandled>,
         tracked_slot: Arc<AtomicU64>,
         internal_slot_sub_id: String,
     ) -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -144,31 +143,20 @@ impl StreamInner {
         while let Some(result) = stream.next().await {
             match result {
                 Ok(message) => {
-                    let mut should_forward = true;
-                    
                     // Track slot updates for reconnection (only decode when necessary)
                     if let Some(geyser::subscribe_update::UpdateOneof::Slot(slot)) = &message.update_oneof {
                         tracked_slot.store(slot.slot, Ordering::SeqCst);
                         
                         // Check if this slot update is from our internal subscription
-                        if message.filters.len() == 1 && message.filters[0] == internal_slot_sub_id {
-                            should_forward = false; // Don't forward internal slot messages to user
+                        // Internal slot messages will have the internal filter ID in their filters array
+                        if message.filters.contains(&internal_slot_sub_id) {
+                            continue; // Skip forwarding this message
                         }
                     }
                     
-                    // Forward message to user ONLY if it's not from internal subscription
-                    if should_forward {
-                        // PERFORMANCE CRITICAL: Encode once and send raw bytes
-                        let mut buf = Vec::new();
-                        match message.encode(&mut buf) {
-                            Ok(_) => {
-                                let _ = ts_callback.call(Ok(buf), ThreadsafeFunctionCallMode::NonBlocking);
-                            }
-                            Err(e) => {
-                                eprintln!("Failed to encode message: {}", e);
-                            }
-                        }
-                    }
+                    // Forward message to user (internal messages already filtered out above)
+                    let wrapper = crate::SubscribeUpdateWrapper(message);
+                    let _ = ts_callback.call(Ok(wrapper), ThreadsafeFunctionCallMode::NonBlocking);
                 }
                 Err(e) => {
                     return Err(Box::new(e));

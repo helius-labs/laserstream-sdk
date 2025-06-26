@@ -356,7 +356,7 @@ impl ClientInner {
         &self,
         subscribe_request: SubscribeRequest,
         ts_callback: napi::threadsafe_function::ThreadsafeFunction<
-            Vec<u8>,
+            crate::SubscribeUpdateWrapper,
             napi::threadsafe_function::ErrorStrategy::CalleeHandled,
         >,
     ) -> Result<crate::StreamHandle> {

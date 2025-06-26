@@ -1,5 +1,4 @@
 import { LaserstreamClient, CommitmentLevel } from '../index';
-import { SubscribeUpdate } from '@triton-one/yellowstone-grpc';
 import fetch from 'node-fetch';
 
 // Load test configuration
@@ -91,7 +90,7 @@ async function main() {
   const client = new LaserstreamClient(config.endpoint, config.apiKey);
 
   // Subscribe with request and callback for raw protobuf buffer
-  const streamHandle = await client.subscribe(subscriptionRequest, async (error: Error | null, rawBuffer: Buffer) => {
+  const streamHandle = await client.subscribe(subscriptionRequest, async (error: Error | null, update: any) => {
     if (error) {
       console.error('🚨 LASERSTREAM ERROR:', error.message);
       errCount += 1;
@@ -110,11 +109,10 @@ async function main() {
       }
       lastConnectionTime = currentTime;
 
-      // Decode the raw protobuf buffer
-      const data = SubscribeUpdate.decode(rawBuffer);
+      const u = update;
 
-      if (data.slot) {
-         const currentSlotInfo = data.slot;
+      if (u.slot) {
+         const currentSlotInfo = u.slot;
          const currentSlotNumber = Number(currentSlotInfo.slot);
 
          if (!isNaN(currentSlotNumber)) {
@@ -157,9 +155,11 @@ async function main() {
         // Handle other update types (ping, pong, etc.) if needed.
         // For now, we ignore them but count the messages
       }
-    } catch (decodeError) {
-      console.error("💥 Decode error:", decodeError);
-      reconnectionCount++;
+    } catch (err) {
+      console.error('Laserstream callback error:', err);
+      errCount += 1;
+      reconnectionCount += 1;
+      lastConnectionTime = Date.now();
     }
   });
 

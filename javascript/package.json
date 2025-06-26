@@ -15,6 +15,7 @@
     "example:block-sub": "ts-node examples/block-sub.ts",
     "example:block-meta-sub": "ts-node examples/block-meta-sub.ts",
     "example:entry-sub": "ts-node examples/entry-sub.ts",
+    "perf:test": "ts-node performance/core-performance-test.ts",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

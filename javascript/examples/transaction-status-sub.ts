@@ -1,4 +1,4 @@
-import { LaserstreamClient, CommitmentLevel } from '../index';
+import { LaserstreamClient, CommitmentLevel, SubscribeUpdate } from '../index';
 const config = require('../test-config');
 
 async function main() {
@@ -25,13 +25,13 @@ async function main() {
   console.log('Starting subscription...');
   
   try {
-    const stream = await client.subscribe(subscribeRequest, (error: Error | null, buffer: Buffer) => {
+    const stream = await client.subscribe(subscribeRequest, (error: Error | null, update: SubscribeUpdate) => {
       if (error) {
         console.error('Stream error:', error);
         return;
       }
 
-      console.log(buffer);
+      console.log(update);
     });
   } catch (error) {
     console.error('Subscription failed:', error);

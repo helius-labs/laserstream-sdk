@@ -1,5 +1,4 @@
 import { LaserstreamClient, CommitmentLevel } from '../index';
-import { SubscribeUpdate } from '@triton-one/yellowstone-grpc';
 import Client from '@triton-one/yellowstone-grpc';
 import bs58 from 'bs58';
 
@@ -142,7 +141,7 @@ async function main() {
     // Create client with endpoint and token
 
     // Subscribe with request and callback for raw protobuf buffer
-    const streamHandle = await client.subscribe(subscriptionRequest, (error: Error | null, rawBuffer: Buffer) => {
+    const streamHandle = await client.subscribe(subscriptionRequest, (error: Error | null, update: any) => {
       if (error) {
         console.error('🚨 LASERSTREAM ERROR:', error.message);
         console.error('   Error type:', error.name);
@@ -152,8 +151,7 @@ async function main() {
       }
       
       try {
-        // Decode the raw protobuf buffer
-        const u = SubscribeUpdate.decode(rawBuffer);
+        const u = update;
 
         const {sig, slot} = extractSigAndSlot(u);
         if (!sig || !slot) return;
@@ -170,8 +168,8 @@ async function main() {
         entry.slotLS = slot ?? 'unknown';
         statusMap.set(sig, entry);
         maybePrint(sig);
-      } catch (decodeError) {
-        console.error('Failed to decode Laserstream protobuf:', decodeError);
+      } catch (err) {
+        console.error('Laserstream callback error:', err);
         errLS += 1;
       }
     });
