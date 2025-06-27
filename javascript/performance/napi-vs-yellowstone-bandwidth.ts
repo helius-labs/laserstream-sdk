@@ -57,16 +57,17 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-function calculateBandwidth(bytes: number, durationSeconds: number): number {
-  return (bytes * 8) / (1024 * 1024 * durationSeconds); // Mbps
+function calculateThroughput(bytes: number, durationSeconds: number): number {
+  return bytes / (1024 * 1024 * durationSeconds); // MB/s
 }
 
-async function runComparativeBandwidthTest(testDurationSeconds: number = 30) {
-  console.log('🚀 NAPI vs YELLOWSTONE BANDWIDTH COMPARISON');
+async function runComparativeGrpcTest(testDurationSeconds: number = 30) {
+  console.log('🚀 NAPI vs YELLOWSTONE GRPC PERFORMANCE COMPARISON');
   console.log('═'.repeat(60));
   console.log(`🔧 Test Duration: ${testDurationSeconds}s`);
   console.log(`🔧 Endpoint: ${testConfig.laserstreamProduction.endpoint}`);
   console.log(`🔧 Token: ${testConfig.laserstreamProduction.apiKey ? 'Present' : 'Missing'}`);
+  console.log('🔧 Measurement: MB/s (following gRPC best practices)');
   console.log();
 
   if (!testConfig.laserstreamProduction.apiKey) {
@@ -203,14 +204,14 @@ async function runComparativeBandwidthTest(testDurationSeconds: number = 30) {
       const napiElapsed = (performance.now() - metrics.napi.startTime) / 1000;
       const yellowstoneElapsed = (performance.now() - metrics.yellowstone.startTime) / 1000;
       
-      const napiThroughput = napiElapsed > 0 ? calculateBandwidth(metrics.napi.totalBytes, napiElapsed) : 0;
-      const yellowstoneThroughput = yellowstoneElapsed > 0 ? calculateBandwidth(metrics.yellowstone.totalBytes, yellowstoneElapsed) : 0;
+      const napiThroughput = napiElapsed > 0 ? calculateThroughput(metrics.napi.totalBytes, napiElapsed) : 0;
+      const yellowstoneThroughput = yellowstoneElapsed > 0 ? calculateThroughput(metrics.yellowstone.totalBytes, yellowstoneElapsed) : 0;
       
       const napiMps = napiElapsed > 0 ? metrics.napi.messageCount / napiElapsed : 0;
       const yellowstoneMps = yellowstoneElapsed > 0 ? metrics.yellowstone.messageCount / yellowstoneElapsed : 0;
 
-      console.log(`🟦 NAPI: ${metrics.napi.messageCount.toLocaleString()} msgs | ${formatBytes(metrics.napi.totalBytes)} | ${napiThroughput.toFixed(1)} Mbps | ${napiMps.toFixed(0)} msg/s`);
-      console.log(`🟨 Yellowstone: ${metrics.yellowstone.messageCount.toLocaleString()} msgs | ${formatBytes(metrics.yellowstone.totalBytes)} | ${yellowstoneThroughput.toFixed(1)} Mbps | ${yellowstoneMps.toFixed(0)} msg/s`);
+              console.log(`🟦 NAPI: ${metrics.napi.messageCount.toLocaleString()} msgs | ${formatBytes(metrics.napi.totalBytes)} | ${napiThroughput.toFixed(1)} MB/s | ${napiMps.toFixed(0)} msg/s`);
+        console.log(`🟨 Yellowstone: ${metrics.yellowstone.messageCount.toLocaleString()} msgs | ${formatBytes(metrics.yellowstone.totalBytes)} | ${yellowstoneThroughput.toFixed(1)} MB/s | ${yellowstoneMps.toFixed(0)} msg/s`);
       
       if (napiThroughput > 0 && yellowstoneThroughput > 0) {
         const ratio = napiThroughput / yellowstoneThroughput;
@@ -247,8 +248,8 @@ async function runComparativeBandwidthTest(testDurationSeconds: number = 30) {
       const napiDuration = (metrics.napi.endTime - metrics.napi.startTime) / 1000;
       const yellowstoneDuration = (metrics.yellowstone.endTime - metrics.yellowstone.startTime) / 1000;
       
-      const napiThroughput = calculateBandwidth(metrics.napi.totalBytes, napiDuration);
-      const yellowstoneThroughput = calculateBandwidth(metrics.yellowstone.totalBytes, yellowstoneDuration);
+      const napiThroughput = calculateThroughput(metrics.napi.totalBytes, napiDuration);
+      const yellowstoneThroughput = calculateThroughput(metrics.yellowstone.totalBytes, yellowstoneDuration);
       
       const napiMps = metrics.napi.messageCount / napiDuration;
       const yellowstoneMps = metrics.yellowstone.messageCount / yellowstoneDuration;
@@ -264,16 +265,18 @@ async function runComparativeBandwidthTest(testDurationSeconds: number = 30) {
        console.log(`🔧 Replay Mode: FROM SLOT ${replaySlot.toLocaleString()} (${currentSlot - replaySlot} slots replayed)`);
        console.log();
 
-      // Side-by-side metrics
-      console.log('📊 BANDWIDTH METRICS COMPARISON:');
-      console.log(''.padEnd(40) + '🟦 NAPI'.padEnd(20) + '🟨 Yellowstone');
-      console.log('─'.repeat(80));
-      console.log(`Messages:`.padEnd(40) + `${metrics.napi.messageCount.toLocaleString()}`.padEnd(20) + `${metrics.yellowstone.messageCount.toLocaleString()}`);
-      console.log(`Data Transferred:`.padEnd(40) + `${formatBytes(metrics.napi.totalBytes)}`.padEnd(20) + `${formatBytes(metrics.yellowstone.totalBytes)}`);
-      console.log(`Messages/Second:`.padEnd(40) + `${napiMps.toFixed(1)}`.padEnd(20) + `${yellowstoneMps.toFixed(1)}`);
-      console.log(`Bandwidth:`.padEnd(40) + `${napiThroughput.toFixed(2)} Mbps`.padEnd(20) + `${yellowstoneThroughput.toFixed(2)} Mbps`);
-      console.log(`Errors:`.padEnd(40) + `${metrics.napi.errorCount}`.padEnd(20) + `${metrics.yellowstone.errorCount}`);
-      console.log();
+             // Side-by-side metrics
+       console.log('📊 BANDWIDTH METRICS COMPARISON:');
+       console.log(''.padEnd(40) + '🟦 NAPI'.padEnd(25) + '🟨 Yellowstone');
+       console.log('─'.repeat(85));
+       console.log(`Messages:`.padEnd(40) + `${metrics.napi.messageCount.toLocaleString()}`.padEnd(25) + `${metrics.yellowstone.messageCount.toLocaleString()}`);
+       console.log(`Data Transferred:`.padEnd(40) + `${formatBytes(metrics.napi.totalBytes)}`.padEnd(25) + `${formatBytes(metrics.yellowstone.totalBytes)}`);
+       console.log(`Test Duration:`.padEnd(40) + `${napiDuration.toFixed(2)}s`.padEnd(25) + `${yellowstoneDuration.toFixed(2)}s`);
+       console.log(`Messages/Second:`.padEnd(40) + `${napiMps.toFixed(1)}`.padEnd(25) + `${yellowstoneMps.toFixed(1)}`);
+       console.log(`Data Rate:`.padEnd(40) + `${formatBytes(metrics.napi.totalBytes/napiDuration)}/s`.padEnd(25) + `${formatBytes(metrics.yellowstone.totalBytes/yellowstoneDuration)}/s`);
+       console.log(`Bandwidth:`.padEnd(40) + `${napiThroughput.toFixed(2)} Mbps (${(napiThroughput/1000).toFixed(3)} Gbps)`.padEnd(25) + `${yellowstoneThroughput.toFixed(2)} Mbps (${(yellowstoneThroughput/1000).toFixed(3)} Gbps)`);
+       console.log(`Errors:`.padEnd(40) + `${metrics.napi.errorCount}`.padEnd(25) + `${metrics.yellowstone.errorCount}`);
+       console.log();
 
       // Performance Analysis
       console.log('🏆 PERFORMANCE ANALYSIS:');
@@ -363,7 +366,7 @@ console.log('🎯 Starting NAPI vs Yellowstone Bandwidth Comparison...');
 console.log(`⏱️  Test Duration: ${testDuration} seconds`);
 console.log('🔧 Press Ctrl+C to stop early\n');
 
-runComparativeBandwidthTest(testDuration).catch((error) => {
-  console.error('💥 Bandwidth comparison test failed:', error);
+runComparativeGrpcTest(testDuration).catch((error) => {
+  console.error('💥 gRPC comparison test failed:', error);
   process.exit(1);
 }); 
