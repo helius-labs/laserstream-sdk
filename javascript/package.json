@@ -19,6 +19,8 @@
     "perf:slot": "ts-node performance/slot-performance-test.ts",
     "perf:token": "ts-node performance/token-performance-test.ts",
     "perf:vote": "ts-node performance/vote-performance-test.ts",
+    "perf:napi": "ts-node performance/napi-bandwidth-test.ts",
+    "perf:compare": "ts-node performance/napi-vs-yellowstone-bandwidth.ts",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
