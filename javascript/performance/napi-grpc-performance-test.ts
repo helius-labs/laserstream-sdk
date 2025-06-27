@@ -137,6 +137,15 @@ async function runGrpcPerformanceTest(testDurationSeconds: number = 30) {
   console.log(`🔧 Endpoint: ${testConfig.laserstreamProduction.endpoint}`);
   console.log(`🔧 Token: ${testConfig.laserstreamProduction.apiKey ? 'Present' : 'Missing'}`);
   console.log('🔧 Measurement: Bytes/s (following gRPC best practices)');
+  console.log('🔧 Optimization: Maximum throughput configuration');
+  console.log();
+  
+  // Performance optimization warnings
+  console.log('⚠️  PERFORMANCE PREREQUISITES:');
+  console.log('📊 Ensure sufficient bandwidth (>500 Mbps recommended)');
+  console.log('📊 CPU: Modern CPU with >3GHz all-core boost');
+  console.log('📊 Memory: >16GB RAM (Solana data is memory intensive)');
+  console.log('📊 Network: Low latency to Yellowstone gRPC endpoint');
   console.log();
 
   if (!testConfig.laserstreamProduction.apiKey) {
@@ -173,8 +182,11 @@ async function runGrpcPerformanceTest(testDurationSeconds: number = 30) {
   let stream: any;
 
   try {
-    // Initialize client (gRPC best practice: reuse channels)
-    client = new LaserstreamClient(testConfig.laserstreamProduction.endpoint, testConfig.laserstreamProduction.apiKey);
+    // Initialize client with maximum throughput settings
+    client = new LaserstreamClient(
+      testConfig.laserstreamProduction.endpoint, 
+      testConfig.laserstreamProduction.apiKey,
+    );
     console.log('✅ gRPC client created successfully');
     console.log();
 
@@ -184,37 +196,61 @@ async function runGrpcPerformanceTest(testDurationSeconds: number = 30) {
     console.log(`🔥 Using fromSlot parameter for maximum protobuf message flow`);
     console.log();
 
-    // High-throughput gRPC subscription with replay
+    // MAXIMUM THROUGHPUT subscription (all data streams)
     const subscriptionRequest = {
+      // All account updates (massive volume)
       accounts: {
-        'grpc-perf-test': {
-          account: [],
-          owner: [],
-          filters: []
+        'max-throughput-accounts': {
+          account: [], // Empty = all accounts
+          owner: [],   // Empty = all owners  
+          filters: []  // No filters = maximum data
         }
       },
+      // All transactions including votes (highest volume)
       transactions: {
-        'grpc-perf-test': {
-          vote: false,
-          failed: false,
+        'max-throughput-transactions': {
+          vote: true,           // ✅ Include vote transactions (~1000+/sec)
+          failed: true,         // ✅ Include failed transactions
+          accountInclude: [],   // Empty = all programs
+          accountExclude: [],   // No exclusions
+          accountRequired: []   // No requirements
+        }
+      },
+      // All slot updates with inter-slot data
+      slots: {
+        'max-throughput-slots': {
+          filterByCommitment: false,  // All commitment levels
+          interslotUpdates: true      // Include intermediate updates
+        }
+      },
+      // Include transaction status updates
+      transactionsStatus: {
+        'max-throughput-tx-status': {
+          vote: true,
+          failed: true,
           accountInclude: [],
           accountExclude: [],
           accountRequired: []
         }
       },
-      slots: {
-        'grpc-perf-test': {
-          filterByCommitment: false,
-          interslotUpdates: true
+      // All block data (heavy but comprehensive)
+      blocks: {
+        'max-throughput-blocks': {
+          accountInclude: [],
+          includeTransactions: true,  // Include full transaction data
+          includeAccounts: true,      // Include account updates
+          includeEntries: true        // Include all entries
         }
       },
-      blocks: {},
-      blocksMeta: {},
-      entry: {},
-      transactionsStatus: {},
-      commitment: 0, // Processed for maximum throughput
-      accountsDataSlice: [],
-      fromSlot: replaySlot, // Replay for maximum protobuf message flow
+      blocksMeta: {
+        'max-throughput-block-meta': {} // All block metadata
+      },
+      entry: {
+        'max-throughput-entries': {} // All ledger entries
+      },
+      commitment: 0, // Processed = maximum throughput (lowest latency)
+      accountsDataSlice: [], // No data slicing = full account data
+      fromSlot: replaySlot,  // Historical replay for maximum initial load
     };
 
     // gRPC message callback
