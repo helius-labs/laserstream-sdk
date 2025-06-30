@@ -131,7 +131,8 @@ impl StreamInner {
         let mut builder = GeyserGrpcClient::build_from_shared(endpoint.to_string())?
             .connect_timeout(Duration::from_secs(10))
             .max_decoding_message_size(1_000_000_000)
-            .timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(300)) // Increased from 10s to 5 minutes for high-throughput streaming
+            .max_encoding_message_size(1_000_000_000) // Match decoding size
             .tls_config(ClientTlsConfig::new().with_enabled_roots())?;
 
         if let Some(ref token) = token {
