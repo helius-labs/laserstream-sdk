@@ -8,8 +8,9 @@ use helius_laserstream::{
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
 use yellowstone_grpc_proto::geyser::{CommitmentLevel, SubscribeRequestFilterAccounts, SubscribeRequestFilterBlocksMeta, SubscribeRequestFilterEntry, SubscribeRequestFilterSlots};
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Instant};
 use clap::Parser;
+use prost::Message;
 
 /// Bandwidth tester for Laserstream gRPC
 #[derive(Parser, Debug)]
@@ -82,11 +83,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Pin the stream to the stack
     futures::pin_mut!(stream);
-    println!("Starting pure stream consumption (no measurements)...");
+    let mut last_checkpoint = Instant::now();
+    let mut total_bytes = 0;
+    let test_duration = 10;
+    let checkpoint_interval = 2;
+    let num_checkpoints = test_duration / checkpoint_interval;
+    let mut checkpoint_num = 1;
+    println!("Starting bandwidth test for {}s with checkpoints every {}s", test_duration, checkpoint_interval);
     
+
     while let Some(result) = stream.next().await {
-        let _result = result?;
-        // Just consume messages - no processing, no measurements
+        let result = result?;
+        let bytes = result.encode_to_vec();
+        total_bytes += bytes.len();
+        if last_checkpoint.elapsed().as_secs() > checkpoint_interval {
+            let throughput = total_bytes as f64 / last_checkpoint.elapsed().as_secs() as f64;
+            let throughput_mbps = throughput / 1024.0 / 1024.0;
+            println!("Checkpoint {}/{}: {:.2} MB/s", checkpoint_num, num_checkpoints, throughput_mbps);
+            total_bytes = 0;
+            last_checkpoint = Instant::now();
+            checkpoint_num += 1;
+            if checkpoint_num > num_checkpoints {
+                break;
+            }
+        }
     }
 
     println!("Test finished.");
