@@ -41,7 +41,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rpc_url = format!("https://mainnet.helius-rpc.com/?api-key={}", api_key);
     let rpc_client = RpcClient::new(rpc_url);
     let slot = rpc_client.get_slot().await.unwrap();
-    let replay_slot = slot - 2500;
+    let replay_slot = slot - 2950;
 
 
     let request = SubscribeRequest {
