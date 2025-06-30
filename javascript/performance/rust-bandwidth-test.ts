@@ -41,28 +41,12 @@ async function main() {
         filters: []
       }
     },
-    slots: {
-      "all-slots": {
-        filterByCommitment: false
-      }
-    },
-    transactions: {
-      "all-transactions": {
-        accountInclude: [],
-        accountExclude: [],
-        accountRequired: [],
-        vote: false,
-        failed: false
-      }
-    },
+    slots: {},
+    transactions: {},
     transactionsStatus: {},
     blocks: {},
-    blocksMeta: {
-      "all-block-meta": {}
-    },
-    entry: {
-      "all-entries": {}
-    },
+    blocksMeta: {},
+    entry: {},
     commitment: CommitmentLevel.Processed,
     accountsDataSlice: [],
     fromSlot: replaySlot
