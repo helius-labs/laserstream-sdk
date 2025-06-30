@@ -16,6 +16,7 @@
     "example:block-meta-sub": "ts-node examples/block-meta-sub.ts",
     "example:entry-sub": "ts-node examples/entry-sub.ts",
     "perf:bandwidth": "ts-node performance/rust-bandwidth-test.ts",
+    "perf:pure": "ts-node performance/pure-rust-bandwidth-test.ts",
     "perf:profile": "./performance/remote-rust-profile.sh",
     "prepublishOnly": "npm run build"
   },

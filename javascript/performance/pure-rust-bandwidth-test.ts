@@ -23,8 +23,8 @@ async function main() {
   const currentSlot = await getCurrentSlot(config.laserstreamProduction.apiKey);
   const replaySlot = currentSlot - 2000;
   
-  console.log(`Starting RUST-BASED bandwidth test from slot ${replaySlot} (current: ${currentSlot})`);
-  console.log('🚀 Measuring Rust-decoded objects (protobuf decoding in NAPI/Rust)');
+  console.log(`Starting PURE RUST measurement from slot ${replaySlot} (current: ${currentSlot})`);
+  console.log('🚀 Measuring pure object count (NO JSON serialization)');
   
   // Create Laserstream client (Rust-based decoding)
   const client = new LaserstreamClient(
@@ -32,7 +32,7 @@ async function main() {
     config.laserstreamProduction.apiKey
   );
   
-  // Create comprehensive subscription request (same as before for fair comparison)
+  // Create comprehensive subscription request
   const subscribeRequest = {
     accounts: {
       "all-accounts": {
@@ -69,7 +69,6 @@ async function main() {
   };
   
   // Bandwidth tracking
-  let totalBytes = 0;
   let messageCount = 0;
   let lastCheckpoint = Date.now();
   const testDuration = 10; // seconds
@@ -78,7 +77,7 @@ async function main() {
   let checkpointNum = 1;
   
   console.log(`Testing for ${testDuration}s with checkpoints every ${checkpointInterval}s`);
-  console.log('Target: 1 GB/s (1,073,741,824 bytes/sec)');
+  console.log('Target: 200k+ msgs/sec (eliminate JSON.stringify bottleneck)');
   
   try {
     await client.subscribe(subscribeRequest, (error: Error | null, update: SubscribeUpdate) => {
@@ -87,36 +86,30 @@ async function main() {
         return;
       }
       
-      // Count Rust-decoded object size (real throughput with Rust decoding)
-      const updateString = JSON.stringify(update);
-      totalBytes += Buffer.byteLength(updateString, 'utf8');
+      // Count ONLY messages - no JSON serialization overhead
       messageCount++;
       
       // Checkpoint reporting
       const now = Date.now();
       if (now - lastCheckpoint > checkpointInterval * 1000) {
         const elapsed = (now - lastCheckpoint) / 1000;
-        const bytesPerSec = totalBytes / elapsed;
         const messagesPerSec = messageCount / elapsed;
-        const mbPerSec = bytesPerSec / (1024 * 1024);
-        const gbPerSec = bytesPerSec / (1024 * 1024 * 1024);
         
-        console.log(`🚀 RUST Checkpoint ${checkpointNum}/${numCheckpoints}: ${messagesPerSec.toFixed(0)} msgs/s, ${mbPerSec.toFixed(2)} MB/s (${gbPerSec.toFixed(3)} GB/s)`);
+        console.log(`🚀 PURE Checkpoint ${checkpointNum}/${numCheckpoints}: ${messagesPerSec.toFixed(0)} msgs/s (NO byte measurement)`);
         
         // Reset counters
-        totalBytes = 0;
         messageCount = 0;
         lastCheckpoint = now;
         checkpointNum++;
         
         if (checkpointNum > numCheckpoints) {
-          console.log('✅ Rust-based bandwidth test completed');
+          console.log('✅ Pure Rust measurement completed');
           process.exit(0);
         }
       }
     });
     
-    console.log('✅ Rust-based subscription started');
+    console.log('✅ Pure measurement started');
     
     // Keep process alive
     process.on('SIGINT', () => {
