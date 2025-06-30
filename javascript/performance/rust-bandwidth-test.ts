@@ -21,7 +21,7 @@ async function getCurrentSlot(apiKey: string): Promise<number> {
 async function main() {
   // Get current slot and calculate replay slot (2000 slots back for more data)
   const currentSlot = await getCurrentSlot(config.laserstreamProduction.apiKey);
-  const replaySlot = currentSlot - 2999;
+  const replaySlot = currentSlot - 2500;
   
   console.log(`Starting RUST-BASED bandwidth test from slot ${replaySlot} (current: ${currentSlot})`);
   console.log('🚀 Measuring Rust-decoded objects (protobuf decoding in NAPI/Rust)');
