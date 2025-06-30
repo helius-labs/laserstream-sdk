@@ -49,8 +49,8 @@ async function main() {
         accountInclude: [],
         accountExclude: [],
         accountRequired: [],
-        vote: false,
-        failed: false
+        vote: undefined,
+        failed: undefined
       }
     },
     transactionsStatus: {},
@@ -63,16 +63,14 @@ async function main() {
     },
     commitment: CommitmentLevel.Processed,
     accountsDataSlice: [],
-    ping: {
-      id: 1
-    },
+    ping: undefined,
     fromSlot: replaySlot
   };
   
   const client = new LaserstreamClient(endpointUrl, apiKey);
   
-  // Bandwidth measurement (copying main.rs approach exactly)
-  let totalBytes = 0;
+  // Message throughput measurement (no processing overhead)
+  let messageCount = 0;
   let lastCheckpoint = Date.now();
   const testDuration = 10; // seconds
   const checkpointInterval = 2; // seconds  
@@ -80,8 +78,8 @@ async function main() {
   let checkpointNum = 1;
   
   console.log("Connecting and subscribing...");
-  console.log(`Starting bandwidth test for ${testDuration}s with checkpoints every ${checkpointInterval}s`);
-  console.log("🎯 TARGET: 1 GB/s (1,073,741,824 bytes/sec)");
+  console.log(`Starting message throughput test for ${testDuration}s with checkpoints every ${checkpointInterval}s`);
+  console.log("🎯 TARGET: 200k+ msgs/sec (eliminate all processing overhead)");
   
   try {
     await client.subscribe(subscribeRequest, (error: Error | null, update: SubscribeUpdate) => {
@@ -90,23 +88,19 @@ async function main() {
         return;
       }
       
-      // Measure bytes per message (equivalent to main.rs encode_to_vec())
-      const updateBytes = JSON.stringify(update);
-      const bytes = Buffer.byteLength(updateBytes, 'utf8');
-      totalBytes += bytes;
+      // Count messages only (no processing overhead)
+      messageCount++;
       
-      // Checkpoint reporting (copying main.rs logic exactly)
+      // Checkpoint reporting
       const now = Date.now();
       if (now - lastCheckpoint > checkpointInterval * 1000) {
         const elapsedSecs = (now - lastCheckpoint) / 1000;
-        const throughput = totalBytes / elapsedSecs;
-        const throughputMbps = throughput / 1024 / 1024;
-        const throughputGbps = throughput / 1024 / 1024 / 1024;
+        const messagesPerSec = messageCount / elapsedSecs;
         
-        console.log(`Checkpoint ${checkpointNum}/${numCheckpoints}: ${throughputMbps.toFixed(2)} MB/s (${throughputGbps.toFixed(3)} GB/s)`);
+        console.log(`Checkpoint ${checkpointNum}/${numCheckpoints}: ${messagesPerSec.toFixed(0)} msgs/sec`);
         
         // Reset for next checkpoint
-        totalBytes = 0;
+        messageCount = 0;
         lastCheckpoint = now;
         checkpointNum++;
         
