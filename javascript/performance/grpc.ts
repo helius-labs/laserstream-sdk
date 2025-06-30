@@ -15,6 +15,7 @@ import {
   SubscribeUpdate,
   CommitmentLevel,
 } from '@triton-one/yellowstone-grpc';
+
 /* ------------------------------------------------------------------------- */
 /* Constants                                                                 */
 /* ------------------------------------------------------------------------- */
@@ -29,23 +30,28 @@ import {
 const MAX_FRAME_SIZE = 16_777_215;      // 16 MiB ‑ 1 (HTTP/2 limit)
 const MAX_WINDOW = 0x7fffffff;          // 2 GiB ‑ 1
 const GRPC_PATH = '/geyser.Geyser/Subscribe';
+
 /* ------------------------------------------------------------------------- */
 /* gRPC framing helpers                                                      */
 /* ------------------------------------------------------------------------- */
-function encodeGrpcFrame(buf) {
+function encodeGrpcFrame(buf: Buffer): Buffer {
     const frame = Buffer.allocUnsafe(buf.length + 5);
     frame[0] = 0; // no compression
     frame.writeUInt32BE(buf.length, 1);
     buf.copy(frame, 5);
     return frame;
 }
+
 class GrpcFrameParser {
     buf = Buffer.allocUnsafe(0);
     offset = 0;
-    constructor(cb) {
+    cb: (payload: Buffer) => void;
+
+    constructor(cb: (payload: Buffer) => void) {
         this.cb = cb;
     }
-    feed(chunk) {
+
+    feed(chunk: Buffer): void {
         if (this.offset === this.buf.length) {
             this.buf = chunk;
             this.offset = 0;
@@ -56,7 +62,8 @@ class GrpcFrameParser {
         }
         this.process();
     }
-    process() {
+
+    process(): void {
         while (this.buf.length - this.offset >= 5) {
             const compressed = this.buf[this.offset];
             const len = this.buf.readUInt32BE(this.offset + 1);
@@ -76,43 +83,52 @@ class GrpcFrameParser {
         }
     }
 }
+
 /* ------------------------------------------------------------------------- */
 /* GrpcStream – lightweight Duplex-like wrapper                               */
 /* ------------------------------------------------------------------------- */
 export class GrpcStream extends EventEmitter {
-    constructor(req) {
+    req: http2.ClientHttp2Stream;
+    _parser: GrpcFrameParser | null = null;
+    _hdr: Buffer;
+
+    constructor(req: http2.ClientHttp2Stream) {
         super();
         this.req = req;
-        this._parser = null;
         this._hdr = Buffer.allocUnsafe(5);
         this._hdr[0] = 0;          // compression flag – never changes
     }
+
     /** gRPC payload writer */
-    write(msg) {
+    write(msg: any): void {
         const ui8 = SubscribeRequest.encode(msg).finish();
         // Ensure we have a Buffer view without copy (protobufjs returns Uint8Array)
         const payload = Buffer.from(ui8.buffer, ui8.byteOffset, ui8.byteLength);
 
         this.req.write(encodeGrpcFrame(payload));        
     }
+
     /** Close the request half */
-    end() {
+    end(): void {
         this.req.end();
     }
+
     /** Allow external error handling */
-    close() {
+    close(): void {
         try {
             this.req.close();
         } catch {
             /* ignore */
         }
     }
+
     /** Internal – set by subscribe() */
-    _setParser(p) {
+    _setParser(p: GrpcFrameParser): void {
         this._parser = p;
     }
+
     /** Bytes currently buffered in the parser */
-    size() {
+    size(): number {
         if (this._parser) {
             // raw buffer minus processed offset
             return this._parser.buf.length - this._parser.offset;
@@ -120,31 +136,34 @@ export class GrpcStream extends EventEmitter {
         return 0;
     }
 }
+
 /* ------------------------------------------------------------------------- */
 /* Client                                                                    */
 /* ------------------------------------------------------------------------- */
 export default class Client {
-    endpoint;
-    apiKey;
-    opts;
-    session;
-    constructor(endpoint, apiKey, opts = {}) {
+    endpoint: string;
+    apiKey: string;
+    opts: any;
+    session: http2.ClientHttp2Session | undefined;
+
+    constructor(endpoint: string, apiKey: string, opts: any = {}) {
         this.endpoint = endpoint;
         this.apiKey = apiKey;
         this.opts = opts;
     }
-    async createSession() {
+
+    async createSession(): Promise<http2.ClientHttp2Session> {
         if (this.session && !this.session.destroyed)
             return this.session;
         const url = new URL(this.endpoint);
-        const tcp = await new Promise((res, rej) => {
+        const tcp = await new Promise<net.Socket>((res, rej) => {
             const sock = net.connect(+url.port || 443, url.hostname, () => res(sock));
             sock.once('error', rej);
         });
         // Disable Nagle's algorithm (TCP_NODELAY)
         tcp.setNoDelay(true);
         tcp.setKeepAlive(true, 30_000);
-        const tlsSock = await new Promise((res, rej) => {
+        const tlsSock = await new Promise<tls.TLSSocket>((res, rej) => {
             const s = tls.connect({ socket: tcp, servername: url.hostname, ALPNProtocols: ['h2'] }, () => res(s));
             s.once('error', rej);
         });
@@ -163,7 +182,8 @@ export default class Client {
         this.session = _session;
         return _session;
     }
-    async subscribe() {
+
+    async subscribe(): Promise<GrpcStream> {
         const session = await this.createSession();
         const req = session.request({
             ':method': 'POST',
@@ -178,11 +198,11 @@ export default class Client {
         });
         const stream = new GrpcStream(req);
         // Hook low-level events and forward
-        req.on('error', (e) => stream.emit('error', e));
+        req.on('error', (e: Error) => stream.emit('error', e));
         req.on('end', () => stream.emit('end'));
-        const parser = new GrpcFrameParser((payload) => {
+        const parser = new GrpcFrameParser((payload: Buffer) => {
             try {
-                const update = SubscribeUpdate.decode(payload);
+                const update = SubscribeUpdate.decode(payload) as any;
                 // Attach raw payload size (in bytes) so callers can measure real throughput
                 update.__payloadLength = payload.length;
                 stream.emit('data', update);
@@ -192,13 +212,17 @@ export default class Client {
                 stream.emit('error', e);
             }
         });
-        req.on('data', (chunk) => {
+        req.on('data', (chunk: Buffer) => {
             parser.feed(chunk);
         });
         // expose parser size to consumers
         stream._setParser(parser);
         return stream;
     }
-    close() { this.session?.close(); }
+
+    close(): void { 
+        this.session?.close(); 
+    }
 }
+
 export { CommitmentLevel, SubscribeRequest }; 

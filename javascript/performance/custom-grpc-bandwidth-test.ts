@@ -1,5 +1,5 @@
 import { CommitmentLevel } from '../index';
-import Client from './grpc.js';
+import Client from './grpc';
 
 const config = require('../test-config');
 
