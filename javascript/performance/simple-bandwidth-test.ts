@@ -25,7 +25,7 @@ async function main() {
   
   // Get current slot and calculate replay slot (same as main.rs: slot - 300)
   const slot = await getCurrentSlot(apiKey);
-  const replaySlot = slot - 300;
+  const replaySlot = slot - 3000;
   
   console.log(`Current slot: ${slot}, Replay slot: ${replaySlot}`);
   
