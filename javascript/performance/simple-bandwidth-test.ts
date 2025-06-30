@@ -49,8 +49,8 @@ async function main() {
         accountInclude: [],
         accountExclude: [],
         accountRequired: [],
-        vote: undefined,
-        failed: undefined
+        vote: false,
+        failed: false
       }
     },
     transactionsStatus: {},
@@ -63,7 +63,9 @@ async function main() {
     },
     commitment: CommitmentLevel.Processed,
     accountsDataSlice: [],
-    ping: undefined,
+    ping: {
+      id: 1
+    },
     fromSlot: replaySlot
   };
   
