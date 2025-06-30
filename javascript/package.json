@@ -15,10 +15,8 @@
     "example:block-sub": "ts-node examples/block-sub.ts",
     "example:block-meta-sub": "ts-node examples/block-meta-sub.ts",
     "example:entry-sub": "ts-node examples/entry-sub.ts",
-    "perf:test": "ts-node performance/pump-raydium-performance-test.ts",
-    "perf:slot": "ts-node performance/slot-performance-test.ts",
-    "perf:token": "ts-node performance/token-performance-test.ts",
-    "perf:vote": "ts-node performance/vote-performance-test.ts",
+    "perf:bandwidth": "ts-node performance/rust-bandwidth-test.ts",
+    "perf:profile": "./performance/remote-rust-profile.sh",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

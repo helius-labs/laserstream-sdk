@@ -49,3 +49,11 @@ temp/
 # Configuration overrides
 *config.local.*
 test-config.local.js
+
+# Remote deployment scripts (contain server details)
+performance/remote-*-profile.sh
+performance/remote-*.sh
+
+# Profiling files
+*.cpuprofile
+rust-bandwidth-profile-*.cpuprofile
