@@ -127,18 +127,6 @@ impl StreamInner {
         internal_slot_sub_id: String,
     ) -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
         
-        // 🔍 DEBUG: Log the actual subscribe request being sent
-        println!("🔍 [DEBUG] Subscribe Request Details:");
-        println!("  - Accounts: {} filters", request.accounts.len());
-        println!("  - Slots: {} filters", request.slots.len());
-        println!("  - Transactions: {} filters", request.transactions.len());
-        println!("  - Blocks: {} filters", request.blocks.len());
-        println!("  - BlocksMeta: {} filters", request.blocks_meta.len());
-        println!("  - Entry: {} filters", request.entry.len());
-        println!("  - Commitment: {:?}", request.commitment);
-        println!("  - FromSlot: {:?}", request.from_slot);
-        println!("  - TransactionsStatus: {} filters", request.transactions_status.len());
-        
         let mut builder = GeyserGrpcClient::build_from_shared(endpoint.to_string())?
             .connect_timeout(Duration::from_secs(10))
             .max_decoding_message_size(1_000_000_000)
@@ -154,22 +142,9 @@ impl StreamInner {
         
         let (_sender, mut stream) = client.subscribe_with_request(Some(request.clone())).await?;
         
-        // 🔍 DEBUG: Message counters for debugging
-        let mut raw_messages_received = 0u64;
-        let mut messages_forwarded = 0u64;
-        
         while let Some(result) = stream.next().await {
             match result {
                 Ok(message) => {
-                    // 🔍 DEBUG: Count raw messages received from gRPC (before ANY processing)
-                    raw_messages_received += 1;
-                    
-                    // 🔍 DEBUG: Report every 1000 messages
-                    if raw_messages_received % 1000 == 0 {
-                        println!("🔍 [DEBUG] Raw messages: {}, Forwarded: {}", 
-                                raw_messages_received, messages_forwarded);
-                    }
-                    
                     // Track slot updates for reconnection (only decode when necessary)
                     if let Some(geyser::subscribe_update::UpdateOneof::Slot(slot)) = &message.update_oneof {
                         tracked_slot.store(slot.slot, Ordering::SeqCst);
@@ -185,28 +160,19 @@ impl StreamInner {
                         let mut clean_message = message;
                         clean_message.filters.retain(|filter_id| filter_id != &internal_slot_sub_id);
                         
-                        // 🔍 DEBUG: Create wrapper and call callback
                         let wrapper = crate::SubscribeUpdateWrapper(clean_message);
                         let _ = ts_callback.call(Ok(wrapper), ThreadsafeFunctionCallMode::NonBlocking);
-                        messages_forwarded += 1;
                     } else {
                         // For non-slot messages, forward as-is (no internal filter cleanup needed)
-                        // 🔍 DEBUG: Create wrapper and call callback
                         let wrapper = crate::SubscribeUpdateWrapper(message);
                         let _ = ts_callback.call(Ok(wrapper), ThreadsafeFunctionCallMode::NonBlocking);
-                        messages_forwarded += 1;
                     }
                 }
                 Err(e) => {
-                    eprintln!("🔍 [DEBUG] gRPC stream error: {:?}", e);
                     return Err(Box::new(e));
                 }
             }
         }
-        
-        // 🔍 DEBUG: Final stats when stream ends
-        println!("🔍 [DEBUG] Stream ended. Final stats - Raw: {}, Forwarded: {}", 
-                raw_messages_received, messages_forwarded);
         
         Ok(())
     }
