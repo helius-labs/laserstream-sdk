@@ -31,8 +31,11 @@ async function main() {
   
   // Create direct Yellowstone gRPC client
   const client = new Client(endpointUrl, apiKey, {
-    "grpc.max_receive_message_size": 1024 * 1024 * 1024, // 1GB
-    "grpc.max_send_message_size": 1024 * 1024 * 1024,    // 1GB
+    "grpc.max_receive_message_length": 1024 * 1024 * 1024, // 1GB
+    "grpc.max_send_message_length": 1024 * 1024 * 1024,    // 1GB
+    "grpc.max_message_size": 1024 * 1024 * 1024,           // 1GB
+    "grpc.max_receive_message_size": 1024 * 1024 * 1024,   // 1GB (keep original too)
+    "grpc.max_send_message_size": 1024 * 1024 * 1024,      // 1GB (keep original too)
   });
   
   console.log("Connecting with direct Yellowstone gRPC client...");
