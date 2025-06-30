@@ -85,6 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     futures::pin_mut!(stream);
     let mut last_checkpoint = Instant::now();
     let mut total_bytes = 0;
+    let mut message_count = 0u64;
     let test_duration = 10;
     let checkpoint_interval = 2;
     let num_checkpoints = test_duration / checkpoint_interval;
@@ -96,11 +97,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let result = result?;
         let bytes = result.encode_to_vec();
         total_bytes += bytes.len();
+        message_count += 1;
+        
         if last_checkpoint.elapsed().as_secs() > checkpoint_interval {
-            let throughput = total_bytes as f64 / last_checkpoint.elapsed().as_secs() as f64;
+            let elapsed_secs = last_checkpoint.elapsed().as_secs_f64();
+            let throughput = total_bytes as f64 / elapsed_secs;
             let throughput_mbps = throughput / 1024.0 / 1024.0;
-            println!("Checkpoint {}/{}: {:.2} MB/s", checkpoint_num, num_checkpoints, throughput_mbps);
+            let throughput_gbps = throughput / 1024.0 / 1024.0 / 1024.0;
+            let messages_per_sec = message_count as f64 / elapsed_secs;
+            
+            println!("Checkpoint {}/{}: {:.2} MB/s ({:.3} GB/s), {:.0} msgs/sec", 
+                checkpoint_num, num_checkpoints, throughput_mbps, throughput_gbps, messages_per_sec);
+            
             total_bytes = 0;
+            message_count = 0;
             last_checkpoint = Instant::now();
             checkpoint_num += 1;
             if checkpoint_num > num_checkpoints {
