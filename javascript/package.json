@@ -59,8 +59,7 @@
     "client.js",
     "client.d.ts",
     "proto-decoder.js",
-    "laserstream-napi.*.node",
-    "examples/",
+    "proto/",
     "README.md"
   ],
   "napi": {
@@ -88,17 +87,17 @@
     "helius-laserstream-linux-arm64-musl": "0.0.8"
   },
   "dependencies": {
-    "@solana/web3.js": "^1.98.2",
-    "@triton-one/yellowstone-grpc": "^4.0.2",
     "@types/protobufjs": "^6.0.0",
-    "bs58": "^5.0.0",
     "protobufjs": "^7.5.3"
   },
   "devDependencies": {
     "@napi-rs/cli": "^2.18.4",
+    "@solana/web3.js": "^1.98.2",
+    "@triton-one/yellowstone-grpc": "^4.0.2",
     "@types/bs58": "^5.0.0",
     "@types/node": "^20.0.0",
     "@types/node-fetch": "^2.6.12",
+    "bs58": "^5.0.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.0.0"
   },

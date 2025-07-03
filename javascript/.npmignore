@@ -1,8 +1,10 @@
 # Source
 src/
+napi-src/
 
-# Tests
+# Tests  
 __tests__/
+test/
 coverage/
 *.test.ts
 jest.config.js
@@ -11,13 +13,27 @@ jest.config.js
 .eslintrc
 .eslintignore
 tsconfig.json
+test-config.js
 examples/
+performance/
+
+# Build artifacts
+target/
+*.node
+Cargo.lock
+Cargo.toml
+build.rs
+package-lock.json
 
 # IDE
 .vscode/
 .idea/
 
+# CI/CD
+.github/
+
 # Misc
 .DS_Store
 *.log
-.env* 
+.env*
+node_modules/ 

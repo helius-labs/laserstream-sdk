@@ -2,7 +2,7 @@ import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '
 const credentials = require('../test-config');
 
 async function main() {
-  console.log('🏦 LaserStream Account Subscription Example');
+  console.log('🏦 Laserstream Account Subscription Example');
 
   const config: LaserstreamConfig = {
     apiKey: credentials.laserstreamProduction.apiKey,
