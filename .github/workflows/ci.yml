@@ -38,19 +38,32 @@ jobs:
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian
-            build: npm run build -- --target x86_64-unknown-linux-gnu
+            build: |-
+              set -e
+              apt-get update && apt-get install -y perl
+              npm run build -- --target x86_64-unknown-linux-gnu
           - host: ubuntu-latest
             target: x86_64-unknown-linux-musl
             docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-alpine
-            build: npm run build -- --target x86_64-unknown-linux-musl
+            build: |-
+              set -e
+              apk add --no-cache perl
+              npm run build -- --target x86_64-unknown-linux-musl
           - host: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian-aarch64
-            build: npm run build -- --target aarch64-unknown-linux-gnu
+            build: |-
+              set -e
+              apt-get update && apt-get install -y perl
+              npm run build -- --target aarch64-unknown-linux-gnu
           - host: ubuntu-latest
             target: aarch64-unknown-linux-musl
-            docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-alpine-aarch64
-            build: npm run build -- --target aarch64-unknown-linux-musl
+            docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-alpine
+            build: |-
+              set -e
+              apk add --no-cache perl
+              rustup target add aarch64-unknown-linux-musl
+              npm run build -- --target aarch64-unknown-linux-musl
     name: stable - ${{ matrix.settings.target }} - node@18
     runs-on: ${{ matrix.settings.host }}
     steps:
