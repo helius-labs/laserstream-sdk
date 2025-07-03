@@ -2,7 +2,7 @@ import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '
 const credentials = require('../test-config');
 
 async function main() {
-  console.log('🏗️ LaserStream Block Meta Subscription Example');
+  console.log('🏗️ Laserstream Block Meta Subscription Example');
 
   const config: LaserstreamConfig = {
     apiKey: credentials.laserstreamProduction.apiKey,
@@ -13,7 +13,7 @@ async function main() {
     blocksMeta: {
       "all-block-meta": {}
     },
-    commitment: CommitmentLevel.Processed,
+    commitment: CommitmentLevel.PROCESSED,
     // Empty objects for unused subscription types
     accounts: {},
     slots: {},

@@ -16,7 +16,7 @@ async function main() {
     apiKey: cfg.laserstream.apiKey,
     endpoint: cfg.laserstream.endpoint
   };
-console.log(config);
+
 
   const subscriptionRequest: any = {
     transactions: {
@@ -28,7 +28,7 @@ console.log(config);
         failed: false
       }
     },
-    commitment: CommitmentLevel.Processed,
+    commitment: CommitmentLevel.PROCESSED,
     accounts: {},
     slots: {},
     transactionsStatus: {},

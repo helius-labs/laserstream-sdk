@@ -35,7 +35,6 @@ async function subscribe(config, request, onData, onError) {
         onData(decodedUpdate);
       }
     } catch (decodeError) {
-      console.error('❌ Failed to decode protobuf update:', decodeError);
       if (onError) {
         onError(decodeError);
       }
@@ -47,7 +46,6 @@ async function subscribe(config, request, onData, onError) {
     const streamHandle = await napiClient.subscribe(request, wrappedCallback);
     return streamHandle;
   } catch (error) {
-    console.error('❌ Failed to subscribe:', error);
     if (onError) {
       onError(error);
     }

@@ -3,7 +3,6 @@ const credentials = require('../test-config');
 
 async function main() {
   console.log('🏦 LaserStream Account Subscription Example');
-  console.log('='.repeat(50));
 
   const config: LaserstreamConfig = {
     apiKey: credentials.laserstreamProduction.apiKey,
@@ -18,8 +17,7 @@ async function main() {
         filters: []
       }
     },
-    commitment: CommitmentLevel.Processed,
-    // Empty objects for unused subscription types
+    commitment: CommitmentLevel.PROCESSED,
     slots: {},
     transactions: {},
     transactionsStatus: {},

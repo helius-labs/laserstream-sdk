@@ -18,9 +18,7 @@ async function initProtobuf() {
     // Get the SubscribeUpdate message type
     SubscribeUpdate = root.lookupType('geyser.SubscribeUpdate');
     
-    console.log('✅ Protobuf schema loaded successfully');
   } catch (error) {
-    console.error('❌ Failed to load protobuf schema:', error);
     throw error;
   }
 }
@@ -54,7 +52,6 @@ function decodeSubscribeUpdate(bytes) {
     return processYellowstoneUpdate(obj);
     
   } catch (error) {
-    console.error('❌ Failed to decode protobuf message:', error);
     throw error;
   }
 }

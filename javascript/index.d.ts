@@ -6,9 +6,9 @@
 export declare function shutdownAllStreams(): void
 export declare function getActiveStreamCount(): number
 export const enum CommitmentLevel {
-  Processed = 0,
-  Confirmed = 1,
-  Finalized = 2
+  PROCESSED = 0,
+  CONFIRMED = 1,
+  FINALIZED = 2
 }
 export declare class LaserstreamClient {
   constructor(endpoint: string, token?: string | undefined | null, maxReconnectAttempts?: number | undefined | null)

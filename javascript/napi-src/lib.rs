@@ -95,9 +95,9 @@ pub fn subscribe_update_to_bytes(update: YellowstoneSubscribeUpdate) -> Result<V
 // Commitment levels enum (keeping for API compatibility)
 #[napi]
 pub enum CommitmentLevel {
-    Processed = 0,
-    Confirmed = 1,
-    Finalized = 2,
+    PROCESSED = 0,
+    CONFIRMED = 1,
+    FINALIZED = 2,
 }
 
 // Main client struct

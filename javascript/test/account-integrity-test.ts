@@ -28,7 +28,7 @@ const subscribeReq: any = {
     },
   },
   accountsDataSlice: [],
-  commitment: CommitmentLevel.Confirmed,
+      commitment: CommitmentLevel.CONFIRMED,
   slots: {},
   transactions: {},
   transactionsStatus: {},

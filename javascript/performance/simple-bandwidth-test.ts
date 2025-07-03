@@ -60,7 +60,7 @@ async function main() {
     entry: {
       "": {}
     },
-    commitment: CommitmentLevel.Processed,
+    commitment: CommitmentLevel.PROCESSED,
     accountsDataSlice: [],
     ping: undefined,
     fromSlot: replaySlot

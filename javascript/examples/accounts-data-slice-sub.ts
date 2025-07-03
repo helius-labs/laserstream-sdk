@@ -23,7 +23,7 @@ async function main() {
         length: 64   // First 64 bytes (mint + authority info)
       }
     ],
-    commitment: CommitmentLevel.Processed,
+    commitment: CommitmentLevel.PROCESSED,
     slots: {},
     transactions: {},
     transactionsStatus: {},

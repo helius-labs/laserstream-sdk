@@ -15,7 +15,7 @@ async function main() {
   const subscriptionRequest: SubscribeRequest = {
     accounts: {},
     accountsDataSlice: [],
-    commitment: CommitmentLevel.Processed,
+    commitment: CommitmentLevel.PROCESSED,
     slots: {
         slotSubscribe: {
             filterByCommitment: true,

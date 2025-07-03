@@ -2,7 +2,7 @@ import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '
 const credentials = require('../test-config');
 
 async function runTransactionStatusSubscription() {
-  console.log('📊 LaserStream Transaction Status Subscription Example');
+  console.log('📊 Laserstream Transaction Status Subscription Example');
 
   const config: LaserstreamConfig  = {
     apiKey: credentials.laserstreamProduction.apiKey,
@@ -20,7 +20,7 @@ async function runTransactionStatusSubscription() {
         accountRequired: []
       }
     },
-    commitment: CommitmentLevel.Processed,
+    commitment: CommitmentLevel.PROCESSED,
     accounts: {},
     slots: {},
     transactions: {},

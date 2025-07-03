@@ -3,7 +3,7 @@ import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '
 const credentials = require('../test-config');
 
 async function main() {
-  console.log('🎰 LaserStream Slot Subscription Example');
+  console.log('🎰 Laserstream Slot Subscription Example');
 
   const config: LaserstreamConfig = {
     apiKey: credentials.laserstreamProduction.apiKey,
@@ -14,7 +14,7 @@ async function main() {
     slots: {
       "all-slots": {}
     },
-    commitment: CommitmentLevel.Processed,
+    commitment: CommitmentLevel.PROCESSED,
     accounts: {},
     transactions: {},
     transactionsStatus: {},

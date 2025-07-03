@@ -28,7 +28,7 @@ async function run(): Promise<void> {
     blocks: {},
     blocksMeta: {},
     entry: {},
-    commitment: CommitmentLevel.Processed,
+    commitment: CommitmentLevel.PROCESSED,
     accountsDataSlice: [],
   };
 

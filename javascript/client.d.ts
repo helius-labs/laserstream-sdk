@@ -45,9 +45,9 @@ export interface StreamHandle {
 
 // Commitment level enum
 export const enum CommitmentLevel {
-  Processed = 0,
-  Confirmed = 1,
-  Finalized = 2
+  PROCESSED = 0,
+  CONFIRMED = 1,
+  FINALIZED = 2
 }
 
 // Single subscribe function using NAPI directly

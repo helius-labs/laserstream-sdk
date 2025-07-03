@@ -2,8 +2,7 @@ import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '
 const credentials = require('../test-config');
 
 async function runBlockSubscription() {
-  console.log('🧱 LaserStream Block Subscription Example');
-  console.log('='.repeat(50));
+  console.log('🧱 Laserstream Block Subscription Example');
 
   const config: LaserstreamConfig = {
     apiKey: credentials.laserstreamProduction.apiKey,
@@ -20,7 +19,7 @@ async function runBlockSubscription() {
         includeEntries: false
       }
     },
-    commitment: CommitmentLevel.Processed,
+    commitment: CommitmentLevel.PROCESSED,
     accounts: {},
     slots: {},
     transactions: {},
