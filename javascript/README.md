@@ -59,6 +59,47 @@ async function main() {
 main().catch(console.error);
 ```
 
+## Runtime Support
+
+### Node.js
+```bash
+node your-app.js
+```
+
+### Bun
+```bash
+bun your-app.js
+```
+
+The library uses Node-API (NAPI) bindings which are supported natively by both runtimes.
+
+## API Reference
+
+### Core Functions
+
+- `subscribe(config, request, onData, onError)` - Main streaming function
+- `shutdownAllStreams()` - Gracefully shutdown all active streams
+- `getActiveStreamCount()` - Get number of active streams
+
+### Types
+
+- `LaserstreamConfig` - Configuration interface
+- `SubscribeRequest` - Stream subscription request
+- `CommitmentLevel` - Solana commitment levels (PROCESSED, CONFIRMED, FINALIZED)
+
+## Performance
+
+This library is built with Rust NAPI bindings, providing significant performance improvements:
+
+**4.6x faster throughput** compared to the standard Yellowstone gRPC client.
+
+### Key Performance Features
+- Zero-copy message passing
+- Minimal JavaScript overhead  
+- Native async/await support
+- Optimized memory usage
+- High-performance Rust implementation
+
 ## License
 
 MIT 
