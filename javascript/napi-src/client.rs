@@ -165,13 +165,7 @@ impl ClientInner {
             for (key, filter) in accounts {
                 let mut yellowstone_filter = SubscribeRequestFilterAccounts::default();
                 
-                // DEBUG: Print account filter details
-                println!("[NAPI DEBUG] Account filter '{}' conversion:", key);
-                println!("  account: {:?}", filter.account);
-                println!("  owner: {:?}", filter.owner);
-                println!("  account_include: {:?}", filter.account_include);
-                println!("  account_exclude: {:?}", filter.account_exclude);
-                println!("  account_required: {:?}", filter.account_required);
+
                 
                 // Handle account field (legacy interface)
                 if let Some(account_list) = filter.account {
@@ -286,22 +280,9 @@ impl ClientInner {
             for (key, filter) in transactions {
                 let mut yellowstone_filter = SubscribeRequestFilterTransactions::default();
                 
-                // DEBUG: Print transaction filter details
-                println!("[NAPI DEBUG] Transaction filter '{}' conversion:", key);
-                println!("  vote: {:?}", filter.vote);
-                println!("  failed: {:?}", filter.failed);
-                println!("  signature: {:?}", filter.signature);
-                println!("  account_include: {:?}", filter.account_include);
-                println!("  account_exclude: {:?}", filter.account_exclude);
-                println!("  account_required: {:?}", filter.account_required);
-                
                 yellowstone_filter.vote = filter.vote;
                 yellowstone_filter.failed = filter.failed;
                 yellowstone_filter.signature = filter.signature;
-                
-                // DEBUG: Print yellowstone filter after assignment
-                println!("  → yellowstone_filter.vote: {:?}", yellowstone_filter.vote);
-                println!("  → yellowstone_filter.failed: {:?}", yellowstone_filter.failed);
                 
                 if let Some(account_include) = filter.account_include {
                     yellowstone_filter.account_include = account_include;
@@ -315,15 +296,9 @@ impl ClientInner {
                     yellowstone_filter.account_required = account_required;
                 }
                 
-                // DEBUG: Print complete yellowstone filter before inserting
-                println!("  → Complete yellowstone_filter: {:?}", yellowstone_filter);
-                
                 transactions_map.insert(key, yellowstone_filter);
             }
             request.transactions = transactions_map;
-            
-            // DEBUG: Print final transactions map
-            println!("[NAPI DEBUG] Final transactions map: {:?}", request.transactions);
         }
         
         // Handle transactions_status with complete filter support
@@ -415,14 +390,7 @@ impl ClientInner {
         // Handle from_slot
         request.from_slot = js_request.from_slot;
         
-        // DEBUG: Print complete final request
-        println!("[NAPI DEBUG] ===== COMPLETE FINAL SUBSCRIBE REQUEST =====");
-        println!("  commitment: {:?}", request.commitment);
-        println!("  from_slot: {:?}", request.from_slot);
-        println!("  transactions: {:?}", request.transactions);
-        println!("  accounts: {:?}", request.accounts);
-        println!("  slots: {:?}", request.slots);
-        println!("================================================");
+
         
         Ok(request)
     }

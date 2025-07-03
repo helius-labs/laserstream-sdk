@@ -9,9 +9,10 @@ const LOCAL_PORT  = 4003;
 const REMOTE_HOST = cfg.proxy.endpoint;
 const REMOTE_PORT = cfg.proxy.port;
 
-/* online / offline windows */
-const MIN_UP  = 20_000, MAX_UP  = 60_000;
-const MIN_DN  =  5_000, MAX_DN  = 30_000;
+/* online / offline windows – more frequent and longer disconnects */
+/* proxy stays ONLINE for 5–15 s, then OFFLINE for 30–90 s */
+const MIN_UP  =  5_000, MAX_UP  = 15_000;
+const MIN_DN  = 30_000, MAX_DN  = 90_000;
 
 let online  = true;
 let flipAt  = Date.now() + randomInt(MIN_UP, MAX_UP);

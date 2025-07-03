@@ -32,6 +32,7 @@ impl StreamInner {
         let (cancel_tx, mut cancel_rx) = oneshot::channel();
         let tracked_slot = Arc::new(AtomicU64::new(0));
         let id_clone = id.clone();
+        let made_progress = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
         // Generate unique internal slot subscription ID to avoid conflicts with user subscriptions
         let internal_slot_sub_id = format!("__internal_slot_tracker_{}", uuid::Uuid::new_v4());
@@ -46,7 +47,7 @@ impl StreamInner {
         let id_for_cleanup = id.clone();
         tokio::spawn(async move {
             let mut current_request = initial_request;
-            let mut reconnect_attempts = 0;
+            let mut reconnect_attempts = 0u32;
             let mut processed_offset_applied = false;
             
             // Determine effective max attempts
@@ -59,6 +60,10 @@ impl StreamInner {
                 let tracked_slot_clone = tracked_slot.clone();
                 let ts_callback_clone = ts_callback.clone();
                 let internal_slot_id_clone = internal_slot_sub_id.clone();
+                let progress_flag_clone = made_progress.clone();
+
+                // Reset progress flag for this connection attempt
+                made_progress.store(false, Ordering::SeqCst);
 
                 tokio::select! {
                     _ = &mut cancel_rx => {
@@ -72,15 +77,23 @@ impl StreamInner {
                         ts_callback_clone,
                         tracked_slot_clone,
                         internal_slot_id_clone,
+                        progress_flag_clone,
                     ) => {
                         match result {
                             Ok(()) => {
-                                // Successful session – reset attempt counter
                                 reconnect_attempts = 0;
+                                eprintln!("[Stream {}] Session ended gracefully, attempts reset", id_clone);
                             }
                             Err(e) => {
                                 eprintln!("[Stream {}] Connection error: {}", id_clone, e);
-                                reconnect_attempts += 1;
+
+                                reconnect_attempts += 1; // Always increment first
+
+                                if made_progress.load(Ordering::SeqCst) {
+                                    reconnect_attempts = 1; // Reset to 1 since this is the first attempt after progress
+                                }
+
+                                eprintln!("[Stream {}] Reconnect attempt #{}/{}", id_clone, reconnect_attempts, effective_max_attempts);
                             }
                         }
 
@@ -126,8 +139,7 @@ impl StreamInner {
         })
     }
 
-    // Legacy method commented out - use new_bytes instead
-    // pub fn new(...) -> Result<Self> { ... }
+
 
     async fn connect_and_stream_bytes(
         endpoint: &str,
@@ -136,6 +148,7 @@ impl StreamInner {
         ts_callback: ThreadsafeFunction<crate::SubscribeUpdateBytes, ErrorStrategy::CalleeHandled>,
         tracked_slot: Arc<AtomicU64>,
         internal_slot_sub_id: String,
+        progress_flag: Arc<std::sync::atomic::AtomicBool>,
     ) -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
         
         let mut builder = GeyserGrpcClient::build_from_shared(endpoint.to_string())?
@@ -150,14 +163,9 @@ impl StreamInner {
 
         let mut client = builder.connect().await?;
         
-        // DEBUG: Print request being sent to gRPC
-        // println!("[NAPI STREAM DEBUG] Sending subscription request to gRPC (bytes mode):");
-        println!("  transactions count: {}", request.transactions.len());
-        println!("  accounts count: {}", request.accounts.len());
+
         
         let (_sender, mut stream) = client.subscribe_with_request(Some(request.clone())).await?;
-        
-        // println!("[NAPI STREAM DEBUG] gRPC subscription established (bytes mode), starting message loop...");
         
         while let Some(result) = stream.next().await {
             match result {
@@ -169,7 +177,6 @@ impl StreamInner {
                         // Check if this slot update is EXCLUSIVELY from our internal subscription
                         // Only skip if the message contains ONLY the internal filter ID (not mixed with user subscriptions)
                         if message.filters.len() == 1 && message.filters.contains(&internal_slot_sub_id) {
-                            // println!("[NAPI STREAM DEBUG] Skipping internal slot message (bytes mode)");
                             continue; // Skip forwarding this message
                         }
                     }
@@ -185,9 +192,12 @@ impl StreamInner {
                         continue;
                     }
                     
-                    // println!("[NAPI STREAM DEBUG] Forwarding protobuf message as {} bytes to JavaScript", buf.len());
+
                     
                     let bytes_wrapper = crate::SubscribeUpdateBytes(buf);
+                    
+                    // mark that at least one message was forwarded in this session
+                    progress_flag.store(true, Ordering::SeqCst);
                     
                     // Use Blocking mode to prevent message drops and handle errors
                     let status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
