@@ -51,6 +51,15 @@ jobs:
         with:
           toolchain: stable
           targets: ${{ matrix.settings.target }}
+      - name: Setup Windows OpenSSL
+        if: matrix.settings.host == 'windows-latest'
+        run: |
+          echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
+          vcpkg install openssl:x64-windows-static-md
+          echo "OPENSSL_NO_VENDOR=1" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "OPENSSL_DIR=$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-static-md" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "OPENSSL_LIB_DIR=$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-static-md\lib" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "OPENSSL_INCLUDE_DIR=$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-static-md\include" | Out-File -FilePath $env:GITHUB_ENV -Append
       - name: Cache cargo
         uses: actions/cache@v4
         with:
