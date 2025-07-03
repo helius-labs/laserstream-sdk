@@ -1,39 +1,49 @@
-import { LaserstreamClient, CommitmentLevel, SubscribeUpdate } from '../index';
-const config = require('../test-config');
+import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '../client';
+const entryCfg = require('../test-config');
 
-async function main() {
-  console.log('LaserStream Entry Subscription Example\n');
-  
-  const client = new LaserstreamClient(
-    config.laserstreamProduction.endpoint,
-    config.laserstreamProduction.apiKey
-  );
+async function runEntrySubscription() {
+  console.log('📝 LaserStream Entry Subscription Example');
+  console.log('='.repeat(50));
 
-  const subscribeRequest = {
-    entry: { 
-      "all-entries": {}
-    },
-    commitment: CommitmentLevel.Processed
+  const config: LaserstreamConfig = {
+    apiKey: entryCfg.laserstreamProduction.apiKey,
+    endpoint: entryCfg.laserstreamProduction.endpoint,
   };
 
-  console.log('Starting subscription...');
-  
-  try {
-    // Just subscribe - lifecycle management is handled automatically!
-    const stream = await client.subscribe(subscribeRequest, (error: Error | null, update: SubscribeUpdate) => {
-      if (error) {
-        console.error('Stream error:', error);
-        return;
-      }
+  // Subscribe to entry updates
+  const request = {
+    entry: {
+      "all-entries": {}
+    },
+    commitment: CommitmentLevel.Processed,
+    accounts: {},
+    slots: {},
+    transactions: {},
+    transactionsStatus: {},
+    blocks: {},
+    blocksMeta: {},
+    accountsDataSlice: [],
+  };
 
-      console.log(update);
-    });
-    
-    console.log(`✅ Entry subscription started (${stream.id})! Press Ctrl+C to exit.`);
-  } catch (error) {
-    console.error('Subscription failed:', error);
-    process.exit(1);
-  }
-} 
+  const stream = await subscribe(
+    config,
+    request,
+    async (update: SubscribeUpdate) => {
+      console.log('📝 Entry Update:', update);
+    },
+    async (error: any) => {
+      console.error('❌ Stream error:', error);
+    }
+  );
 
-main().catch(console.error); 
+  console.log(`✅ Entry subscription started with ID: ${stream.id}`);
+
+  // Cleanup on exit
+  process.on('SIGINT', () => {
+    console.log('\n🛑 Cancelling stream...');
+    stream.cancel();
+    process.exit(0);
+  });
+}
+
+runEntrySubscription().catch(console.error); 

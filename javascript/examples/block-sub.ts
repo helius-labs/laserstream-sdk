@@ -1,44 +1,54 @@
-import { LaserstreamClient, CommitmentLevel, SubscribeUpdate } from '../index';
-const config = require('../test-config');
+import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '../client';
+const blockCfg = require('../test-config');
 
-async function main() {
-  console.log('LaserStream Block Subscription Example\n');
-  
-  const client = new LaserstreamClient(
-    config.laserstreamProduction.endpoint,
-    config.laserstreamProduction.apiKey
-  );
+async function runBlockSubscription() {
+  console.log('🧱 LaserStream Block Subscription Example');
+  console.log('='.repeat(50));
 
-  const subscribeRequest = {
-    blocks: { 
-      "pump-blocks": {
+  const config: LaserstreamConfig = {
+    apiKey: blockCfg.laserstreamProduction.apiKey,
+    endpoint: blockCfg.laserstreamProduction.endpoint,
+  };
+
+  // Subscribe to block updates
+  const request = {
+    blocks: {
+      "all-blocks": {
         accountInclude: [],
-        includeTransactions: true,
+        includeTransactions: false,
         includeAccounts: false,
         includeEntries: false
       }
     },
-    commitment: CommitmentLevel.Processed
+    commitment: CommitmentLevel.Processed,
+    accounts: {},
+    slots: {},
+    transactions: {},
+    transactionsStatus: {},
+    blocksMeta: {},
+    entry: {},
+    accountsDataSlice: [],
   };
 
-  console.log('Starting subscription...');
-  
-  try {
-    // Just subscribe - lifecycle management is handled automatically!
-    const stream = await client.subscribe(subscribeRequest, (error: Error | null, update: SubscribeUpdate) => {
-      if (error) {
-        console.error('Stream error:', error);
-        return;
-      }
+  const stream = await subscribe(
+    config,
+    request,
+    async (update: SubscribeUpdate) => {
+      console.log('🧱 Block Update:', update);
+    },
+    async (error: any) => {
+      console.error('❌ Stream error:', error);
+    }
+  );
 
-      console.log(update);
-    });
-    
-    console.log(`✅ Block subscription started (${stream.id})! Press Ctrl+C to exit.`);
-  } catch (error) {
-    console.error('Subscription failed:', error);
-    process.exit(1);
-  }
-} 
+  console.log(`✅ Block subscription started with ID: ${stream.id}`);
 
-main().catch(console.error); 
+  // Cleanup on exit
+  process.on('SIGINT', () => {
+    console.log('\n🛑 Cancelling stream...');
+    stream.cancel();
+    process.exit(0);
+  });
+}
+
+runBlockSubscription().catch(console.error); 

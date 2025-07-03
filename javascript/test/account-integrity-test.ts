@@ -1,16 +1,6 @@
-import { LaserstreamClient, CommitmentLevel } from '../index';
+import { subscribe, CommitmentLevel, LaserstreamConfig } from '../src';
 import Client from '@triton-one/yellowstone-grpc';
 import bs58 from 'bs58';
-
-// Load test configuration
-const testConfig = require('../test-config.js');
-
-// Define LaserStreamConfig interface locally
-interface LaserstreamConfig {
-  apiKey: string;
-  endpoint: string;
-  maxReconnectAttempts?: number;
-}
 
 const ACCOUNTS = [
   'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA', // Pump AMM program
@@ -18,14 +8,14 @@ const ACCOUNTS = [
 ];
 
 const laserstreamCfg: LaserstreamConfig = {
-  apiKey: testConfig.laserstream.apiKey,
-  endpoint: testConfig.laserstream.endpoint
+  apiKey: '',
+  endpoint: ''
 };
 
-// Yellowstone node for comparing with Laserstream
+//Yellowstone node for comparing with Laserstream
 const yellowstoneCfg = {
-  endpoint: testConfig.yellowstone.endpoint,
-  xToken: testConfig.yellowstone.apiKey
+  endpoint: '',
+  xToken: ''
 } as const;
 
 const subscribeReq: any = {
@@ -37,7 +27,7 @@ const subscribeReq: any = {
     },
   },
   accountsDataSlice: [],
-  commitment: CommitmentLevel.Confirmed,
+  commitment: CommitmentLevel.CONFIRMED,
   slots: {},
   transactions: {},
   transactionsStatus: {},
@@ -97,25 +87,11 @@ function normaliseAccountUpdate(u: any): any {
   return clone;
 }
 
-async function startLaserstream(): Promise<{ client: any; streamHandle: any }> {
-  // Create client with endpoint and token
-  const client = new LaserstreamClient(
-    laserstreamCfg.endpoint,
-    laserstreamCfg.apiKey
-  );
-
-  // Subscribe with request and callback for raw protobuf buffer
-  const streamHandle = await client.subscribe(subscribeReq, (error: Error | null, update: any) => {
-    if (error) {
-      console.error('🚨 LASERSTREAM ERROR:', error.message);
-      console.error('   Error type:', error.name);
-      console.error('   Full error:', error);
-      errLS += 1;
-      return;
-    }
-    
-    try {
-      const u = update;
+async function startLaserstream() {
+  await subscribe(
+    laserstreamCfg,
+    subscribeReq,
+    (u) => {
       const { key, slot } = extractKeyAndSlot(u);
       if (!key) return;
       const entry = state.get(key) || {};
@@ -125,17 +101,12 @@ async function startLaserstream(): Promise<{ client: any; streamHandle: any }> {
       latestLaserstreamUpdate.set(key, normaliseAccountUpdate(u));
       newLS += 1;
       maybePrint(key);
-    } catch (err) {
-      console.error('Laserstream callback error:', err);
-      errLS += 1;
-    }
-  });
-
-  // Return both client and stream handle to keep them alive
-  return { client, streamHandle };
+    },
+    (err) => { errLS += 1; console.error('LASERSTREAM error:', err); },
+  );
 }
 
-async function startYellowstone(): Promise<{ client: any; stream: any }> {
+async function startYellowstone() {
   const client = new Client(yellowstoneCfg.endpoint, yellowstoneCfg.xToken, {
     'grpc.max_receive_message_length': 64 * 1024 * 1024,
   });
@@ -155,9 +126,6 @@ async function startYellowstone(): Promise<{ client: any; stream: any }> {
   });
   stream.on('error', (e: Error) => { errYS += 1; console.error('YELLOWSTONE error:', e); });
   stream.on('end', () => { errYS += 1; console.error('YELLOWSTONE stream ended'); });
-
-  // Return both client and stream to keep them alive
-  return { client, stream };
 }
 
 const INTERVAL = 30_000;
@@ -230,36 +198,7 @@ setInterval(() => {
 }, INTERVAL);
 
 (async () => {
-  // Account integrity test started
-
-  // Global variables to keep streams alive
-  let laserstreamClient: any = null;
-  let laserstreamStream: any = null;
-  let yellowstoneClient: any = null;
-  let yellowstoneStream: any = null;
-
-  // Start both streams concurrently
-  const [laserstreamConnection, yellowstoneConnection] = await Promise.all([
-    startLaserstream(),
-    startYellowstone()
-  ]);
-
-  // Store references globally to prevent garbage collection
-  laserstreamClient = laserstreamConnection.client;
-  laserstreamStream = laserstreamConnection.streamHandle;
-  yellowstoneClient = yellowstoneConnection.client;
-  yellowstoneStream = yellowstoneConnection.stream;
-
-  // Cleanup on exit
-  process.on('SIGINT', () => {
-    if (laserstreamStream && typeof laserstreamStream.cancel === 'function') {
-      laserstreamStream.cancel();
-    }
-    if (yellowstoneStream && typeof yellowstoneStream.end === 'function') {
-      yellowstoneStream.end();
-    }
-    process.exit(0);
-  });
-
+  console.log('Starting account integrity test…');
+  await Promise.all([startLaserstream(), startYellowstone()]);
   await new Promise(() => {});
 })(); 

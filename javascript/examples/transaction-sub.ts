@@ -1,44 +1,58 @@
-import { LaserstreamClient, CommitmentLevel, SubscribeUpdate } from '../index';
-const config = require('../test-config');
+import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '../client';
+const txConfig = require('../test-config');
 
-async function main() {
-  console.log('LaserStream Transaction Subscription Example\n');
-  
-  const client = new LaserstreamClient(
-    config.laserstreamProduction.endpoint,
-    config.laserstreamProduction.apiKey
-  );
+async function runTransactionSubscription() {
+  console.log('💸 LaserStream Transaction Subscription Example');
 
-  const subscribeRequest = {
-    transactions: { 
-      "pump-transactions": {
-        accountInclude: ["pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"],
-        accountExclude: [],
-        accountRequired: [],
-        vote: false,
-        failed: false
-      }
-    },
-    commitment: CommitmentLevel.Processed
+  const config: LaserstreamConfig = {
+    apiKey: txConfig.laserstreamProduction.apiKey,
+    endpoint: txConfig.laserstreamProduction.endpoint,
   };
 
-  console.log('Starting subscription...');
-  
-  try {
-    const stream = await client.subscribe(subscribeRequest, (error: Error | null, update: SubscribeUpdate) => {
-      if (error) {
-        console.error('Stream error:', error);
-        return;
+  // Subscribe to transaction updates
+  const request = {
+    transactions: {
+      "all-transactions": {
+        vote: false,    // Exclude vote transactions
+        failed: false,  // Exclude failed transactions
+        accountInclude: [],
+        accountExclude: [],
+        accountRequired: []
       }
+    },
+    commitment: CommitmentLevel.Processed,
+    // Empty objects for unused subscription types
+    accounts: {},
+    slots: {},
+    transactionsStatus: {},
+    blocks: {},
+    blocksMeta: {},
+    entry: {},
+    accountsDataSlice: [],
+  };
 
-      console.log(update);
-    });
-    
-    console.log(`✅ Transaction subscription started (${stream.id})! Press Ctrl+C to exit.`);
-  } catch (error) {
-    console.error('Subscription failed:', error);
-    process.exit(1);
-  }
-} 
+  let messageCount = 0;
+  const startTime = Date.now();
 
-main().catch(console.error); 
+  const stream = await subscribe(
+    config,
+    request,
+    async (update: SubscribeUpdate) => {
+      console.log('💸 Transaction Update:', update);
+    },
+    async (error: any) => {
+      console.error('❌ Stream error:', error);
+    }
+  );
+
+  console.log(`✅ Transaction subscription started with ID: ${stream.id}`);
+
+  // Cleanup on exit
+  process.on('SIGINT', () => {
+    console.log('\n🛑 Cancelling stream...');
+    stream.cancel();
+    process.exit(0);
+  });
+}
+
+runTransactionSubscription().catch(console.error); 

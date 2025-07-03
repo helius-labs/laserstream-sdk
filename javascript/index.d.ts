@@ -10,91 +10,9 @@ export const enum CommitmentLevel {
   Confirmed = 1,
   Finalized = 2
 }
-export interface SubscribeUpdateAccount {
-  account: SubscribeUpdateAccountData
-  slot: string
-  isStartup: boolean
-}
-export interface SubscribeUpdateAccountData {
-  pubkey: Array<number>
-  lamports: string
-  owner: Array<number>
-  executable: boolean
-  rentEpoch: string
-  data: Array<number>
-  writeVersion: string
-  txnSignature?: Array<number>
-}
-export interface SubscribeUpdateSlot {
-  slot: string
-  parent?: string
-  status: number
-  deadError?: string
-}
-export interface SubscribeUpdateTransaction {
-  transaction: SubscribeUpdateTransactionData
-  slot: string
-  meta?: any
-}
-export interface SubscribeUpdateTransactionData {
-  signature: Array<number>
-  isVote: boolean
-  transaction?: any
-}
-export interface SubscribeUpdateTransactionStatus {
-  slot: string
-  signature: Array<number>
-  isVote: boolean
-  index: string
-  err?: string
-}
-export interface SubscribeUpdateBlock {
-  slot: string
-  blockhash: string
-  blockTime?: SubscribeUpdateBlockTime
-  parentSlot: string
-  parentBlockhash: string
-}
-export interface SubscribeUpdateBlockMeta {
-  slot: string
-  blockhash: string
-  blockTime?: SubscribeUpdateBlockTime
-  parentSlot: string
-  parentBlockhash: string
-}
-export interface SubscribeUpdateBlockTime {
-  timestamp: string
-}
-export interface SubscribeUpdateEntry {
-  slot: string
-  index: string
-  numHashes: string
-  hash: Array<number>
-  executedTransactionCount: string
-  startingTransactionIndex: string
-}
-export interface SubscribeUpdatePing {
-  
-}
-export interface SubscribeUpdatePong {
-  id: number
-}
-export interface SubscribeUpdate {
-  filters: Array<string>
-  createdAt?: string
-  account?: SubscribeUpdateAccount
-  slot?: SubscribeUpdateSlot
-  transaction?: SubscribeUpdateTransaction
-  transactionStatus?: SubscribeUpdateTransactionStatus
-  block?: SubscribeUpdateBlock
-  blockMeta?: SubscribeUpdateBlockMeta
-  entry?: SubscribeUpdateEntry
-  ping?: SubscribeUpdatePing
-  pong?: SubscribeUpdatePong
-}
 export declare class LaserstreamClient {
   constructor(endpoint: string, token?: string | undefined | null, maxReconnectAttempts?: number | undefined | null)
-  subscribe(request: any, callback: (error: Error | null, update: SubscribeUpdate) => void): Promise<StreamHandle>
+  subscribe(request: any, callback: (error: Error | null, updateBytes: Uint8Array) => void): Promise<StreamHandle>
 }
 export declare class StreamHandle {
   id: string

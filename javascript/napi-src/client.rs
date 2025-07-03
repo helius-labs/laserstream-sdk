@@ -52,6 +52,13 @@ pub struct JsAccountFilter {
     pub filters: Option<Vec<JsAccountsFilter>>,
     #[serde(alias = "nonemptyTxnSignature")]
     pub nonempty_txn_signature: Option<bool>,
+    // Add aliases for consistent interface matching transactions
+    #[serde(alias = "accountInclude")]
+    pub account_include: Option<Vec<String>>,
+    #[serde(alias = "accountExclude")]
+    pub account_exclude: Option<Vec<String>>,
+    #[serde(alias = "accountRequired")]
+    pub account_required: Option<Vec<String>>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -158,12 +165,37 @@ impl ClientInner {
             for (key, filter) in accounts {
                 let mut yellowstone_filter = SubscribeRequestFilterAccounts::default();
                 
+                // DEBUG: Print account filter details
+                println!("[NAPI DEBUG] Account filter '{}' conversion:", key);
+                println!("  account: {:?}", filter.account);
+                println!("  owner: {:?}", filter.owner);
+                println!("  account_include: {:?}", filter.account_include);
+                println!("  account_exclude: {:?}", filter.account_exclude);
+                println!("  account_required: {:?}", filter.account_required);
+                
+                // Handle account field (legacy interface)
                 if let Some(account_list) = filter.account {
                     yellowstone_filter.account = account_list;
                 }
                 
+                // Handle accountInclude field (consistent interface)
+                if let Some(account_include_list) = filter.account_include {
+                    yellowstone_filter.account = account_include_list;
+                }
+                
                 if let Some(owner_list) = filter.owner {
                     yellowstone_filter.owner = owner_list;
+                }
+                
+                // Handle accountExclude - NOT directly supported by Yellowstone accounts filter
+                // This would need to be implemented via complex filters, which is beyond scope
+                if let Some(_account_exclude_list) = filter.account_exclude {
+                    eprintln!("[NAPI] Warning: accountExclude not directly supported for account subscriptions");
+                }
+                
+                // Handle accountRequired - NOT directly supported by Yellowstone accounts filter
+                if let Some(_account_required_list) = filter.account_required {
+                    eprintln!("[NAPI] Warning: accountRequired not directly supported for account subscriptions");
                 }
                 
                 if let Some(nonempty_txn_signature) = filter.nonempty_txn_signature {
@@ -254,9 +286,22 @@ impl ClientInner {
             for (key, filter) in transactions {
                 let mut yellowstone_filter = SubscribeRequestFilterTransactions::default();
                 
+                // DEBUG: Print transaction filter details
+                println!("[NAPI DEBUG] Transaction filter '{}' conversion:", key);
+                println!("  vote: {:?}", filter.vote);
+                println!("  failed: {:?}", filter.failed);
+                println!("  signature: {:?}", filter.signature);
+                println!("  account_include: {:?}", filter.account_include);
+                println!("  account_exclude: {:?}", filter.account_exclude);
+                println!("  account_required: {:?}", filter.account_required);
+                
                 yellowstone_filter.vote = filter.vote;
                 yellowstone_filter.failed = filter.failed;
                 yellowstone_filter.signature = filter.signature;
+                
+                // DEBUG: Print yellowstone filter after assignment
+                println!("  → yellowstone_filter.vote: {:?}", yellowstone_filter.vote);
+                println!("  → yellowstone_filter.failed: {:?}", yellowstone_filter.failed);
                 
                 if let Some(account_include) = filter.account_include {
                     yellowstone_filter.account_include = account_include;
@@ -270,9 +315,15 @@ impl ClientInner {
                     yellowstone_filter.account_required = account_required;
                 }
                 
+                // DEBUG: Print complete yellowstone filter before inserting
+                println!("  → Complete yellowstone_filter: {:?}", yellowstone_filter);
+                
                 transactions_map.insert(key, yellowstone_filter);
             }
             request.transactions = transactions_map;
+            
+            // DEBUG: Print final transactions map
+            println!("[NAPI DEBUG] Final transactions map: {:?}", request.transactions);
         }
         
         // Handle transactions_status with complete filter support
@@ -364,23 +415,29 @@ impl ClientInner {
         // Handle from_slot
         request.from_slot = js_request.from_slot;
         
+        // DEBUG: Print complete final request
+        println!("[NAPI DEBUG] ===== COMPLETE FINAL SUBSCRIBE REQUEST =====");
+        println!("  commitment: {:?}", request.commitment);
+        println!("  from_slot: {:?}", request.from_slot);
+        println!("  transactions: {:?}", request.transactions);
+        println!("  accounts: {:?}", request.accounts);
+        println!("  slots: {:?}", request.slots);
+        println!("================================================");
+        
         Ok(request)
     }
 
-    pub async fn subscribe_internal(
+    pub async fn subscribe_internal_bytes(
         &self,
         subscribe_request: SubscribeRequest,
         ts_callback: napi::threadsafe_function::ThreadsafeFunction<
-            crate::SubscribeUpdateWrapper,
+            crate::SubscribeUpdateBytes,
             napi::threadsafe_function::ErrorStrategy::CalleeHandled,
         >,
     ) -> Result<crate::StreamHandle> {
         let stream_id = Uuid::new_v4().to_string();
 
-        // Internal slot subscription is now added in StreamInner::new with proper filtering
-        // to avoid sending internal messages to the user
-
-        let stream_inner = Arc::new(StreamInner::new(
+        let stream_inner = Arc::new(StreamInner::new_bytes(
             stream_id.clone(),
             self.endpoint.clone(),
             self.token.clone(),

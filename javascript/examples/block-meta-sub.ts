@@ -1,39 +1,53 @@
-import { LaserstreamClient, CommitmentLevel, SubscribeUpdate } from '../index';
-const config = require('../test-config');
+import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '../client';
+const blockMetaConfig = require('../test-config');
 
 async function main() {
-  console.log('LaserStream Block Meta Subscription Example\n');
-  
-  const client = new LaserstreamClient(
-    config.laserstreamProduction.endpoint,
-    config.laserstreamProduction.apiKey
-  );
+  console.log('🏗️ LaserStream Block Meta Subscription Example');
+  console.log('='.repeat(50));
 
-  const subscribeRequest = {
-    blocksMeta: { 
-      "all-block-meta": {}
-    },
-    commitment: CommitmentLevel.Processed
+  const laserstreamConfig: LaserstreamConfig = {
+    apiKey: blockMetaConfig.laserstreamProduction.apiKey,
+    endpoint: blockMetaConfig.laserstreamProduction.endpoint,
   };
 
-  console.log('Starting subscription...');
-  
-  try {
-    // Just subscribe - lifecycle management is handled automatically!
-    const stream = await client.subscribe(subscribeRequest, (error: Error | null, update: SubscribeUpdate) => {
-      if (error) {
-        console.error('Stream error:', error);
-        return;
-      }
+  const request = {
+    blocksMeta: {
+      "all-block-meta": {}
+    },
+    commitment: CommitmentLevel.Processed,
+    // Empty objects for unused subscription types
+    accounts: {},
+    slots: {},
+    transactions: {},
+    transactionsStatus: {},
+    blocks: {},
+    entry: {},
+    accountsDataSlice: [],
+  };
 
-      console.log(update);
-    });
-    
-    console.log(`✅ Block Meta subscription started (${stream.id})! Press Ctrl+C to exit.`);
-  } catch (error) {
-    console.error('Subscription failed:', error);
-    process.exit(1);
-  }
-} 
+  // Client handles disconnections automatically:
+  // - Reconnects on network issues
+  // - Resumes from last processed slot
+  // - Maintains subscription state
+  const stream = await subscribe(
+    laserstreamConfig,
+    request,
+    async (update: SubscribeUpdate) => {
+      console.log('🏗️ Block Meta Update:', update);
+    },
+    async (error: any) => {
+      console.error('❌ Stream error:', error);
+    }
+  );
+
+  console.log(`✅ Block Meta subscription started with ID: ${stream.id}`);
+
+  // Cleanup on exit
+  process.on('SIGINT', () => {
+    console.log('\n🛑 Cancelling stream...');
+    stream.cancel();
+    process.exit(0);
+  });
+}
 
 main().catch(console.error); 

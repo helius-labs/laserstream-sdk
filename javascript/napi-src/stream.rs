@@ -9,6 +9,7 @@ use tokio::sync::oneshot;
 use yellowstone_grpc_client::{GeyserGrpcClient, ClientTlsConfig};
 use yellowstone_grpc_proto::geyser;
 use uuid;
+use prost::Message;
 
 // Constants for reconnect logic
 const HARD_CAP_RECONNECT_ATTEMPTS: u32 = (20 * 60) / 5; // 20 mins / 5 sec interval = 240 attempts
@@ -20,12 +21,12 @@ pub struct StreamInner {
 }
 
 impl StreamInner {
-    pub fn new(
+    pub fn new_bytes(
         id: String,
         endpoint: String,
         token: Option<String>,
         mut initial_request: geyser::SubscribeRequest,
-        ts_callback: ThreadsafeFunction<crate::SubscribeUpdateWrapper, ErrorStrategy::CalleeHandled>,
+        ts_callback: ThreadsafeFunction<crate::SubscribeUpdateBytes, ErrorStrategy::CalleeHandled>,
         max_reconnect_attempts: u32,
     ) -> Result<Self> {
         let (cancel_tx, mut cancel_rx) = oneshot::channel();
@@ -63,7 +64,7 @@ impl StreamInner {
                         break;
                     }
 
-                    result = Self::connect_and_stream(
+                    result = Self::connect_and_stream_bytes(
                         &endpoint,
                         &token,
                         &current_request,
@@ -118,11 +119,14 @@ impl StreamInner {
         })
     }
 
-    async fn connect_and_stream(
+    // Legacy method commented out - use new_bytes instead
+    // pub fn new(...) -> Result<Self> { ... }
+
+    async fn connect_and_stream_bytes(
         endpoint: &str,
         token: &Option<String>,
         request: &geyser::SubscribeRequest,
-        ts_callback: ThreadsafeFunction<crate::SubscribeUpdateWrapper, ErrorStrategy::CalleeHandled>,
+        ts_callback: ThreadsafeFunction<crate::SubscribeUpdateBytes, ErrorStrategy::CalleeHandled>,
         tracked_slot: Arc<AtomicU64>,
         internal_slot_sub_id: String,
     ) -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -130,8 +134,7 @@ impl StreamInner {
         let mut builder = GeyserGrpcClient::build_from_shared(endpoint.to_string())?
             .connect_timeout(Duration::from_secs(10))
             .max_decoding_message_size(1_000_000_000)
-            .timeout(Duration::from_secs(300)) // Increased from 10s to 5 minutes for high-throughput streaming
-            .max_encoding_message_size(1_000_000_000) // Match decoding size
+            .timeout(Duration::from_secs(10))
             .tls_config(ClientTlsConfig::new().with_enabled_roots())?;
 
         if let Some(ref token) = token {
@@ -140,7 +143,14 @@ impl StreamInner {
 
         let mut client = builder.connect().await?;
         
+        // DEBUG: Print request being sent to gRPC
+        // println!("[NAPI STREAM DEBUG] Sending subscription request to gRPC (bytes mode):");
+        println!("  transactions count: {}", request.transactions.len());
+        println!("  accounts count: {}", request.accounts.len());
+        
         let (_sender, mut stream) = client.subscribe_with_request(Some(request.clone())).await?;
+        
+        // println!("[NAPI STREAM DEBUG] gRPC subscription established (bytes mode), starting message loop...");
         
         while let Some(result) = stream.next().await {
             match result {
@@ -152,20 +162,31 @@ impl StreamInner {
                         // Check if this slot update is EXCLUSIVELY from our internal subscription
                         // Only skip if the message contains ONLY the internal filter ID (not mixed with user subscriptions)
                         if message.filters.len() == 1 && message.filters.contains(&internal_slot_sub_id) {
+                            // println!("[NAPI STREAM DEBUG] Skipping internal slot message (bytes mode)");
                             continue; // Skip forwarding this message
                         }
-                        
-                        // For slot messages that reach here, clean up internal filter ID if present
-                        // (since we know user has slot subscriptions if we reach this point)
-                        let mut clean_message = message;
-                        clean_message.filters.retain(|filter_id| filter_id != &internal_slot_sub_id);
-                        
-                        let wrapper = crate::SubscribeUpdateWrapper(clean_message);
-                        let _ = ts_callback.call(Ok(wrapper), ThreadsafeFunctionCallMode::NonBlocking);
-                    } else {
-                        // For non-slot messages, forward as-is (no internal filter cleanup needed)
-                        let wrapper = crate::SubscribeUpdateWrapper(message);
-                        let _ = ts_callback.call(Ok(wrapper), ThreadsafeFunctionCallMode::NonBlocking);
+                    }
+                    
+                    // Clean up internal filter ID from ALL message types
+                    let mut clean_message = message;
+                    clean_message.filters.retain(|filter_id| filter_id != &internal_slot_sub_id);
+                    
+                    // Serialize the protobuf message to bytes
+                    let mut buf = Vec::new();
+                    if let Err(e) = clean_message.encode(&mut buf) {
+                        eprintln!("[Stream] Failed to encode protobuf message: {}", e);
+                        continue;
+                    }
+                    
+                    // println!("[NAPI STREAM DEBUG] Forwarding protobuf message as {} bytes to JavaScript", buf.len());
+                    
+                    let bytes_wrapper = crate::SubscribeUpdateBytes(buf);
+                    
+                    // Use Blocking mode to prevent message drops and handle errors
+                    let status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
+                    if status != napi::Status::Ok {
+                        eprintln!("[Stream] Failed to deliver bytes to JavaScript: {:?}", status);
+                        // Continue processing other messages instead of breaking the stream
                     }
                 }
                 Err(e) => {

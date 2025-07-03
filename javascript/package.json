@@ -4,6 +4,13 @@
   "description": "High-performance Solana gRPC streaming client using Rust NAPI bindings with enhanced features",
   "main": "index.js",
   "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./index.mjs",
+      "require": "./index.js",
+      "types": "./index.d.ts"
+    }
+  },
   "scripts": {
     "build": "napi build --platform --release",
     "build:debug": "napi build --platform",
@@ -15,9 +22,12 @@
     "example:block-sub": "ts-node examples/block-sub.ts",
     "example:block-meta-sub": "ts-node examples/block-meta-sub.ts",
     "example:entry-sub": "ts-node examples/entry-sub.ts",
-    "perf:bandwidth": "ts-node performance/rust-bandwidth-test.ts",
-    "perf:pure": "ts-node performance/pure-rust-bandwidth-test.ts",
-    "perf:profile": "./performance/remote-rust-profile.sh",
+    "perf:test": "ts-node performance/pump-raydium-performance-test.ts",
+    "perf:slot": "ts-node performance/slot-performance-test.ts",
+    "perf:token": "ts-node performance/token-performance-test.ts",
+    "perf:vote": "ts-node performance/vote-performance-test.ts",
+    "perf:napi": "ts-node performance/napi-grpc-performance-test.ts",
+    "perf:compare": "ts-node performance/napi-vs-yellowstone-bandwidth.ts",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -39,7 +49,7 @@
   "homepage": "https://github.com/helius-labs/laserstream/tree/main/javascript#readme",
   "files": [
     "index.js",
-    "index.d.ts", 
+    "index.d.ts",
     "laserstream-napi.*.node",
     "examples/",
     "README.md"
@@ -59,7 +69,9 @@
   "dependencies": {
     "@solana/web3.js": "^1.98.2",
     "@triton-one/yellowstone-grpc": "^4.0.2",
-    "bs58": "^5.0.0"
+    "@types/protobufjs": "^6.0.0",
+    "bs58": "^5.0.0",
+    "protobufjs": "^7.5.3"
   },
   "devDependencies": {
     "@napi-rs/cli": "^2.18.4",

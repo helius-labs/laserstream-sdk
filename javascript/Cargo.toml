@@ -23,6 +23,7 @@ parking_lot = "0.12"
 uuid = { version = "1", features = ["v4"] }
 yellowstone-grpc-client = "6.1.0"
 yellowstone-grpc-proto = "6.1.0"
+prost = "0.13"
 bs58 = "0.5.0"
 fastrand = "2.0"
 

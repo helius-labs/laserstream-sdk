@@ -1,41 +1,40 @@
-import { LaserstreamClient, CommitmentLevel, SubscribeUpdate } from '../index';
-const config = require('../test-config');
+import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '../client';
+// Type imports removed to avoid dependency issues
+const slotConfig = require('../test-config');
 
 async function main() {
-  console.log('LaserStream Slot Subscription Example\n');
-  
-  const client = new LaserstreamClient(
-    config.laserstreamProduction.endpoint,
-    config.laserstreamProduction.apiKey
-  );
+  console.log('🎰 LaserStream Slot Subscription Example');
+  console.log('='.repeat(50));
 
-  const subscribeRequest = {
-    slots: { 
-      "all-slots": {
-        filterByCommitment: true
-      }
-    },
-    commitment: CommitmentLevel.Processed
+  const config: LaserstreamConfig = {
+    apiKey: slotConfig.laserstreamProduction.apiKey,
+    endpoint: slotConfig.laserstreamProduction.endpoint,
   };
 
-  console.log('Starting subscription...');
-  
-  try {
-    // Just subscribe - lifecycle management is handled automatically!
-    await client.subscribe(subscribeRequest, (error: Error | null, update: SubscribeUpdate) => {
-      if (error) {
-        console.error('Stream error:', error);
-        return;
-      }
+  const request = {
+    slots: {
+      "all-slots": {}
+    },
+    commitment: CommitmentLevel.Processed,
+    accounts: {},
+    transactions: {},
+    transactionsStatus: {},
+    blocks: {},
+    blocksMeta: {},
+    entry: {},
+    accountsDataSlice: [],
+  };
 
-      console.log(update);
-    });
-    
-    console.log('✅ Slot subscription started! Press Ctrl+C to exit.');
-  } catch (error) {
-    console.error('Subscription failed:', error);
-    process.exit(1);
-  }
-} 
+  const stream = await subscribe(
+    config,
+    request,
+    async (update: SubscribeUpdate) => {
+      console.log('🎰 Slot Update:', update);
+    },
+    async (err) => console.error('❌ Stream error:', err)
+  );
+
+  console.log(`✅ Slot subscription started (id: ${stream.id})`);
+}
 
 main().catch(console.error); 

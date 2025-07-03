@@ -1,5 +1,4 @@
-import { LaserstreamClient, CommitmentLevel } from '../index';
-import type { SubscribeUpdate } from '../index';
+import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '../client';
 
 const config = require('../test-config');
 
@@ -67,18 +66,25 @@ async function main() {
     fromSlot: replaySlot
   };
   
-  const client = new LaserstreamClient(endpointUrl, apiKey);
-  
+  const stream = await subscribe(
+    config,
+    subscribeRequest,
+    async (update: SubscribeUpdate) => {
+    },
+    async (error: any) => {
+      console.error('❌ Stream error:', error);
+    }
+  );
   console.log("Connecting and subscribing...");
   console.log("🚀 Starting pure message consumption (no measurements)...");
   
+  const client: LaserstreamConfig = {
+    apiKey: config.laserstreamProduction.apiKey,
+    endpoint: config.laserstreamProduction.endpoint
+  };
   try {
-    await client.subscribe(subscribeRequest, (error: Error | null, update: SubscribeUpdate) => {
-      if (error) {
-        console.error('Stream error:', error);
-        return;
-      }
-      
+    await subscribe(client, subscribeRequest, (update: SubscribeUpdate) => {
+
       // Just consume messages - no processing, no measurements
     });
     

@@ -1,44 +1,45 @@
-// import { SubscribeUpdate } from '@triton-one/yellowstone-grpc';
-import { LaserstreamClient, CommitmentLevel } from '../index';
-import type { SubscribeUpdate } from '../index';
-const config = require('../test-config');
+import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '../client';
+// Type imports removed to avoid dependency issues
+const accConfig = require('../test-config');
 
 async function main() {
-  console.log('LaserStream Account Subscription Example\n');
-  
-  const client = new LaserstreamClient(
-    config.laserstreamProduction.endpoint,
-    config.laserstreamProduction.apiKey
-  );
+  console.log('🏦 LaserStream Account Subscription Example');
+  console.log('='.repeat(50));
 
-  const subscribeRequest = {
-    accounts: { 
-      "pump": {
-        account: ["pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"],
+  const config: LaserstreamConfig = {
+    apiKey: accConfig.laserstreamProduction.apiKey,
+    endpoint: accConfig.laserstreamProduction.endpoint,
+  };
+
+  const request = {
+    accounts: {
+      "all-accounts": {
+        account: [],
         owner: [],
         filters: []
       }
     },
-    commitment: CommitmentLevel.Processed
+    commitment: CommitmentLevel.Processed,
+    // Empty objects for unused subscription types
+    slots: {},
+    transactions: {},
+    transactionsStatus: {},
+    blocks: {},
+    blocksMeta: {},
+    entry: {},
+    accountsDataSlice: [],
   };
 
-  console.log('Starting subscription...');
-  
-  try {
-    // Just subscribe - lifecycle management is handled automatically!
-    await client.subscribe(subscribeRequest, (error: Error | null, update: SubscribeUpdate) => {
-      if (error) {
-        console.error('Stream error:', error);
-        return;
-      }
-      console.log(update);
-    });
-    
-    console.log('✅ Account subscription started! Press Ctrl+C to exit.');
-  } catch (error) {
-    console.error('Subscription failed:', error);
-    process.exit(1);
-  }
-} 
+  const stream = await subscribe(
+    config,
+    request,
+    async (update: SubscribeUpdate) => {
+      console.log('🏦 Account Update:', update);
+    },
+    async (err) => console.error('❌ Stream error:', err)
+  );
 
-main().catch(console.error);
+  console.log(`✅ Account subscription started (id: ${stream.id})`);
+}
+
+main().catch(console.error); 
