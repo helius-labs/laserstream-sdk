@@ -48,8 +48,8 @@ async function main() {
         accountInclude: [],
         accountExclude: [],
         accountRequired: [],
-        vote: undefined,
-        failed: undefined
+        vote: false,
+        failed: false
       }
     },
     transactionsStatus: {},
@@ -66,26 +66,14 @@ async function main() {
     fromSlot: replaySlot
   };
   
-  const stream = await subscribe(
-    config,
-    subscribeRequest,
-    async (update: SubscribeUpdate) => {
-    },
-    async (error: any) => {
-      console.error('❌ Stream error:', error);
-    }
-  );
-  console.log("Connecting and subscribing...");
-  console.log("🚀 Starting pure message consumption (no measurements)...");
-  
-  const client: LaserstreamConfig = {
+  const clientConfig: LaserstreamConfig = {
     apiKey: config.laserstreamProduction.apiKey,
     endpoint: config.laserstreamProduction.endpoint
   };
-  try {
-    await subscribe(client, subscribeRequest, (update: SubscribeUpdate) => {
 
-      // Just consume messages - no processing, no measurements
+  try {
+    await subscribe(clientConfig, subscribeRequest, (_update: SubscribeUpdate) => {
+      // Consume messages but do not process
     });
     
     console.log("✅ Subscription started - consuming messages continuously...");
