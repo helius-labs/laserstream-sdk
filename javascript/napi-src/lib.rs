@@ -163,8 +163,6 @@ impl StreamHandle {
     pub fn cancel(&self) -> Result<()> {
         // Unregister from global registry first
         unregister_stream(&self.id);
-        println!("🛑 Laserstream: Stream {} cancelled (active: {})", 
-                 &self.id[..8], get_active_stream_count());
         
         // Then cancel the actual stream
         self.inner.cancel()

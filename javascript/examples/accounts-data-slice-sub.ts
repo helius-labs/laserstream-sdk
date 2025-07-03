@@ -1,9 +1,8 @@
 import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '../client';
-// Type imports removed to avoid dependency issues
 const credentials = require('../test-config');
 
 async function main() {
-  console.log('🎰 LaserStream Slot Subscription Example');
+  console.log('🔍 LaserStream Accounts Data Slice Subscription Example');
 
   const config: LaserstreamConfig = {
     apiKey: credentials.laserstreamProduction.apiKey,
@@ -11,29 +10,38 @@ async function main() {
   };
 
   const request = {
-    slots: {
-      "all-slots": {}
+    accounts: {
+      "spl-token-accounts": {
+        account: [],
+        owner: ["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"], // SPL Token program
+        filters: []
+      }
     },
+    accountsDataSlice: [
+      {
+        offset: 0,   // Start of account data
+        length: 64   // First 64 bytes (mint + authority info)
+      }
+    ],
     commitment: CommitmentLevel.Processed,
-    accounts: {},
+    slots: {},
     transactions: {},
     transactionsStatus: {},
     blocks: {},
     blocksMeta: {},
     entry: {},
-    accountsDataSlice: [],
   };
 
   const stream = await subscribe(
     config,
     request,
     async (update: SubscribeUpdate) => {
-      console.log('🎰 Slot Update:', update);
+      console.log(update);
     },
     async (err) => console.error('❌ Stream error:', err)
   );
 
-  console.log(`✅ Slot subscription started (id: ${stream.id})`);
+  console.log(`✅ Accounts data slice subscription started (id: ${stream.id})`);
 }
 
 main().catch(console.error); 

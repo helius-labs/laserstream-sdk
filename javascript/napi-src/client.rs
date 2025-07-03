@@ -184,12 +184,12 @@ impl ClientInner {
                 // Handle accountExclude - NOT directly supported by Yellowstone accounts filter
                 // This would need to be implemented via complex filters, which is beyond scope
                 if let Some(_account_exclude_list) = filter.account_exclude {
-                    eprintln!("[NAPI] Warning: accountExclude not directly supported for account subscriptions");
+                    // accountExclude not directly supported for account subscriptions
                 }
                 
                 // Handle accountRequired - NOT directly supported by Yellowstone accounts filter
                 if let Some(_account_required_list) = filter.account_required {
-                    eprintln!("[NAPI] Warning: accountRequired not directly supported for account subscriptions");
+                    // accountRequired not directly supported for account subscriptions
                 }
                 
                 if let Some(nonempty_txn_signature) = filter.nonempty_txn_signature {

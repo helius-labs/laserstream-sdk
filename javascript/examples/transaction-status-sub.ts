@@ -1,13 +1,12 @@
 import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '../client';
-const txStatusCfg = require('../test-config');
+const credentials = require('../test-config');
 
 async function runTransactionStatusSubscription() {
   console.log('📊 LaserStream Transaction Status Subscription Example');
-  console.log('='.repeat(50));
 
   const config: LaserstreamConfig  = {
-    apiKey: txStatusCfg.laserstreamProduction.apiKey,
-    endpoint: txStatusCfg.laserstreamProduction.endpoint,
+    apiKey: credentials.laserstreamProduction.apiKey,
+    endpoint: credentials.laserstreamProduction.endpoint,
   };
 
   // Subscribe to transaction status updates
@@ -37,7 +36,7 @@ async function runTransactionStatusSubscription() {
     async (update: SubscribeUpdate) => {
       console.log('📊 Transaction Status Update:', update);
     },
-    async (error: Error | null ) => {
+    async (error: Error) => {
       console.error('❌ Stream error:', error);
     }
   );

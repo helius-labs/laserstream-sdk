@@ -317,3 +317,22 @@ module.exports.getActiveStreamCount = getActiveStreamCount
 module.exports.CommitmentLevel = CommitmentLevel
 module.exports.LaserstreamClient = LaserstreamClient
 module.exports.StreamHandle = StreamHandle
+
+// Lazy load client functions to avoid circular dependency
+Object.defineProperty(module.exports, 'subscribe', {
+  get() {
+    return require('./client.js').subscribe;
+  }
+});
+
+Object.defineProperty(module.exports, 'initProtobuf', {
+  get() {
+    return require('./client.js').initProtobuf;
+  }
+});
+
+Object.defineProperty(module.exports, 'decodeSubscribeUpdate', {
+  get() {
+    return require('./client.js').decodeSubscribeUpdate;
+  }
+});

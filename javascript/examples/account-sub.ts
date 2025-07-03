@@ -1,14 +1,13 @@
 import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '../client';
-// Type imports removed to avoid dependency issues
-const accConfig = require('../test-config');
+const credentials = require('../test-config');
 
 async function main() {
   console.log('🏦 LaserStream Account Subscription Example');
   console.log('='.repeat(50));
 
   const config: LaserstreamConfig = {
-    apiKey: accConfig.laserstreamProduction.apiKey,
-    endpoint: accConfig.laserstreamProduction.endpoint,
+    apiKey: credentials.laserstreamProduction.apiKey,
+    endpoint: credentials.laserstreamProduction.endpoint,
   };
 
   const request = {

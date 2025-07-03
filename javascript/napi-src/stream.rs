@@ -31,7 +31,6 @@ impl StreamInner {
     ) -> Result<Self> {
         let (cancel_tx, mut cancel_rx) = oneshot::channel();
         let tracked_slot = Arc::new(AtomicU64::new(0));
-        let id_clone = id.clone();
         let made_progress = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
         // Generate unique internal slot subscription ID to avoid conflicts with user subscriptions
@@ -82,10 +81,10 @@ impl StreamInner {
                         match result {
                             Ok(()) => {
                                 reconnect_attempts = 0;
-                                eprintln!("[Stream {}] Session ended gracefully, attempts reset", id_clone);
+                                // Session ended gracefully, attempts reset
                             }
-                            Err(e) => {
-                                eprintln!("[Stream {}] Connection error: {}", id_clone, e);
+                            Err(_e) => {
+                                // Connection error occurred
 
                                 reconnect_attempts += 1; // Always increment first
 
@@ -93,12 +92,12 @@ impl StreamInner {
                                     reconnect_attempts = 1; // Reset to 1 since this is the first attempt after progress
                                 }
 
-                                eprintln!("[Stream {}] Reconnect attempt #{}/{}", id_clone, reconnect_attempts, effective_max_attempts);
+                                // Check if exceeded max reconnect attempts
                             }
                         }
 
                         if reconnect_attempts >= effective_max_attempts {
-                            eprintln!("[Stream {}] Exceeded max reconnect attempts ({})", id_clone, effective_max_attempts);
+                            // Exceeded max reconnect attempts
                             break;
                         }
 
@@ -163,8 +162,6 @@ impl StreamInner {
 
         let mut client = builder.connect().await?;
         
-
-        
         let (_sender, mut stream) = client.subscribe_with_request(Some(request.clone())).await?;
         
         while let Some(result) = stream.next().await {
@@ -187,8 +184,8 @@ impl StreamInner {
                     
                     // Serialize the protobuf message to bytes
                     let mut buf = Vec::new();
-                    if let Err(e) = clean_message.encode(&mut buf) {
-                        eprintln!("[Stream] Failed to encode protobuf message: {}", e);
+                    if let Err(_e) = clean_message.encode(&mut buf) {
+                        // Failed to encode protobuf message, skip this message
                         continue;
                     }
                     
@@ -202,7 +199,7 @@ impl StreamInner {
                     // Use Blocking mode to prevent message drops and handle errors
                     let status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
                     if status != napi::Status::Ok {
-                        eprintln!("[Stream] Failed to deliver bytes to JavaScript: {:?}", status);
+                        // Failed to deliver bytes to JavaScript, continue processing
                         // Continue processing other messages instead of breaking the stream
                     }
                 }

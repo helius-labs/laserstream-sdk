@@ -1,13 +1,12 @@
 import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '../client';
-const entryCfg = require('../test-config');
+const credentials = require('../test-config');
 
 async function runEntrySubscription() {
   console.log('📝 LaserStream Entry Subscription Example');
-  console.log('='.repeat(50));
 
   const config: LaserstreamConfig = {
-    apiKey: entryCfg.laserstreamProduction.apiKey,
-    endpoint: entryCfg.laserstreamProduction.endpoint,
+    apiKey: credentials.laserstreamProduction.apiKey,
+    endpoint: credentials.laserstreamProduction.endpoint,
   };
 
   // Subscribe to entry updates
@@ -31,7 +30,7 @@ async function runEntrySubscription() {
     async (update: SubscribeUpdate) => {
       console.log('📝 Entry Update:', update);
     },
-    async (error: any) => {
+    async (error: Error) => {
       console.error('❌ Stream error:', error);
     }
   );

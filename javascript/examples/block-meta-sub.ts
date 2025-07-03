@@ -1,13 +1,12 @@
 import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '../client';
-const blockMetaConfig = require('../test-config');
+const credentials = require('../test-config');
 
 async function main() {
   console.log('🏗️ LaserStream Block Meta Subscription Example');
-  console.log('='.repeat(50));
 
-  const laserstreamConfig: LaserstreamConfig = {
-    apiKey: blockMetaConfig.laserstreamProduction.apiKey,
-    endpoint: blockMetaConfig.laserstreamProduction.endpoint,
+  const config: LaserstreamConfig = {
+    apiKey: credentials.laserstreamProduction.apiKey,
+    endpoint: credentials.laserstreamProduction.endpoint,
   };
 
   const request = {
@@ -30,7 +29,7 @@ async function main() {
   // - Resumes from last processed slot
   // - Maintains subscription state
   const stream = await subscribe(
-    laserstreamConfig,
+    config,
     request,
     async (update: SubscribeUpdate) => {
       console.log('🏗️ Block Meta Update:', update);

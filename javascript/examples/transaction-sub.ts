@@ -1,12 +1,12 @@
 import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '../client';
-const txConfig = require('../test-config');
+const credentials = require('../test-config');
 
 async function runTransactionSubscription() {
   console.log('💸 LaserStream Transaction Subscription Example');
 
   const config: LaserstreamConfig = {
-    apiKey: txConfig.laserstreamProduction.apiKey,
-    endpoint: txConfig.laserstreamProduction.endpoint,
+    apiKey: credentials.laserstreamProduction.apiKey,
+    endpoint: credentials.laserstreamProduction.endpoint,
   };
 
   // Subscribe to transaction updates
@@ -31,16 +31,13 @@ async function runTransactionSubscription() {
     accountsDataSlice: [],
   };
 
-  let messageCount = 0;
-  const startTime = Date.now();
-
   const stream = await subscribe(
     config,
     request,
     async (update: SubscribeUpdate) => {
       console.log('💸 Transaction Update:', update);
     },
-    async (error: any) => {
+    async (error: Error) => {
       console.error('❌ Stream error:', error);
     }
   );

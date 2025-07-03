@@ -1,13 +1,13 @@
 import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '../client';
-const blockCfg = require('../test-config');
+const credentials = require('../test-config');
 
 async function runBlockSubscription() {
   console.log('🧱 LaserStream Block Subscription Example');
   console.log('='.repeat(50));
 
   const config: LaserstreamConfig = {
-    apiKey: blockCfg.laserstreamProduction.apiKey,
-    endpoint: blockCfg.laserstreamProduction.endpoint,
+    apiKey: credentials.laserstreamProduction.apiKey,
+    endpoint: credentials.laserstreamProduction.endpoint,
   };
 
   // Subscribe to block updates
@@ -36,7 +36,7 @@ async function runBlockSubscription() {
     async (update: SubscribeUpdate) => {
       console.log('🧱 Block Update:', update);
     },
-    async (error: any) => {
+    async (error: Error) => {
       console.error('❌ Stream error:', error);
     }
   );
