@@ -1,2 +1,3 @@
 # Ignore build artifacts directory.
 /target/
+/test/*.sh

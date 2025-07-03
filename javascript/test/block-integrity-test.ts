@@ -1,11 +1,13 @@
-import { subscribe, CommitmentLevel, LaserstreamConfig, SubscribeRequest } from '../src';
+import { subscribe, CommitmentLevel, LaserstreamConfig, SubscribeRequest } from '../client';
 import fetch from 'node-fetch';
+const cfg = require('../test-config');
 
 async function main() {
   // Configuration for the Laserstream service
+
   const config: LaserstreamConfig = {
-    apiKey: '', // Replace with your actual API key if needed
-    endpoint: '' // Replace with the appropriate endpoint
+    apiKey: cfg.laserstream.apiKey,
+    endpoint: cfg.laserstream.endpoint
   };
 
   // Subscription request for blocks
@@ -13,7 +15,7 @@ async function main() {
   const subscriptionRequest: SubscribeRequest = {
     accounts: {},
     accountsDataSlice: [],
-    commitment: CommitmentLevel.CONFIRMED,
+    commitment: CommitmentLevel.Processed,
     slots: {
         slotSubscribe: {
             filterByCommitment: true,
@@ -30,7 +32,7 @@ async function main() {
   // Track last seen slot number to check ordering
   let lastSlotNumber: number | null = null;
 
-  const rpcEndpoint = 'https://mainnet.helius-rpc.com';
+  const rpcEndpoint = cfg.blockRpc.endpoint;
 
   async function blockExists(slot: number): Promise<boolean> {
     const body = {
@@ -49,7 +51,7 @@ async function main() {
     };
 
     try {
-      const resp = await fetch(`${rpcEndpoint}?api-key=${config.apiKey}`, {
+      const resp = await fetch(`${rpcEndpoint}?api-key=${cfg.blockRpc.apiKey}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

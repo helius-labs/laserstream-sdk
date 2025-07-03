@@ -1,6 +1,7 @@
-import { subscribe, CommitmentLevel, LaserstreamConfig } from '../src';
+import { subscribe, CommitmentLevel, LaserstreamConfig } from '../client';
 import Client from '@triton-one/yellowstone-grpc';
 import bs58 from 'bs58';
+const cfg = require('../test-config');
 
 const ACCOUNTS = [
   'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA', // Pump AMM program
@@ -8,14 +9,14 @@ const ACCOUNTS = [
 ];
 
 const laserstreamCfg: LaserstreamConfig = {
-  apiKey: '',
-  endpoint: ''
+  apiKey: cfg.laserstream.apiKey,
+  endpoint: cfg.laserstream.endpoint,
 };
 
-//Yellowstone node for comparing with Laserstream
+// Yellowstone node for comparing with Laserstream
 const yellowstoneCfg = {
-  endpoint: '',
-  xToken: ''
+  endpoint: cfg.yellowstone.endpoint,
+  xToken: cfg.yellowstone.apiKey,
 } as const;
 
 const subscribeReq: any = {
@@ -27,7 +28,7 @@ const subscribeReq: any = {
     },
   },
   accountsDataSlice: [],
-  commitment: CommitmentLevel.CONFIRMED,
+  commitment: CommitmentLevel.Confirmed,
   slots: {},
   transactions: {},
   transactionsStatus: {},

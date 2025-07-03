@@ -1,4 +1,4 @@
-const { LaserstreamClient: NapiClient, CommitmentLevel } = require('./index');
+const { LaserstreamClient: NapiClient, CommitmentLevel, shutdownAllStreams, getActiveStreamCount } = require('./index');
 const { initProtobuf, decodeSubscribeUpdate } = require('./proto-decoder');
 
 // Initialize protobuf on module load
@@ -60,5 +60,8 @@ module.exports = {
   subscribe,
   CommitmentLevel,
   initProtobuf,
-  decodeSubscribeUpdate
+  decodeSubscribeUpdate,
+  // re-export lifecycle helpers from native binding
+  shutdownAllStreams,
+  getActiveStreamCount,
 }; 

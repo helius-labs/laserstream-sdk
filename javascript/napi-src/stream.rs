@@ -47,6 +47,7 @@ impl StreamInner {
         tokio::spawn(async move {
             let mut current_request = initial_request;
             let mut reconnect_attempts = 0;
+            let mut processed_offset_applied = false;
             
             // Determine effective max attempts
             let effective_max_attempts = max_reconnect_attempts.min(HARD_CAP_RECONNECT_ATTEMPTS);
@@ -74,33 +75,39 @@ impl StreamInner {
                     ) => {
                         match result {
                             Ok(()) => {
-                                // Stream ended gracefully, continue reconnecting
+                                // Successful session – reset attempt counter
+                                reconnect_attempts = 0;
                             }
                             Err(e) => {
                                 eprintln!("[Stream {}] Connection error: {}", id_clone, e);
+                                reconnect_attempts += 1;
                             }
                         }
 
-                        reconnect_attempts += 1;
-                        
                         if reconnect_attempts >= effective_max_attempts {
                             eprintln!("[Stream {}] Exceeded max reconnect attempts ({})", id_clone, effective_max_attempts);
                             break;
                         }
 
-                        // Implement commitment-based reconnection logic
+                        // Determine where to resume based on commitment level.
                         let last_tracked_slot = tracked_slot.load(Ordering::SeqCst);
+
                         if last_tracked_slot > 0 {
                             let from_slot = match commitment_level {
-                                0 => { // Processed - replay from tracked_slot - 31 for fork safety
-                                    last_tracked_slot.saturating_sub(FORK_DEPTH_SAFETY_MARGIN)
+                                // Processed – apply one-time 31-slot rewind for fork safety
+                                0 => {
+                                    if !processed_offset_applied {
+                                        processed_offset_applied = true;
+                                        last_tracked_slot.saturating_sub(FORK_DEPTH_SAFETY_MARGIN)
+                                    } else {
+                                        last_tracked_slot // subsequent reconnects: no extra offset
+                                    }
                                 }
-                                1 | 2 => { // Confirmed or Finalized - replay from tracked_slot
-                                    last_tracked_slot
-                                }
-                                _ => last_tracked_slot
+                                // Confirmed / Finalized – always resume exactly at tracked slot
+                                1 | 2 => last_tracked_slot,
+                                _ => last_tracked_slot,
                             };
-                            
+
                             current_request.from_slot = Some(from_slot);
                         }
 

@@ -60,4 +60,6 @@ export function subscribe(
 
 // Utility functions
 export function initProtobuf(): Promise<void>;
-export function decodeSubscribeUpdate(bytes: Uint8Array): SubscribeUpdate; 
+export function decodeSubscribeUpdate(bytes: Uint8Array): SubscribeUpdate;
+export function shutdownAllStreams(): void;
+export function getActiveStreamCount(): number; 
