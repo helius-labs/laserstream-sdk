@@ -51,17 +51,35 @@ jobs:
         with:
           toolchain: stable
           targets: ${{ matrix.settings.target }}
-      - name: Setup Windows dependencies
+      - name: Setup Windows dependencies (fast)
         if: matrix.settings.host == 'windows-latest'
+        shell: powershell
         run: |
-          echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
-          vcpkg install openssl:x64-windows-static-md protobuf:x64-windows-static-md
+          # Move operations to faster D: drive
+          echo "CARGO_TARGET_DIR=D:\cargo-target" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "VCPKG_ROOT=D:\vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Append
+          
+          # Install both OpenSSL and protobuf via vcpkg (pre-compiled, much faster)
+          mkdir D:\vcpkg
+          git clone https://github.com/Microsoft/vcpkg.git D:\vcpkg --depth 1
+          D:\vcpkg\bootstrap-vcpkg.bat
+          D:\vcpkg\vcpkg.exe install openssl:x64-windows-static-md protobuf:x64-windows-static-md --clean-after-build
+          
+          # Set environment variables to use vcpkg-installed protobuf
           echo "OPENSSL_NO_VENDOR=1" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "OPENSSL_DIR=$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-static-md" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "OPENSSL_LIB_DIR=$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-static-md\lib" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "OPENSSL_INCLUDE_DIR=$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-static-md\include" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "PROTOBUF_SRC_ROOT_FOLDER=$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-static-md" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "PROTOC=$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-static-md\tools\protobuf\protoc.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "OPENSSL_DIR=D:\vcpkg\installed\x64-windows-static-md" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "OPENSSL_LIB_DIR=D:\vcpkg\installed\x64-windows-static-md\lib" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "OPENSSL_INCLUDE_DIR=D:\vcpkg\installed\x64-windows-static-md\include" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "PROTOC=D:\vcpkg\installed\x64-windows-static-md\tools\protobuf\protoc.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "PROTOBUF_SRC_ROOT_FOLDER=D:\vcpkg\installed\x64-windows-static-md" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "PROTOBUF_LIB_DIR=D:\vcpkg\installed\x64-windows-static-md\lib" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "PROTOBUF_INCLUDE_DIR=D:\vcpkg\installed\x64-windows-static-md\include" | Out-File -FilePath $env:GITHUB_ENV -Append
+          
+          # Force protobuf-src to skip building from source
+          echo "PROTOBUF_SRC_SKIP_BUILD=1" | Out-File -FilePath $env:GITHUB_ENV -Append
+          
+          # Add protoc to PATH
+          echo "D:\vcpkg\installed\x64-windows-static-md\tools\protobuf" | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -69,7 +87,7 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            javascript/target/
+            ${{ matrix.settings.host == 'windows-latest' && 'D:\cargo-target' || 'javascript/target/' }}
           key: ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}-${{ hashFiles('javascript/Cargo.lock') }}
           restore-keys: |
             ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}-
@@ -82,7 +100,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bindings-${{ matrix.settings.target }}
-          path: javascript/${{ env.APP_NAME }}.*.node
+          path: |
+            ${{ matrix.settings.host == 'windows-latest' && 'D:\cargo-target\**\*.node' || 'javascript/**/*.node' }}
           if-no-files-found: error
 
   publish:
