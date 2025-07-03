@@ -15,7 +15,7 @@
     "build": "napi build --platform --release",
     "build:debug": "napi build --platform",
     "build:ts": "tsc",
-    "build:all": "napi build --platform --release --target x86_64-apple-darwin --target aarch64-apple-darwin --target x86_64-pc-windows-msvc --target aarch64-pc-windows-msvc --target x86_64-unknown-linux-gnu --target aarch64-unknown-linux-gnu --target x86_64-unknown-linux-musl --target aarch64-unknown-linux-musl",
+    "build:all": "napi build --platform --release --target x86_64-apple-darwin --target aarch64-apple-darwin --target x86_64-pc-windows-msvc --target x86_64-unknown-linux-gnu",
     "example:account-sub": "ts-node examples/account-sub.ts",
     "example:accounts-data-slice-sub": "ts-node examples/accounts-data-slice-sub.ts",
     "example:slot-sub": "ts-node examples/slot-sub.ts",
@@ -69,22 +69,15 @@
       "additional": [
         "x86_64-pc-windows-msvc",
         "aarch64-apple-darwin",
-        "x86_64-unknown-linux-gnu",
-        "aarch64-unknown-linux-gnu",
-        "x86_64-unknown-linux-musl",
-        "aarch64-unknown-linux-musl"
+        "x86_64-unknown-linux-gnu"
       ]
     }
   },
   "optionalDependencies": {
     "helius-laserstream-win32-x64-msvc": "0.0.8",
-    "helius-laserstream-win32-arm64-msvc": "0.0.8",
     "helius-laserstream-darwin-x64": "0.0.8",
     "helius-laserstream-darwin-arm64": "0.0.8",
-    "helius-laserstream-linux-x64-gnu": "0.0.8",
-    "helius-laserstream-linux-arm64-gnu": "0.0.8",
-    "helius-laserstream-linux-x64-musl": "0.0.8",
-    "helius-laserstream-linux-arm64-musl": "0.0.8"
+    "helius-laserstream-linux-x64-gnu": "0.0.8"
   },
   "dependencies": {
     "@types/protobufjs": "^6.0.0",

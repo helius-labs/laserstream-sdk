@@ -32,113 +32,76 @@ jobs:
           - host: windows-latest
             target: x86_64-pc-windows-msvc
             build: npm run build -- --target x86_64-pc-windows-msvc
-          - host: windows-latest
-            target: aarch64-pc-windows-msvc
-            build: npm run build -- --target aarch64-pc-windows-msvc
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian
-            build: |-
-              set -e
-              apt-get update && apt-get install -y perl
-              npm run build -- --target x86_64-unknown-linux-gnu
-          - host: ubuntu-latest
-            target: x86_64-unknown-linux-musl
-            docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-alpine
-            build: |-
-              set -e
-              apk add --no-cache perl
-              npm run build -- --target x86_64-unknown-linux-musl
-          - host: ubuntu-latest
-            target: aarch64-unknown-linux-gnu
-            docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian-aarch64
-            build: |-
-              set -e
-              apt-get update && apt-get install -y perl
-              npm run build -- --target aarch64-unknown-linux-gnu
-          - host: ubuntu-latest
-            target: aarch64-unknown-linux-musl
-            docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-alpine
-            build: |-
-              set -e
-              apk add --no-cache perl
-              rustup target add aarch64-unknown-linux-musl
-              npm run build -- --target aarch64-unknown-linux-musl
+            build: npm run build -- --target x86_64-unknown-linux-gnu
     name: stable - ${{ matrix.settings.target }} - node@18
     runs-on: ${{ matrix.settings.host }}
     steps:
       - uses: actions/checkout@v4
       - name: Setup node
         uses: actions/setup-node@v4
-        if: ${{ !matrix.settings.docker }}
         with:
           node-version: 18
-      - name: Cache npm dependencies
-        uses: actions/cache@v4
-        if: ${{ !matrix.settings.docker }}
-        with:
-          path: javascript/node_modules
-          key: ${{ matrix.settings.host }}-npm-${{ hashFiles('javascript/package-lock.json') }}
-          restore-keys: |
-            ${{ matrix.settings.host }}-npm-
+      - name: Install dependencies
+        run: npm ci
+        working-directory: javascript
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-        if: ${{ !matrix.settings.docker }}
         with:
           toolchain: stable
           targets: ${{ matrix.settings.target }}
+      - name: Setup Windows dependencies (fast)
+        if: matrix.settings.host == 'windows-latest'
+        shell: powershell
+        run: |
+          # Move operations to faster D: drive
+          echo "CARGO_TARGET_DIR=D:\cargo-target" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "VCPKG_ROOT=D:\vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Append
+          
+          # Install both OpenSSL and protobuf via vcpkg (pre-compiled, much faster)
+          mkdir D:\vcpkg
+          git clone https://github.com/Microsoft/vcpkg.git D:\vcpkg --depth 1
+          D:\vcpkg\bootstrap-vcpkg.bat
+          D:\vcpkg\vcpkg.exe install openssl:x64-windows-static-md protobuf:x64-windows-static-md --clean-after-build
+          
+          # Set environment variables to use vcpkg-installed protobuf
+          echo "OPENSSL_NO_VENDOR=1" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "OPENSSL_DIR=D:\vcpkg\installed\x64-windows-static-md" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "OPENSSL_LIB_DIR=D:\vcpkg\installed\x64-windows-static-md\lib" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "OPENSSL_INCLUDE_DIR=D:\vcpkg\installed\x64-windows-static-md\include" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "PROTOC=D:\vcpkg\installed\x64-windows-static-md\tools\protobuf\protoc.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "PROTOBUF_SRC_ROOT_FOLDER=D:\vcpkg\installed\x64-windows-static-md" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "PROTOBUF_LIB_DIR=D:\vcpkg\installed\x64-windows-static-md\lib" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "PROTOBUF_INCLUDE_DIR=D:\vcpkg\installed\x64-windows-static-md\include" | Out-File -FilePath $env:GITHUB_ENV -Append
+          
+          # Force protobuf-src to skip building from source
+          echo "PROTOBUF_SRC_SKIP_BUILD=1" | Out-File -FilePath $env:GITHUB_ENV -Append
+          
+          # Add protoc to PATH
+          echo "D:\vcpkg\installed\x64-windows-static-md\tools\protobuf" | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: Cache cargo
         uses: actions/cache@v4
-        if: ${{ !matrix.settings.docker }}
         with:
           path: |
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            javascript/target/
+            ${{ matrix.settings.host == 'windows-latest' && 'D:\cargo-target' || 'javascript/target/' }}
           key: ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}-${{ hashFiles('javascript/Cargo.lock') }}
           restore-keys: |
             ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}-
             ${{ matrix.settings.target }}-cargo-
-      - uses: goto-bus-stop/setup-zig@v2
-        if: ${{ matrix.settings.target == 'armv7-unknown-linux-gnueabihf' }}
-        with:
-          version: 0.10.1
-      - name: Setup toolchain
-        run: ${{ matrix.settings.setup }}
-        if: ${{ matrix.settings.setup }}
-        shell: bash
-      - name: Setup node x86
-        if: matrix.settings.target == 'i686-pc-windows-msvc'
-        run: yarn config set supportedArchitectures.cpu "ia32"
-        shell: bash
-        working-directory: javascript
-      - name: Install dependencies
-        run: npm ci
-        working-directory: javascript
-      - name: Setup node x86
-        uses: actions/setup-node@v4
-        if: matrix.settings.target == 'i686-pc-windows-msvc'
-        with:
-          node-version: 18
-          architecture: x86
-      - name: Build in docker
-        uses: addnab/docker-run-action@v3
-        if: ${{ matrix.settings.docker }}
-        with:
-          image: ${{ matrix.settings.docker }}
-          options: '--user 0:0 -v ${{ github.workspace }}/.cargo-cache:/root/.cargo/registry/cache -v ${{ github.workspace }}/.cargo/registry/index:/root/.cargo/registry/index -v ${{ github.workspace }}:/build -w /build/javascript'
-          run: ${{ matrix.settings.build }}
       - name: Build
         run: ${{ matrix.settings.build }}
-        if: ${{ !matrix.settings.docker }}
         shell: bash
         working-directory: javascript
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: bindings-${{ matrix.settings.target }}
-          path: javascript/${{ env.APP_NAME }}.*.node
+          path: |
+            ${{ matrix.settings.host == 'windows-latest' && 'D:\cargo-target\**\*.node' || 'javascript/**/*.node' }}
           if-no-files-found: error
 
   publish:
@@ -153,13 +116,6 @@ jobs:
         with:
           node-version: 18
           registry-url: https://registry.npmjs.org/
-      - name: Cache npm dependencies
-        uses: actions/cache@v4
-        with:
-          path: javascript/node_modules
-          key: ubuntu-latest-npm-${{ hashFiles('javascript/package-lock.json') }}
-          restore-keys: |
-            ubuntu-latest-npm-
       - name: Install dependencies
         run: npm ci
         working-directory: javascript
@@ -192,11 +148,7 @@ jobs:
               "x86_64-apple-darwin") PACKAGE_NAME="helius-laserstream-darwin-x64" ;;
               "aarch64-apple-darwin") PACKAGE_NAME="helius-laserstream-darwin-arm64" ;;
               "x86_64-pc-windows-msvc") PACKAGE_NAME="helius-laserstream-win32-x64-msvc" ;;
-              "aarch64-pc-windows-msvc") PACKAGE_NAME="helius-laserstream-win32-arm64-msvc" ;;
               "x86_64-unknown-linux-gnu") PACKAGE_NAME="helius-laserstream-linux-x64-gnu" ;;
-              "aarch64-unknown-linux-gnu") PACKAGE_NAME="helius-laserstream-linux-arm64-gnu" ;;
-              "x86_64-unknown-linux-musl") PACKAGE_NAME="helius-laserstream-linux-x64-musl" ;;
-              "aarch64-unknown-linux-musl") PACKAGE_NAME="helius-laserstream-linux-arm64-musl" ;;
               *) echo "Unknown target: $target"; continue ;;
             esac
             
