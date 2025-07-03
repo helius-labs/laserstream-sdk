@@ -1,5 +1,6 @@
-import { subscribe, CommitmentLevel, LaserstreamConfig } from '../src';
+import { subscribe, CommitmentLevel, LaserstreamConfig } from '../client';
 import Client from '@triton-one/yellowstone-grpc';
+const cfg = require('../test-config');
 
 import bs58 from 'bs58';
 
@@ -12,8 +13,8 @@ async function main() {
 
   // Laserstream stream (under test)
   const config: LaserstreamConfig = {
-    apiKey: '',
-    endpoint: ''
+    apiKey: cfg.laserstream.apiKey,
+    endpoint: cfg.laserstream.endpoint
   };
 
 
@@ -27,7 +28,7 @@ async function main() {
         failed: false
       }
     },
-    commitment: CommitmentLevel.CONFIRMED,
+    commitment: CommitmentLevel.PROCESSED,
     accounts: {},
     slots: {},
     transactionsStatus: {},
@@ -39,8 +40,8 @@ async function main() {
 
   // Yellowstone node for comparing with Laserstream
   const yellowstoneConfig = {
-    endpoint: '',
-    xToken: ''
+    endpoint: cfg.yellowstone.endpoint,
+    xToken: cfg.yellowstone.apiKey
   } as const;
 
 

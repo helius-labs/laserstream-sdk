@@ -1,29 +1,26 @@
 import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '../client';
 const credentials = require('../test-config');
 
-async function main() {
-  console.log('🏦 Laserstream Account Subscription Example');
+async function runEntrySubscription() {
+  console.log('📝 Laserstream Entry Subscription Example');
 
   const config: LaserstreamConfig = {
     apiKey: credentials.laserstreamProduction.apiKey,
     endpoint: credentials.laserstreamProduction.endpoint,
   };
 
+  // Subscribe to entry updates
   const request = {
-    accounts: {
-      "all-accounts": {
-        account: [],
-        owner: [],
-        filters: []
-      }
+    entry: {
+      "all-entries": {}
     },
     commitment: CommitmentLevel.PROCESSED,
+    accounts: {},
     slots: {},
     transactions: {},
     transactionsStatus: {},
     blocks: {},
     blocksMeta: {},
-    entry: {},
     accountsDataSlice: [],
   };
 
@@ -31,12 +28,21 @@ async function main() {
     config,
     request,
     async (update: SubscribeUpdate) => {
-      console.log('🏦 Account Update:', update);
+      console.log('📝 Entry Update:', update);
     },
-    async (err) => console.error('❌ Stream error:', err)
+    async (error: Error) => {
+      console.error('❌ Stream error:', error);
+    }
   );
 
-  console.log(`✅ Account subscription started (id: ${stream.id})`);
+  console.log(`✅ Entry subscription started with ID: ${stream.id}`);
+
+  // Cleanup on exit
+  process.on('SIGINT', () => {
+    console.log('\n🛑 Cancelling stream...');
+    stream.cancel();
+    process.exit(0);
+  });
 }
 
-main().catch(console.error); 
+runEntrySubscription().catch(console.error); 

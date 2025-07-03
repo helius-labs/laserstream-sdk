@@ -1,4 +1,8 @@
 node_modules/
 dist/
-tests/
 package-lock.json
+performance/*sh
+target/
+*.sh
+*.node
+test-config.js

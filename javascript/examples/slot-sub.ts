@@ -1,8 +1,9 @@
 import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '../client';
+// Type imports removed to avoid dependency issues
 const credentials = require('../test-config');
 
 async function main() {
-  console.log('🏦 Laserstream Account Subscription Example');
+  console.log('🎰 Laserstream Slot Subscription Example');
 
   const config: LaserstreamConfig = {
     apiKey: credentials.laserstreamProduction.apiKey,
@@ -10,15 +11,11 @@ async function main() {
   };
 
   const request = {
-    accounts: {
-      "all-accounts": {
-        account: [],
-        owner: [],
-        filters: []
-      }
+    slots: {
+      "all-slots": {}
     },
     commitment: CommitmentLevel.PROCESSED,
-    slots: {},
+    accounts: {},
     transactions: {},
     transactionsStatus: {},
     blocks: {},
@@ -31,12 +28,12 @@ async function main() {
     config,
     request,
     async (update: SubscribeUpdate) => {
-      console.log('🏦 Account Update:', update);
+      console.log('🎰 Slot Update:', update);
     },
     async (err) => console.error('❌ Stream error:', err)
   );
 
-  console.log(`✅ Account subscription started (id: ${stream.id})`);
+  console.log(`✅ Slot subscription started (id: ${stream.id})`);
 }
 
 main().catch(console.error); 

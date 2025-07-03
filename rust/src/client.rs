@@ -59,6 +59,8 @@ pub fn subscribe(
 
             match connect_and_subscribe_once(&config, attempt_request, api_key_string.clone()).await {
                 Ok((sender, stream)) => {
+                    // Successful connection – reset attempt counter so we don't hit the cap
+                    reconnect_attempts = 0;
 
                     // Box sender and stream here before processing
                     let mut sender: Pin<Box<dyn futures_util::Sink<SubscribeRequest, Error = futures_mpsc::SendError> + Send>> = Box::pin(sender);
