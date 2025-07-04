@@ -64,6 +64,14 @@ jobs:
         run: ${{ matrix.settings.build }}
         shell: bash
         working-directory: javascript
+      - name: Verify build output
+        run: |
+          if [ ! -f *.node ]; then
+            echo "❌ Error: No .node file found after build"
+            exit 1
+          fi
+          echo "✅ Build output verified: $(ls -la *.node)"
+        working-directory: javascript
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -99,24 +107,57 @@ jobs:
           # Get version from package.json
           VERSION=$(node -p "require('./package.json').version")
           
+          # Check if artifacts directory exists
+          if [ ! -d "../artifacts" ]; then
+            echo "❌ Error: artifacts directory not found!"
+            exit 1
+          fi
+          
+          # List artifacts for debugging
+          echo "📦 Available artifacts:"
+          ls -la ../artifacts/
+          
+          # Track successful packages
+          PUBLISHED_COUNT=0
+          
           # Create platform-specific packages
-          for artifact in artifacts/bindings-*/; do
+          for artifact in ../artifacts/bindings-*/; do
+            if [ ! -d "$artifact" ]; then
+              echo "❌ Error: artifact directory $artifact not found!"
+              continue
+            fi
+            
             target=$(basename "$artifact" | sed 's/bindings-//')
-            echo "Creating package for $target"
+            echo "🔨 Creating package for $target"
+            
+            # Check if .node files exist
+            if ! ls "$artifact"/*.node 1> /dev/null 2>&1; then
+              echo "❌ Error: No .node files found in $artifact"
+              exit 1
+            fi
             
             # Create package directory
             mkdir -p "platform-$target"
             cd "platform-$target"
             
             # Copy the .node file
-            cp "../$artifact"/*.node ./ || continue
+            cp "$artifact"/*.node ./ || {
+              echo "❌ Error: Failed to copy .node files from $artifact"
+              exit 1
+            }
+            
+            # Verify .node file was copied
+            if ! ls *.node 1> /dev/null 2>&1; then
+              echo "❌ Error: No .node files found after copy"
+              exit 1
+            fi
             
             # Determine package name based on target
             case $target in
               "x86_64-apple-darwin") PACKAGE_NAME="helius-laserstream-darwin-x64" ;;
               "aarch64-apple-darwin") PACKAGE_NAME="helius-laserstream-darwin-arm64" ;;
               "x86_64-unknown-linux-gnu") PACKAGE_NAME="helius-laserstream-linux-x64-gnu" ;;
-              *) echo "Unknown target: $target"; continue ;;
+              *) echo "❌ Unknown target: $target"; exit 1 ;;
             esac
             
             # Create package.json for platform package
@@ -139,16 +180,65 @@ jobs:
           EOF
             
             # Publish platform package
-            echo "Publishing $PACKAGE_NAME@$VERSION"
-            npm publish
+            echo "📤 Publishing $PACKAGE_NAME@$VERSION"
+            npm publish || {
+              echo "❌ Error: Failed to publish $PACKAGE_NAME"
+              exit 1
+            }
             
+            PUBLISHED_COUNT=$((PUBLISHED_COUNT + 1))
             cd ..
           done
+          
+          # Verify we published expected number of packages
+          if [ "$PUBLISHED_COUNT" -ne 3 ]; then
+            echo "❌ Error: Expected 3 platform packages, but published $PUBLISHED_COUNT"
+            exit 1
+          fi
+          
+          echo "✅ Successfully published $PUBLISHED_COUNT platform packages"
       - name: Publish main package
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         working-directory: javascript
         run: |
           # Publish main package (without .node files)
-          echo "Publishing main package helius-laserstream"
-          npm publish 
+          echo "📤 Publishing main package helius-laserstream"
+          npm publish || {
+            echo "❌ Error: Failed to publish main package"
+            exit 1
+          }
+          echo "✅ Successfully published main package"
+      - name: Verify publication
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        working-directory: javascript
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "🔍 Verifying publication of version $VERSION"
+          
+          # Wait a moment for NPM to propagate
+          sleep 10
+          
+          # Check main package
+          if ! npm view helius-laserstream@$VERSION version > /dev/null 2>&1; then
+            echo "❌ Error: Main package helius-laserstream@$VERSION not found on NPM"
+            exit 1
+          fi
+          
+          # Check platform packages
+          PLATFORM_PACKAGES=(
+            "helius-laserstream-darwin-x64"
+            "helius-laserstream-darwin-arm64"
+            "helius-laserstream-linux-x64-gnu"
+          )
+          
+          for package in "${PLATFORM_PACKAGES[@]}"; do
+            if ! npm view "$package@$VERSION" version > /dev/null 2>&1; then
+              echo "❌ Error: Platform package $package@$VERSION not found on NPM"
+              exit 1
+            fi
+            echo "✅ Verified: $package@$VERSION"
+          done
+          
+          echo "🎉 All packages successfully published and verified!" 

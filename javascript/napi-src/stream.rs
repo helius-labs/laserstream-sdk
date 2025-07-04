@@ -1,4 +1,4 @@
-use futures_util::StreamExt;
+use futures_util::{StreamExt, SinkExt};
 use napi::threadsafe_function::{ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi::bindgen_prelude::*;
 use parking_lot::Mutex;
@@ -47,7 +47,6 @@ impl StreamInner {
         tokio::spawn(async move {
             let mut current_request = initial_request;
             let mut reconnect_attempts = 0u32;
-            let mut processed_offset_applied = false;
             
             // Determine effective max attempts
             let effective_max_attempts = max_reconnect_attempts.min(HARD_CAP_RECONNECT_ATTEMPTS);
@@ -83,44 +82,51 @@ impl StreamInner {
                                 reconnect_attempts = 0;
                                 // Session ended gracefully, attempts reset
                             }
-                            Err(_e) => {
+                            Err(e) => {
                                 // Connection error occurred
-
                                 reconnect_attempts += 1; // Always increment first
 
                                 if made_progress.load(Ordering::SeqCst) {
                                     reconnect_attempts = 1; // Reset to 1 since this is the first attempt after progress
                                 }
 
+                                // Report every error as it happens
+                                let error_msg = format!("Connection error (attempt {}): {}", reconnect_attempts, e);
+                                let _ = ts_callback.call(Err(napi::Error::from_reason(error_msg)), ThreadsafeFunctionCallMode::Blocking);
+
                                 // Check if exceeded max reconnect attempts
                             }
                         }
 
                         if reconnect_attempts >= effective_max_attempts {
-                            // Exceeded max reconnect attempts
+                            // Exceeded max reconnect attempts - call error callback one final time
+                            let error_msg = format!("Connection failed after {} attempts", effective_max_attempts);
+                            let _ = ts_callback.call(Err(napi::Error::from_reason(error_msg)), ThreadsafeFunctionCallMode::Blocking);
                             break;
                         }
 
-                        // Determine where to resume based on commitment level.
+                                                // Determine where to resume based on commitment level.
                         let last_tracked_slot = tracked_slot.load(Ordering::SeqCst);
 
                         if last_tracked_slot > 0 {
+                            // Always calculate from_slot based on current tracked_slot and commitment level
                             let from_slot = match commitment_level {
-                                // Processed – apply one-time 31-slot rewind for fork safety
+                                // Processed – always rewind by 31 slots for fork safety
                                 0 => {
-                                    if !processed_offset_applied {
-                                        processed_offset_applied = true;
-                                        last_tracked_slot.saturating_sub(FORK_DEPTH_SAFETY_MARGIN)
-                                    } else {
-                                        last_tracked_slot // subsequent reconnects: no extra offset
-                                    }
+                                    last_tracked_slot.saturating_sub(FORK_DEPTH_SAFETY_MARGIN)
                                 }
                                 // Confirmed / Finalized – always resume exactly at tracked slot
-                                1 | 2 => last_tracked_slot,
-                                _ => last_tracked_slot,
+                                1 | 2 => {
+                                    last_tracked_slot
+                                }
+                                _ => {
+                                    last_tracked_slot
+                                }
                             };
 
                             current_request.from_slot = Some(from_slot);
+                        } else {
+                            current_request.from_slot = None;
                         }
 
                         // Fixed interval delay between reconnections
@@ -137,8 +143,6 @@ impl StreamInner {
             cancel_tx: Mutex::new(Some(cancel_tx)),
         })
     }
-
-
 
     async fn connect_and_stream_bytes(
         endpoint: &str,
@@ -162,11 +166,26 @@ impl StreamInner {
 
         let mut client = builder.connect().await?;
         
-        let (_sender, mut stream) = client.subscribe_with_request(Some(request.clone())).await?;
+        let (mut sender, mut stream) = client.subscribe_with_request(Some(request.clone())).await?;
         
         while let Some(result) = stream.next().await {
             match result {
                 Ok(message) => {
+                    // Handle ping/pong mechanism for connection health
+                    if let Some(geyser::subscribe_update::UpdateOneof::Ping(_ping)) = &message.update_oneof {
+                        // Respond with pong to maintain connection (use static ID since ping doesn't contain one)
+                        let pong_request = geyser::SubscribeRequest {
+                            ping: Some(geyser::SubscribeRequestPing { id: 1 }),
+                            ..Default::default()
+                        };
+                        
+                        // Send pong response (ignore errors as connection issues will be handled by reconnect logic)
+                        let _ = sender.send(pong_request).await;
+                        
+                        // Don't forward ping messages to JavaScript - they're internal connection health
+                        continue;
+                    }
+                    
                     // Track slot updates for reconnection (only decode when necessary)
                     if let Some(geyser::subscribe_update::UpdateOneof::Slot(slot)) = &message.update_oneof {
                         tracked_slot.store(slot.slot, Ordering::SeqCst);
@@ -188,8 +207,6 @@ impl StreamInner {
                         // Failed to encode protobuf message, skip this message
                         continue;
                     }
-                    
-
                     
                     let bytes_wrapper = crate::SubscribeUpdateBytes(buf);
                     
