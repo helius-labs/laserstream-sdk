@@ -44,14 +44,14 @@ export interface StreamHandle {
 }
 
 // Commitment level enum
-export const enum CommitmentLevel {
-  PROCESSED = 0,
-  CONFIRMED = 1,
-  FINALIZED = 2
-}
+export declare const CommitmentLevel: {
+  readonly PROCESSED: 0;
+  readonly CONFIRMED: 1;
+  readonly FINALIZED: 2;
+};
 
 // Single subscribe function using NAPI directly
-export function subscribe(
+export declare function subscribe(
   config: LaserstreamConfig,
   request: SubscribeRequest,
   onData: (update: SubscribeUpdate) => void | Promise<void>,
@@ -59,7 +59,7 @@ export function subscribe(
 ): Promise<StreamHandle>;
 
 // Utility functions
-export function initProtobuf(): Promise<void>;
-export function decodeSubscribeUpdate(bytes: Uint8Array): SubscribeUpdate;
-export function shutdownAllStreams(): void;
-export function getActiveStreamCount(): number; 
+export declare function initProtobuf(): Promise<void>;
+export declare function decodeSubscribeUpdate(bytes: Uint8Array): SubscribeUpdate;
+export declare function shutdownAllStreams(): void;
+export declare function getActiveStreamCount(): number; 
