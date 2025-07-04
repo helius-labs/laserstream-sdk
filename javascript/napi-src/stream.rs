@@ -47,7 +47,6 @@ impl StreamInner {
         tokio::spawn(async move {
             let mut current_request = initial_request;
             let mut reconnect_attempts = 0u32;
-            let mut first_error_reported = false;
             
             // Determine effective max attempts
             let effective_max_attempts = max_reconnect_attempts.min(HARD_CAP_RECONNECT_ATTEMPTS);
@@ -81,25 +80,19 @@ impl StreamInner {
                         match result {
                             Ok(()) => {
                                 reconnect_attempts = 0;
-                                first_error_reported = false; // Reset on successful connection
                                 // Session ended gracefully, attempts reset
                             }
                             Err(e) => {
                                 // Connection error occurred
-                                
-                                // Call error callback only on first error (so user can see what's wrong)
-                                if !first_error_reported {
-                                    let error_msg = format!("Connection error: {}", e);
-                                    let _ = ts_callback.call(Err(napi::Error::from_reason(error_msg)), ThreadsafeFunctionCallMode::Blocking);
-                                    first_error_reported = true;
-                                }
-
                                 reconnect_attempts += 1; // Always increment first
 
                                 if made_progress.load(Ordering::SeqCst) {
                                     reconnect_attempts = 1; // Reset to 1 since this is the first attempt after progress
-                                    first_error_reported = false; // Reset error reporting after progress
                                 }
+
+                                // Report every error as it happens
+                                let error_msg = format!("Connection error (attempt {}): {}", reconnect_attempts, e);
+                                let _ = ts_callback.call(Err(napi::Error::from_reason(error_msg)), ThreadsafeFunctionCallMode::Blocking);
 
                                 // Check if exceeded max reconnect attempts
                             }
