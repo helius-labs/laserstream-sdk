@@ -130,8 +130,12 @@ jobs:
             target=$(basename "$artifact" | sed 's/bindings-//')
             echo "🔨 Creating package for $target"
             
-            # Check if .node files exist
-            if ! ls "$artifact"/*.node 1> /dev/null 2>&1; then
+            # Debug: List artifact contents
+            echo "🔍 Contents of $artifact:"
+            find "$artifact" -name "*.node" -type f
+            
+            # Check if .node files exist (they should be in javascript/ subdirectory)
+            if ! find "$artifact" -name "*.node" -type f | head -1 > /dev/null; then
               echo "❌ Error: No .node files found in $artifact"
               exit 1
             fi
@@ -140,8 +144,8 @@ jobs:
             mkdir -p "platform-$target"
             cd "platform-$target"
             
-            # Copy the .node file
-            cp "$artifact"/*.node ./ || {
+            # Copy the .node file (from javascript/ subdirectory)
+            find "../$artifact" -name "*.node" -type f -exec cp {} ./ \; || {
               echo "❌ Error: Failed to copy .node files from $artifact"
               exit 1
             }
