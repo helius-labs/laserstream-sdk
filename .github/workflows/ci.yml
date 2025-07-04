@@ -161,17 +161,20 @@ jobs:
               "x86_64-apple-darwin") 
                 PACKAGE_NAME="helius-laserstream-darwin-x64"
                 OS_FIELD="darwin"
-                CPU_FIELD="x64" 
+                CPU_FIELD="x64"
+                MAIN_BINARY="laserstream-napi.darwin-x64.node"
                 ;;
               "aarch64-apple-darwin") 
                 PACKAGE_NAME="helius-laserstream-darwin-arm64"
                 OS_FIELD="darwin"
                 CPU_FIELD="arm64"
+                MAIN_BINARY="laserstream-napi.darwin-arm64.node"
                 ;;
               "x86_64-unknown-linux-gnu") 
                 PACKAGE_NAME="helius-laserstream-linux-x64-gnu"
                 OS_FIELD="linux"
                 CPU_FIELD="x64"
+                MAIN_BINARY="laserstream-napi.linux-x64-gnu.node"
                 ;;
               *) echo "❌ Unknown target: $target"; exit 1 ;;
             esac
@@ -182,7 +185,7 @@ jobs:
             "name": "$PACKAGE_NAME",
             "version": "$VERSION",
             "description": "Platform-specific binary for helius-laserstream ($target)",
-            "main": "$(basename *.node)",
+            "main": "$MAIN_BINARY",
             "files": ["*.node"],
             "os": ["$OS_FIELD"],
             "cpu": ["$CPU_FIELD"],
