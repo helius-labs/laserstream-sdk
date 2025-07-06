@@ -41,7 +41,7 @@ async function main() {
   console.log("Connecting with direct Yellowstone gRPC client...");
   
   // Create subscribe request matching simple-bandwidth-test.ts exactly
-  const subscribeRequest: any = {
+  const subscribeRequest = {
     accounts: {
       "": {
         account: [],
@@ -60,8 +60,8 @@ async function main() {
         accountInclude: [],
         accountExclude: [],
         accountRequired: [],
-        vote: undefined,
-        failed: undefined
+        vote: true,
+        failed: true
       }
     },
     transactionsStatus: {},
