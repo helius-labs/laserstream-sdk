@@ -23,7 +23,7 @@ async function main() {
   
   // Get current slot and calculate replay slot (same as simple-bandwidth-test.ts: slot - 300)
   const slot = await getCurrentSlot(apiKey);
-  const replaySlot = slot - 2950;
+  const replaySlot = slot - 2500;
   
   console.log(`Current slot: ${slot}, Replay slot: ${replaySlot}`);
   console.log(`Endpoint: ${endpointUrl}`);
