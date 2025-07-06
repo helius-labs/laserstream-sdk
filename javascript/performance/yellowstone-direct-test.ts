@@ -1,5 +1,4 @@
-import Client from '@triton-one/yellowstone-grpc';
-import { CommitmentLevel } from '../index';
+import Client, { CommitmentLevel } from '@triton-one/yellowstone-grpc';
 
 const config = require('../test-config');
 
@@ -75,7 +74,7 @@ async function main() {
     commitment: CommitmentLevel.PROCESSED,
     accountsDataSlice: [],
     ping: undefined,
-    fromSlot: replaySlot
+    fromSlot: replaySlot.toString()
   };
   
   console.log("🚀 Starting direct Yellowstone gRPC message consumption (no measurements)...");
