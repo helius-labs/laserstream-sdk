@@ -12,6 +12,11 @@ interface LatencyStats {
   maxLatencyDiff: number;
   minLatencyDiff: number;
   latencyDiffs: number[];
+  // LaserStream loss specific metrics
+  laserstreamLosses: number[];
+  avgLaserstreamLoss: number;
+  maxLaserstreamLoss: number;
+  minLaserstreamLoss: number;
 }
 
 class LatencyComparator {
@@ -22,7 +27,12 @@ class LatencyComparator {
     avgLatencyDiff: 0,
     maxLatencyDiff: 0,
     minLatencyDiff: Number.MAX_VALUE,
-    latencyDiffs: []
+    latencyDiffs: [],
+    // LaserStream loss specific metrics
+    laserstreamLosses: [],
+    avgLaserstreamLoss: 0,
+    maxLaserstreamLoss: 0,
+    minLaserstreamLoss: Number.MAX_VALUE
   };
 
   private transactionReceived: Map<string, { source: 'laserstream' | 'yellowstone', timestamp: number }> = new Map();
@@ -187,6 +197,20 @@ class LatencyComparator {
       } else {
         this.stats.yellowstoneWins++;
         console.log(`🟡 Yellowstone WINS by ${latencyDiff}ms - TX: ${sigString.substring(0, 8)}...`);
+        
+        // Track LaserStream loss specific metrics
+        this.stats.laserstreamLosses.push(latencyDiff);
+        
+        // Update LaserStream loss min/max
+        if (latencyDiff > this.stats.maxLaserstreamLoss) {
+          this.stats.maxLaserstreamLoss = latencyDiff;
+        }
+        if (latencyDiff < this.stats.minLaserstreamLoss) {
+          this.stats.minLaserstreamLoss = latencyDiff;
+        }
+        
+        // Calculate running average of LaserStream losses
+        this.stats.avgLaserstreamLoss = this.stats.laserstreamLosses.reduce((a, b) => a + b, 0) / this.stats.laserstreamLosses.length;
       }
       
       // Update min/max latency diffs
@@ -236,6 +260,27 @@ class LatencyComparator {
       console.log(`   P99 Latency Diff: ${p99}ms`);
     }
     
+    // LaserStream Loss Analysis
+    if (this.stats.laserstreamLosses.length > 0) {
+      console.log('\n🔍 LASERSTREAM LOSS ANALYSIS:');
+      console.log(`   Total LaserStream Losses: ${this.stats.laserstreamLosses.length}`);
+      console.log(`   Average Loss Latency: ${this.stats.avgLaserstreamLoss.toFixed(2)}ms`);
+      console.log(`   Max Loss Latency: ${this.stats.maxLaserstreamLoss}ms`);
+      console.log(`   Min Loss Latency: ${this.stats.minLaserstreamLoss === Number.MAX_VALUE ? 0 : this.stats.minLaserstreamLoss}ms`);
+      
+      const sortedLosses = this.stats.laserstreamLosses.sort((a, b) => a - b);
+      const lossP50 = sortedLosses[Math.floor(sortedLosses.length * 0.5)];
+      const lossP95 = sortedLosses[Math.floor(sortedLosses.length * 0.95)];
+      const lossP99 = sortedLosses[Math.floor(sortedLosses.length * 0.99)];
+      
+      console.log(`   P50 Loss Latency: ${lossP50}ms`);
+      console.log(`   P95 Loss Latency: ${lossP95}ms`);
+      console.log(`   P99 Loss Latency: ${lossP99}ms`);
+    } else {
+      console.log('\n🔍 LASERSTREAM LOSS ANALYSIS:');
+      console.log('   🎯 LaserStream never lost!');
+    }
+    
     console.log('\n💡 INSIGHTS:');
     if (this.stats.laserstreamWins > this.stats.yellowstoneWins) {
       console.log('   🎯 LaserStream is generally faster');
@@ -247,6 +292,22 @@ class LatencyComparator {
     
     if (this.stats.avgLatencyDiff > 100) {
       console.log('   ⚠️  High average latency difference detected');
+    }
+    
+    // LaserStream loss insights
+    if (this.stats.laserstreamLosses.length > 0) {
+      const lossRate = (this.stats.laserstreamLosses.length / this.stats.totalTransactions) * 100;
+      console.log(`   📊 LaserStream loss rate: ${lossRate.toFixed(1)}%`);
+      
+      if (this.stats.avgLaserstreamLoss > 50) {
+        console.log('   ⚠️  LaserStream loses by significant margins when it does lose');
+      } else if (this.stats.avgLaserstreamLoss < 20) {
+        console.log('   ✅ LaserStream loses by small margins when it does lose');
+      }
+      
+      if (this.stats.maxLaserstreamLoss > 200) {
+        console.log('   🔴 Some LaserStream losses are very high latency');
+      }
     }
     
     console.log('==========================================\n');
