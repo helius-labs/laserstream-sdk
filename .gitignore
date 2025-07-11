@@ -1,0 +1,53 @@
+# Environment files with API keys
+.env
+.env.local
+.env.production
+.env.staging
+
+# Go binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go test binaries
+*-test
+*_test
+test-*
+
+# Go build output
+go/examples/test-account
+go/test/block-integrity-test
+go/test/test-chaos
+
+# Go module cache
+go.sum
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+
+# Node.js (for JavaScript client)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Rust
+target/
+Cargo.lock
+
+# Build outputs
+dist/
+build/
+out/ 
