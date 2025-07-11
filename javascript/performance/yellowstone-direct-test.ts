@@ -1,5 +1,4 @@
-import Client from '@triton-one/yellowstone-grpc';
-import { CommitmentLevel } from '../index';
+import Client, { CommitmentLevel } from '@triton-one/yellowstone-grpc';
 
 const config = require('../test-config');
 
@@ -24,7 +23,7 @@ async function main() {
   
   // Get current slot and calculate replay slot (same as simple-bandwidth-test.ts: slot - 300)
   const slot = await getCurrentSlot(apiKey);
-  const replaySlot = slot - 2950;
+  const replaySlot = slot - 2500;
   
   console.log(`Current slot: ${slot}, Replay slot: ${replaySlot}`);
   console.log(`Endpoint: ${endpointUrl}`);
@@ -41,7 +40,7 @@ async function main() {
   console.log("Connecting with direct Yellowstone gRPC client...");
   
   // Create subscribe request matching simple-bandwidth-test.ts exactly
-  const subscribeRequest: any = {
+  const subscribeRequest = {
     accounts: {
       "": {
         account: [],
@@ -60,8 +59,8 @@ async function main() {
         accountInclude: [],
         accountExclude: [],
         accountRequired: [],
-        vote: undefined,
-        failed: undefined
+        vote: true,
+        failed: true
       }
     },
     transactionsStatus: {},
@@ -75,7 +74,7 @@ async function main() {
     commitment: CommitmentLevel.PROCESSED,
     accountsDataSlice: [],
     ping: undefined,
-    fromSlot: replaySlot
+    fromSlot: replaySlot.toString()
   };
   
   console.log("🚀 Starting direct Yellowstone gRPC message consumption (no measurements)...");
