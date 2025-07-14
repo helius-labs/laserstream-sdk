@@ -52,7 +52,12 @@ async function main() {
         failed: true
       }
     },
-    transactionsStatus: {},
+    transactionsStatus: {
+      "": {
+        vote: true,
+        failed: true
+      }
+    },
     blocks: {},
     blocksMeta: {
       "": {}

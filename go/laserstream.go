@@ -4,50 +4,70 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/url"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	pb "github.com/rpcpool/yellowstone-grpc/examples/golang/proto"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
+// Constants for reconnect logic
+const (
+	HardCapReconnectAttempts = 240  // 20 minutes / 5 seconds = 240 attempts
+	FixedReconnectIntervalMs = 5000 // 5 seconds fixed interval
+	ForkDepthSafetyMargin    = 31   // Max fork depth for processed commitment
+)
+
+// Commitment levels
+const (
+	CommitmentProcessed = 0
+	CommitmentConfirmed = 1
+	CommitmentFinalized = 2
+)
+
 // LaserstreamConfig holds the configuration for the client.
 type LaserstreamConfig struct {
 	Endpoint             string
 	APIKey               string
-	Insecure             bool
-	MaxReconnectAttempts int // 0 or negative uses default max (~240 attempts over 20min)
+	MaxReconnectAttempts *int // nil uses default (240 attempts)
 }
 
 // DataCallback defines the function signature for handling received data.
-type DataCallback func(data *pb.SubscribeUpdate)
+type DataCallback func(data *SubscribeUpdate)
 
 // ErrorCallback defines the function signature for handling errors.
 type ErrorCallback func(err error)
 
 // Client manages the connection and subscription to Laserstream.
 type Client struct {
-	config             LaserstreamConfig
-	conn               *grpc.ClientConn
-	stream             pb.Geyser_SubscribeClient
-	lastSlot           uint64
-	mu                 sync.Mutex
-	cancel             context.CancelFunc
-	running            bool
-	dataCallback       DataCallback
-	errorCallback      ErrorCallback
-	subRequest         *pb.SubscribeRequest // Stores the initial request (or modified if internal slot sub added)
-	hasInternalSlotSub bool                 // Flag if we added an internal slot sub
+	config        LaserstreamConfig
+	conn          *grpc.ClientConn
+	stream        pb.Geyser_SubscribeClient
+	mu            sync.RWMutex
+	cancel        context.CancelFunc
+	running       bool
+	dataCallback  DataCallback
+	errorCallback ErrorCallback
 
+	// Enhanced slot tracking
+	trackedSlot  uint64
+	madeProgress uint64 // atomic bool (0/1)
+
+	// Request management
+	originalRequest   *SubscribeRequest
+	internalSlotSubID string
+	commitmentLevel   int32
 }
 
 // NewClient creates a new Laserstream client instance.
@@ -59,7 +79,7 @@ func NewClient(config LaserstreamConfig) *Client {
 
 // Subscribe initiates a subscription to the Laserstream service.
 func (c *Client) Subscribe(
-	req *pb.SubscribeRequest,
+	req *SubscribeRequest,
 	dataCallback DataCallback,
 	errorCallback ErrorCallback,
 ) error {
@@ -70,65 +90,38 @@ func (c *Client) Subscribe(
 		return fmt.Errorf("client is already subscribed")
 	}
 
-	// Clone the request so we don't modify the user's original
-	initialReq := proto.Clone(req).(*pb.SubscribeRequest)
-
-	// Add internal slot subscription if user didn't provide one
-	if len(initialReq.Slots) == 0 {
-		c.hasInternalSlotSub = true
-		internalSlotSubID := fmt.Sprintf("internal_slot_%d", rand.Intn(1000000))
-		if initialReq.Slots == nil {
-			initialReq.Slots = make(map[string]*pb.SubscribeRequestFilterSlots)
-		}
-		initialReq.Slots[internalSlotSubID] = &pb.SubscribeRequestFilterSlots{}
-	} else {
-		c.hasInternalSlotSub = false
-	}
-
-	c.subRequest = initialReq
+	// Clone the original request
+	c.originalRequest = proto.Clone(req).(*SubscribeRequest)
 	c.dataCallback = dataCallback
 	c.errorCallback = errorCallback
 
+	// Extract commitment level for reconnection logic
+	c.commitmentLevel = CommitmentProcessed
+	if req.Commitment != nil {
+		c.commitmentLevel = int32(*req.Commitment)
+	}
+
+	// Generate unique internal slot subscription ID
+	c.internalSlotSubID = fmt.Sprintf("__internal_slot_tracker_%s", strings.ReplaceAll(uuid.New().String(), "-", "")[:8])
+
+	// Add internal slot subscription for tracking (will be filtered out)
+	if c.originalRequest.Slots == nil {
+		c.originalRequest.Slots = make(map[string]*SubscribeRequestFilterSlots)
+	}
+
+	filterByCommitment := true
+	interslotUpdates := false
+	c.originalRequest.Slots[c.internalSlotSubID] = &SubscribeRequestFilterSlots{
+		FilterByCommitment: &filterByCommitment,
+		InterslotUpdates:   &interslotUpdates,
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	c.cancel = cancel
-
-	if c.conn == nil {
-		if err := c.connect(ctx); err != nil {
-			cancel()
-			return fmt.Errorf("failed to connect: %w", err)
-		}
-	}
-
-	geyserClient := pb.NewGeyserClient(c.conn)
-
-	streamCtx := ctx
-	md := metadata.New(map[string]string{"x-token": c.config.APIKey})
-	streamCtx = metadata.NewOutgoingContext(streamCtx, md)
-
-	stream, err := geyserClient.Subscribe(streamCtx)
-	if err != nil {
-		cancel()
-		if c.conn != nil {
-			c.conn.Close()
-			c.conn = nil
-		}
-		return fmt.Errorf("failed to create subscribe stream: %w", err)
-	}
-	c.stream = stream
-
-	if err := c.stream.Send(c.subRequest); err != nil {
-		cancel()
-		c.stream.CloseSend()
-		c.stream = nil
-		if c.conn != nil {
-			c.conn.Close()
-			c.conn = nil
-		}
-		return fmt.Errorf("failed to send subscription request: %w", err)
-	}
-
 	c.running = true
-	go c.receiveLoop(ctx)
+
+	// Start the connection and streaming loop
+	go c.streamLoop(ctx)
 
 	return nil
 }
@@ -137,74 +130,34 @@ func (c *Client) Subscribe(
 func (c *Client) Close() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
 	if c.cancel != nil {
 		c.cancel()
 		c.cancel = nil
 	}
-	if c.stream != nil {
-		c.stream.CloseSend()
-		c.stream = nil
-	}
-	if c.conn != nil {
-		c.conn.Close()
-		c.conn = nil
-	}
+
+	c.cleanup()
 	c.running = false
 }
 
-// --- Helper functions ---
-
-// connect establishes a gRPC connection.
-// Assumes the caller holds the client mutex (c.mu).
-func (c *Client) connect(ctx context.Context) error {
-	if c.conn != nil {
-		c.conn.Close()
-		c.conn = nil
-	}
-
-	endpoint := c.config.Endpoint
-	u, err := url.Parse(endpoint)
-	if err != nil {
-		return fmt.Errorf("error parsing endpoint: %w", err)
-	}
-
-	// Hardcode port 443 as per previous discussions
-	endpoint = u.Hostname() + ":" + "443"
-
-	insecureDial := c.config.Insecure
-	var opts []grpc.DialOption
-	if insecureDial {
-		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	} else {
-		creds := credentials.NewClientTLSFromCert(nil, "")
-		opts = append(opts, grpc.WithTransportCredentials(creds))
-	}
-	opts = append(opts, grpc.WithKeepaliveParams(kacp))
-
-	conn, err := grpc.DialContext(ctx, endpoint, opts...)
-	if err != nil {
-		return err
-	}
-
-	c.conn = conn
-	return nil
-}
-
-// receiveLoop runs in a goroutine, receiving messages and handling reconnects.
-func (c *Client) receiveLoop(ctx context.Context) {
+// streamLoop handles the main streaming logic with enhanced reconnection
+func (c *Client) streamLoop(ctx context.Context) {
 	defer func() {
 		c.mu.Lock()
+		c.cleanup()
 		c.running = false
-		if c.conn != nil {
-			c.conn.Close()
-			c.conn = nil
-		}
-		if c.stream != nil {
-			c.stream.CloseSend()
-			c.stream = nil
-		}
 		c.mu.Unlock()
 	}()
+
+	reconnectAttempts := uint32(0)
+
+	// Determine effective max attempts
+	maxAttempts := HardCapReconnectAttempts
+	if c.config.MaxReconnectAttempts != nil {
+		if *c.config.MaxReconnectAttempts < maxAttempts {
+			maxAttempts = *c.config.MaxReconnectAttempts
+		}
+	}
 
 	for {
 		select {
@@ -213,190 +166,336 @@ func (c *Client) receiveLoop(ctx context.Context) {
 		default:
 		}
 
-		c.mu.Lock()
-		stream := c.stream
-		c.mu.Unlock()
+		// Reset progress flag for this connection attempt
+		atomic.StoreUint64(&c.madeProgress, 0)
 
-		if stream == nil {
-			if !c.attemptReconnect(ctx) {
+		// Attempt connection and streaming
+		err := c.connectAndStream(ctx)
+
+		if err != nil {
+			// Always increment reconnect attempts first
+			reconnectAttempts++
+
+			// If we made progress, reset attempts to 1 (this is the first attempt after progress)
+			if atomic.LoadUint64(&c.madeProgress) != 0 {
+				reconnectAttempts = 1
+			}
+
+			// Report the error
+			if c.errorCallback != nil {
+				errorMsg := fmt.Sprintf("Connection error (attempt %d): %v", reconnectAttempts, err)
+				c.errorCallback(fmt.Errorf(errorMsg))
+			}
+
+			// Check if exceeded max reconnect attempts
+			if reconnectAttempts >= uint32(maxAttempts) {
+				if c.errorCallback != nil {
+					finalErr := fmt.Sprintf("Connection failed after %d attempts", maxAttempts)
+					c.errorCallback(fmt.Errorf(finalErr))
+				}
 				return
+			}
+
+			// Update request with from_slot for reconnection
+			c.updateRequestForReconnection()
+
+			// Wait before next attempt
+			select {
+			case <-time.After(time.Duration(FixedReconnectIntervalMs) * time.Millisecond):
+				continue
+			case <-ctx.Done():
+				return
+			}
+		} else {
+			// Connection ended gracefully, reset attempts
+			reconnectAttempts = 0
+		}
+	}
+}
+
+// connectAndStream establishes connection and handles streaming
+func (c *Client) connectAndStream(ctx context.Context) error {
+	// Connect to gRPC service
+	if err := c.connect(ctx); err != nil {
+		return fmt.Errorf("failed to connect: %w", err)
+	}
+
+	// Create gRPC client and stream
+	geyserClient := pb.NewGeyserClient(c.conn)
+
+	streamCtx := ctx
+	if c.config.APIKey != "" {
+		md := metadata.New(map[string]string{"x-token": c.config.APIKey})
+		streamCtx = metadata.NewOutgoingContext(streamCtx, md)
+	}
+
+	stream, err := geyserClient.Subscribe(streamCtx)
+	if err != nil {
+		c.cleanup()
+		return fmt.Errorf("failed to create stream: %w", err)
+	}
+
+	// Send subscription request
+	if err := stream.Send(c.originalRequest); err != nil {
+		stream.CloseSend()
+		c.cleanup()
+		return fmt.Errorf("failed to send subscription request: %w", err)
+	}
+
+	c.mu.Lock()
+	c.stream = stream
+	c.mu.Unlock()
+
+	// Handle streaming messages
+	return c.handleStream(ctx, stream)
+}
+
+// handleStream processes messages from the stream
+func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeClient) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+
+		resp, err := stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				return fmt.Errorf("stream ended")
+			}
+
+			st, ok := status.FromError(err)
+			if ok && (st.Code() == codes.Unavailable || st.Code() == codes.DeadlineExceeded) {
+				return fmt.Errorf("stream unavailable: %w", err)
+			}
+
+			return fmt.Errorf("stream error: %w", err)
+		}
+
+		// Handle ping/pong for connection health
+		if pingUpdate, ok := resp.UpdateOneof.(*pb.SubscribeUpdate_Ping); ok {
+			if pingUpdate.Ping != nil {
+				// Respond with pong
+				pongReq := &SubscribeRequest{
+					Ping: &SubscribeRequestPing{Id: 1},
+				}
+				if err := stream.Send(pongReq); err != nil {
+					return fmt.Errorf("failed to send pong: %w", err)
+				}
 			}
 			continue
 		}
 
-		resp, err := stream.Recv()
+		// Track slot updates for reconnection
+		if slotUpdate, ok := resp.UpdateOneof.(*pb.SubscribeUpdate_Slot); ok {
+			if slotUpdate.Slot != nil {
+				atomic.StoreUint64(&c.trackedSlot, slotUpdate.Slot.Slot)
 
-		if err != nil {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-
-			c.mu.Lock()
-			if c.errorCallback != nil {
-				c.errorCallback(err)
-			}
-			c.stream = nil
-			c.mu.Unlock()
-
-			st, ok := status.FromError(err)
-			if (ok && (st.Code() == codes.Unavailable || st.Code() == codes.DeadlineExceeded)) || err == io.EOF {
-				if !c.attemptReconnect(ctx) {
-					return
-				}
-			} else {
-				return // Non-recoverable error
-			}
-		} else {
-			suppressCallback := false
-
-			if slotUpdate, ok := resp.UpdateOneof.(*pb.SubscribeUpdate_Slot); ok {
-				if slotUpdate.Slot != nil {
-					newSlot := slotUpdate.Slot.Slot
-					if newSlot > 0 {
-						c.mu.Lock()
-						c.lastSlot = newSlot
-						c.mu.Unlock()
-					}
-				}
-				if c.hasInternalSlotSub {
-					suppressCallback = true
+				// Check if this slot update is EXCLUSIVELY from our internal subscription
+				if len(resp.Filters) == 1 && resp.Filters[0] == c.internalSlotSubID {
+					continue // Skip forwarding this message
 				}
 			}
+		}
 
-			c.mu.Lock()
-			callback := c.dataCallback
-			c.mu.Unlock()
-			if callback != nil && !suppressCallback {
-				callback(resp)
+		// Clean up internal filter ID from ALL message types
+		cleanedFilters := make([]string, 0, len(resp.Filters))
+		for _, filter := range resp.Filters {
+			if filter != c.internalSlotSubID {
+				cleanedFilters = append(cleanedFilters, filter)
 			}
+		}
+		resp.Filters = cleanedFilters
+
+		// Mark that at least one message was forwarded in this session
+		atomic.StoreUint64(&c.madeProgress, 1)
+
+		// Forward to user callback
+		if c.dataCallback != nil {
+			c.dataCallback(resp)
 		}
 	}
 }
 
-// attemptReconnect handles the logic for reconnecting.
-func (c *Client) attemptReconnect(ctx context.Context) bool {
-	const reconnectInterval = 5 * time.Second
-	const maxReconnectWindow = 20 * time.Minute
-	maxPossibleAttempts := int(maxReconnectWindow / reconnectInterval)
-	if maxPossibleAttempts < 1 {
-		maxPossibleAttempts = 1
-	}
+// updateRequestForReconnection updates the request with from_slot for reconnection
+func (c *Client) updateRequestForReconnection() {
+	lastTrackedSlot := atomic.LoadUint64(&c.trackedSlot)
 
-	c.mu.Lock()
-	userRequestedAttempts := c.config.MaxReconnectAttempts
-	c.mu.Unlock()
+	if lastTrackedSlot > 0 {
+		var fromSlot uint64
 
-	attemptsToMake := userRequestedAttempts
-	if attemptsToMake <= 0 {
-		attemptsToMake = maxPossibleAttempts
-	} else if attemptsToMake > maxPossibleAttempts {
-		attemptsToMake = maxPossibleAttempts
-	}
-
-	for currentAttempt := 1; currentAttempt <= attemptsToMake; currentAttempt++ {
-		select {
-		case <-ctx.Done():
-			return false
+		// Determine where to resume based on commitment level
+		switch c.commitmentLevel {
+		case CommitmentProcessed:
+			// Processed – always rewind by 31 slots for fork safety
+			if lastTrackedSlot > ForkDepthSafetyMargin {
+				fromSlot = lastTrackedSlot - ForkDepthSafetyMargin
+			} else {
+				fromSlot = 0
+			}
+		case CommitmentConfirmed, CommitmentFinalized:
+			// Confirmed/Finalized – resume exactly at tracked slot
+			fromSlot = lastTrackedSlot
 		default:
-		}
-
-		select {
-		case <-time.After(reconnectInterval):
-			c.mu.Lock()
-			if ctx.Err() != nil {
-				c.mu.Unlock()
-				return false
-			}
-			apiKey := c.config.APIKey
-			subReq := c.subRequest // Use the initial request (potentially with internal slot sub)
-			lastKnownSlot := c.lastSlot
-			errorCb := c.errorCallback
-			c.mu.Unlock()
-
-			if err := c.connect(ctx); err != nil {
-				errMsg := fmt.Sprintf("Reconnect connection failed on attempt %d/%d: %v", currentAttempt, attemptsToMake, err)
-				if errorCb != nil {
-					errorCb(fmt.Errorf("%s", errMsg))
-				}
-				continue
-			}
-
-			c.mu.Lock()
-			geyserClient := pb.NewGeyserClient(c.conn)
-			streamCtx := ctx
-			if apiKey != "" { // Check if API key exists before adding metadata
-				md := metadata.New(map[string]string{"x-token": apiKey})
-				streamCtx = metadata.NewOutgoingContext(streamCtx, md)
-			}
-			errorCb = c.errorCallback
-
-			resubReq := proto.Clone(subReq).(*pb.SubscribeRequest)
-
-			// Set FromSlot for replay if we have a last known slot
-			if lastKnownSlot > 0 {
-				// Using the FromSlot field (field 11) provided in the proto definition
-				resubReq.FromSlot = &lastKnownSlot
+			// Default to processed behavior
+			if lastTrackedSlot > ForkDepthSafetyMargin {
+				fromSlot = lastTrackedSlot - ForkDepthSafetyMargin
 			} else {
-				// If no slot tracked yet, ensure FromSlot is nil (which proto.Clone should handle)
-				resubReq.FromSlot = nil
+				fromSlot = 0
 			}
+		}
 
-			// Note: The internal slot subscription (if added) remains in the resubReq.
-			// This ensures slot tracking continues even if the user only subscribed
-			// to non-slot types initially. It becomes slightly redundant for replay
-			// once FromSlot is active, but guarantees tracking.
+		c.originalRequest.FromSlot = &fromSlot
+	} else {
+		c.originalRequest.FromSlot = nil
+	}
+}
 
-			stream, err := geyserClient.Subscribe(streamCtx)
-			if err != nil {
-				errMsg := fmt.Sprintf("Failed to re-create stream on attempt %d/%d: %v", currentAttempt, attemptsToMake, err)
-				if c.conn != nil {
-					c.conn.Close()
-					c.conn = nil
-				}
-				c.mu.Unlock()
-				if errorCb != nil {
-					errorCb(fmt.Errorf("%s", errMsg))
-				}
-				continue
-			}
+// connect establishes a gRPC connection
+func (c *Client) connect(ctx context.Context) error {
+	c.cleanup()
 
-			if err := stream.Send(resubReq); err != nil {
-				errMsg := fmt.Sprintf("Failed to re-send subscription request on attempt %d/%d: %v", currentAttempt, attemptsToMake, err)
-				stream.CloseSend()
-				if c.conn != nil {
-					c.conn.Close()
-					c.conn = nil
-				}
-				c.mu.Unlock()
-				if errorCb != nil {
-					errorCb(fmt.Errorf("%s", errMsg))
-				}
-				continue
-			}
+	endpoint := c.config.Endpoint
 
-			c.stream = stream
-			c.mu.Unlock()
-			return true // Reconnect successful
-
-		case <-ctx.Done():
-			return false
+	// Handle production endpoint formats
+	var target string
+	if strings.HasPrefix(endpoint, "https://") || strings.HasPrefix(endpoint, "http://") {
+		// URL format (e.g., https://example.com or https://example.com:443)
+		u, err := url.Parse(endpoint)
+		if err != nil {
+			return fmt.Errorf("error parsing endpoint URL: %w", err)
+		}
+		if u.Port() != "" {
+			// URL has port specified (e.g., https://example.com:443)
+			target = u.Host
+		} else {
+			// URL without port, add default 443
+			target = u.Hostname() + ":443"
+		}
+	} else {
+		// Simple host:port format (e.g., localhost:4003, example.com:80, example.com)
+		if strings.Contains(endpoint, ":") {
+			// Already has port
+			target = endpoint
+		} else {
+			// No port, add default 443
+			target = endpoint + ":443"
 		}
 	}
 
-	maxAttemptsErr := fmt.Errorf("failed to reconnect after %d attempts", attemptsToMake)
-	c.mu.Lock()
-	errorCb := c.errorCallback
-	c.mu.Unlock()
-	if errorCb != nil {
-		errorCb(maxAttemptsErr)
+	var opts []grpc.DialOption
+	creds := credentials.NewClientTLSFromCert(nil, "")
+	opts = append(opts, grpc.WithTransportCredentials(creds))
+
+	// Enhanced keepalive parameters
+	opts = append(opts, grpc.WithKeepaliveParams(keepalive.ClientParameters{
+		Time:                30 * time.Second,
+		Timeout:             5 * time.Second,
+		PermitWithoutStream: true,
+	}))
+
+	// Message size limits (matching JavaScript and Rust implementations)
+	opts = append(opts, grpc.WithDefaultCallOptions(
+		grpc.MaxCallRecvMsgSize(1024*1024*1024), // 1GB - matches JavaScript/Rust
+		grpc.MaxCallSendMsgSize(32*1024*1024),   // 32MB - matches Rust
+	))
+
+	// Additional performance and reliability options
+	opts = append(opts, grpc.WithConnectParams(grpc.ConnectParams{
+		Backoff:           backoff.DefaultConfig,
+		MinConnectTimeout: 10 * time.Second,
+	}))
+
+	// Set initial window size for better throughput
+	opts = append(opts, grpc.WithInitialWindowSize(4*1024*1024))     // 4MB per stream
+	opts = append(opts, grpc.WithInitialConnWindowSize(8*1024*1024)) // 8MB total
+	opts = append(opts, grpc.WithWriteBufferSize(64*1024))           // 64KB buffer
+
+	conn, err := grpc.DialContext(ctx, target, opts...)
+	if err != nil {
+		return fmt.Errorf("failed to dial: %w", err)
 	}
-	return false
+
+	c.conn = conn
+	return nil
 }
 
-var kacp = keepalive.ClientParameters{
-	Time:                10 * time.Second,
-	Timeout:             time.Second,
-	PermitWithoutStream: true,
+// cleanup closes connections and streams
+func (c *Client) cleanup() {
+	if c.stream != nil {
+		c.stream.CloseSend()
+		c.stream = nil
+	}
+	if c.conn != nil {
+		c.conn.Close()
+		c.conn = nil
+	}
 }
+
+// Re-export protobuf types so customers don't need to import yellowstone-grpc directly
+
+// Main request and response types
+type (
+	SubscribeRequest = pb.SubscribeRequest
+	SubscribeUpdate  = pb.SubscribeUpdate
+)
+
+// Commitment levels - re-export enum values
+const (
+	CommitmentLevel_PROCESSED = pb.CommitmentLevel_PROCESSED
+	CommitmentLevel_CONFIRMED = pb.CommitmentLevel_CONFIRMED
+	CommitmentLevel_FINALIZED = pb.CommitmentLevel_FINALIZED
+)
+
+// CommitmentLevel type
+type CommitmentLevel = pb.CommitmentLevel
+
+// Filter types for different subscription types
+type (
+	SubscribeRequestFilterTransactions = pb.SubscribeRequestFilterTransactions
+	SubscribeRequestFilterSlots        = pb.SubscribeRequestFilterSlots
+	SubscribeRequestFilterAccounts     = pb.SubscribeRequestFilterAccounts
+	SubscribeRequestFilterBlocks       = pb.SubscribeRequestFilterBlocks
+	SubscribeRequestFilterBlocksMeta   = pb.SubscribeRequestFilterBlocksMeta
+	SubscribeRequestFilterEntry        = pb.SubscribeRequestFilterEntry
+)
+
+// Additional request types
+type (
+	SubscribeRequestAccountsDataSlice = pb.SubscribeRequestAccountsDataSlice
+	SubscribeRequestPing              = pb.SubscribeRequestPing
+)
+
+// Account filter types for more advanced filtering
+type (
+	SubscribeRequestFilterAccountsFilter         = pb.SubscribeRequestFilterAccountsFilter
+	SubscribeRequestFilterAccountsFilterMemcmp   = pb.SubscribeRequestFilterAccountsFilterMemcmp
+	SubscribeRequestFilterAccountsFilterLamports = pb.SubscribeRequestFilterAccountsFilterLamports
+)
+
+// All SubscribeUpdate variant types for pattern matching
+type (
+	SubscribeUpdate_Account           = pb.SubscribeUpdate_Account
+	SubscribeUpdate_Slot              = pb.SubscribeUpdate_Slot
+	SubscribeUpdate_Transaction       = pb.SubscribeUpdate_Transaction
+	SubscribeUpdate_TransactionStatus = pb.SubscribeUpdate_TransactionStatus
+	SubscribeUpdate_Block             = pb.SubscribeUpdate_Block
+	SubscribeUpdate_BlockMeta         = pb.SubscribeUpdate_BlockMeta
+	SubscribeUpdate_Entry             = pb.SubscribeUpdate_Entry
+	SubscribeUpdate_Ping              = pb.SubscribeUpdate_Ping
+	SubscribeUpdate_Pong              = pb.SubscribeUpdate_Pong
+)
+
+// Individual update data types
+type (
+	SubscribeUpdateAccount           = pb.SubscribeUpdateAccount
+	SubscribeUpdateSlot              = pb.SubscribeUpdateSlot
+	SubscribeUpdateTransaction       = pb.SubscribeUpdateTransaction
+	SubscribeUpdateTransactionStatus = pb.SubscribeUpdateTransactionStatus
+	SubscribeUpdateBlock             = pb.SubscribeUpdateBlock
+	SubscribeUpdateBlockMeta         = pb.SubscribeUpdateBlockMeta
+	SubscribeUpdateEntry             = pb.SubscribeUpdateEntry
+	SubscribeUpdatePing              = pb.SubscribeUpdatePing
+	SubscribeUpdatePong              = pb.SubscribeUpdatePong
+)
