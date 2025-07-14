@@ -1,4 +1,4 @@
-module helius-laserstream
+module github.com/helius-labs/laserstream-sdk/go
 
 go 1.23.5
 
