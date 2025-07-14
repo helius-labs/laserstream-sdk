@@ -16,7 +16,6 @@ import (
 	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -41,7 +40,6 @@ const (
 type LaserstreamConfig struct {
 	Endpoint             string
 	APIKey               string
-	Insecure             bool
 	MaxReconnectAttempts *int // nil uses default (240 attempts)
 }
 
@@ -360,21 +358,23 @@ func (c *Client) connect(ctx context.Context) error {
 
 	endpoint := c.config.Endpoint
 
-	// Handle different endpoint formats
+	// Handle production endpoint formats
 	var target string
-	if strings.Contains(endpoint, "://") {
-		// Full URL format (e.g., https://example.com or grpc://localhost:4003)
+	if strings.HasPrefix(endpoint, "https://") || strings.HasPrefix(endpoint, "http://") {
+		// URL format (e.g., https://example.com or https://example.com:443)
 		u, err := url.Parse(endpoint)
 		if err != nil {
-			return fmt.Errorf("error parsing endpoint: %w", err)
+			return fmt.Errorf("error parsing endpoint URL: %w", err)
 		}
 		if u.Port() != "" {
+			// URL has port specified (e.g., https://example.com:443)
 			target = u.Host
 		} else {
+			// URL without port, add default 443
 			target = u.Hostname() + ":443"
 		}
 	} else {
-		// Simple host:port format (e.g., localhost:4003 or example.com)
+		// Simple host:port format (e.g., localhost:4003, example.com:80, example.com)
 		if strings.Contains(endpoint, ":") {
 			// Already has port
 			target = endpoint
@@ -385,12 +385,8 @@ func (c *Client) connect(ctx context.Context) error {
 	}
 
 	var opts []grpc.DialOption
-	if c.config.Insecure {
-		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	} else {
-		creds := credentials.NewClientTLSFromCert(nil, "")
-		opts = append(opts, grpc.WithTransportCredentials(creds))
-	}
+	creds := credentials.NewClientTLSFromCert(nil, "")
+	opts = append(opts, grpc.WithTransportCredentials(creds))
 
 	// Enhanced keepalive parameters
 	opts = append(opts, grpc.WithKeepaliveParams(keepalive.ClientParameters{
