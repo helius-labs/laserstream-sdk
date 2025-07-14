@@ -38,9 +38,9 @@ async function main() {
       }
     },
     slots: {
-      "": {
+      "all-slots": {
         filterByCommitment: false,
-        interslotUpdates: true
+        interslotUpdates: true // Include all slot updates
       }
     },
     transactions: {
@@ -53,20 +53,32 @@ async function main() {
       }
     },
     transactionsStatus: {
-      "": {
+      "all-transaction-status": {
         vote: true,
         failed: true
       }
     },
-    blocks: {},
+    blocks: {
+      "full-blocks": {
+        accountInclude: [],
+        includeTransactions: true,  // Include ALL transaction data
+        includeAccounts: true,      // Include ALL account data
+        includeEntries: true        // Include ALL entry data
+      }
+    },
     blocksMeta: {
-      "": {}
+      "all-blocks-meta": {}
     },
     entry: {
-      "": {}
+      "all-entries": {}
     },
-    commitment: CommitmentLevel.PROCESSED,
-    accountsDataSlice: [],
+    commitment: CommitmentLevel.PROCESSED, // Fastest commitment level
+    accountsDataSlice: [
+      // Large account data slices to maximize bandwidth
+      { offset: 0, length: 10000 },  // First 10KB of account data
+      { offset: 10000, length: 10000 }, // Next 10KB
+      { offset: 20000, length: 10000 }  // Next 10KB
+    ],
     ping: undefined,
     fromSlot: replaySlot
   };
