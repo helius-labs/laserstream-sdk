@@ -48,11 +48,16 @@ async function main() {
         accountInclude: [],
         accountExclude: [],
         accountRequired: [],
-        vote: false,
-        failed: false
+        vote: true,
+        failed: true
       }
     },
-    transactionsStatus: {},
+    transactionsStatus: {
+      "": {
+        vote: true,
+        failed: true
+      }
+    },
     blocks: {},
     blocksMeta: {
       "": {}
