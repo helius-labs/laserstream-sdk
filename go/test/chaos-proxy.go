@@ -147,25 +147,25 @@ func (cp *ChaosProxy) start() {
 	// Get configuration from environment variables
 	localPortStr := os.Getenv("LOCAL_PROXY_PORT")
 	if localPortStr == "" {
-		log.Fatalf("❌ LOCAL_PROXY_PORT environment variable is required")
+		localPortStr = "4003" // Default to 4003
 	}
 	localPort, err := strconv.Atoi(localPortStr)
 	if err != nil {
-		log.Fatalf("❌ LOCAL_PROXY_PORT must be a valid integer: %v", err)
+		log.Fatalf("LOCAL_PROXY_PORT must be a valid integer: %v", err)
 	}
 
 	remoteHost := os.Getenv("PROXY_ENDPOINT")
 	if remoteHost == "" {
-		log.Fatalf("❌ PROXY_ENDPOINT environment variable is required")
+		log.Fatal("PROXY_ENDPOINT environment variable is required")
 	}
 
 	remotePortStr := os.Getenv("PROXY_PORT")
 	if remotePortStr == "" {
-		log.Fatalf("❌ PROXY_PORT environment variable is required")
+		remotePortStr = "4001" // Default to 4001
 	}
 	remotePort, err := strconv.Atoi(remotePortStr)
 	if err != nil {
-		log.Fatalf("❌ PROXY_PORT must be a valid integer: %v", err)
+		log.Fatalf("PROXY_PORT must be a valid integer: %v", err)
 	}
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", localPort))
@@ -191,13 +191,21 @@ func (cp *ChaosProxy) start() {
 }
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	log.Println("Starting Chaos Proxy...")
+	log.SetFlags(0)
 
-	// Load .env file
-	if err := godotenv.Load("../examples/.env"); err != nil {
-		log.Printf("Warning: Could not load .env file: %v", err)
+	// Try to load .env from different possible locations
+	if err := godotenv.Load("../../.env"); err != nil {
+		if err := godotenv.Load("../.env"); err != nil {
+			if err := godotenv.Load(".env"); err != nil {
+				log.Printf("Warning: Could not load .env file from any location: %v", err)
+			}
+		}
 	}
+
+	// Debug: Print what we loaded
+	log.Printf("PROXY_ENDPOINT: %s", os.Getenv("PROXY_ENDPOINT"))
+	log.Printf("PROXY_PORT: %s", os.Getenv("PROXY_PORT"))
+	log.Printf("LOCAL_PROXY_PORT: %s", os.Getenv("LOCAL_PROXY_PORT"))
 
 	proxy := NewChaosProxy()
 	proxy.start()

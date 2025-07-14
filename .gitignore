@@ -50,4 +50,5 @@ Cargo.lock
 # Build outputs
 dist/
 build/
-out/ 
+out/
+go/test/remote-integrity-test.sh

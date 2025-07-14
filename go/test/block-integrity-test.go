@@ -36,7 +36,6 @@ type RPCError struct {
 }
 
 func blockExists(slot uint64) (bool, error) {
-	// Get RPC configuration from environment variables
 	rpcEndpoint := os.Getenv("BLOCK_RPC_ENDPOINT")
 	if rpcEndpoint == "" {
 		return true, fmt.Errorf("BLOCK_RPC_ENDPOINT environment variable is required")
@@ -79,7 +78,7 @@ func blockExists(slot uint64) (bool, error) {
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("RPC check failed for slot %d: %v", slot, err)
-		return true, nil // assume exists to err on side of reporting
+		return true, nil
 	}
 	defer resp.Body.Close()
 
@@ -90,7 +89,6 @@ func blockExists(slot uint64) (bool, error) {
 	}
 
 	if rpcResp.Error != nil && rpcResp.Error.Code == -32007 {
-		// Slot was skipped – no block expected
 		return false, nil
 	}
 
@@ -99,28 +97,22 @@ func blockExists(slot uint64) (bool, error) {
 
 func main() {
 	log.SetFlags(0)
-	log.Println("Starting block integrity test. Subscribing to slots...")
 
-	// Load .env file
-	if err := godotenv.Load("../examples/.env"); err != nil {
-		log.Printf("Warning: Could not load .env file: %v", err)
-	}
+	godotenv.Load("../.env")
 
-	// Get configuration from environment variables
 	endpoint := os.Getenv("LASERSTREAM_ENDPOINT")
 	if endpoint == "" {
-		log.Fatalf("❌ LASERSTREAM_ENDPOINT environment variable is required")
+		endpoint = "localhost:4003" // Default to chaos proxy
 	}
 	apiKey := os.Getenv("LASERSTREAM_API_KEY")
 	if apiKey == "" {
-		log.Fatalf("❌ LASERSTREAM_API_KEY environment variable is required")
+		log.Fatal("LASERSTREAM_API_KEY required")
 	}
 
 	config := laserstream.LaserstreamConfig{
-		Endpoint:             endpoint,
-		APIKey:               apiKey,
-		Insecure:             false,
-		MaxReconnectAttempts: nil,
+		Endpoint: endpoint,
+		APIKey:   apiKey,
+		Insecure: true, // localhost connection through chaos proxy
 	}
 
 	commitmentLevel := laserstream.CommitmentLevel_PROCESSED
@@ -147,7 +139,6 @@ func main() {
 				currentSlotNumber := slotUpdate.Slot.Slot
 
 				if lastSlotNumber != nil && currentSlotNumber != *lastSlotNumber+1 {
-					// Iterate through each gap slot and verify if a block exists
 					for missing := *lastSlotNumber + 1; missing < currentSlotNumber; missing++ {
 						exists, err := blockExists(missing)
 						if err != nil {
@@ -169,11 +160,10 @@ func main() {
 				log.Printf("Received slot update, but slot number is undefined: %+v", slotUpdate)
 			}
 		}
-		// Handle other update types if needed - for now ignore them
 	}
 
 	errorCallback := func(err error) {
-		log.Printf("Subscription error: %v", err)
+		log.Printf("Error: %v", err)
 	}
 
 	err := client.Subscribe(subscriptionRequest, dataCallback, errorCallback)
@@ -183,12 +173,11 @@ func main() {
 
 	log.Println("Subscription started. Waiting for slots...")
 
-	// Handle graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
 
-	log.Println("\nShutting down...")
+	log.Println("Shutting down...")
 	client.Close()
 	time.Sleep(1 * time.Second)
 	log.Println("Block integrity test finished.")

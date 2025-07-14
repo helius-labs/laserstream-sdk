@@ -22,35 +22,30 @@ import (
 
 const (
 	PUMP_ADDRESS             = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
-	SLOT_LAG                 = 3000 // number of slots to wait before declaring a slot closed
+	SLOT_LAG                 = 3000
 	INTEGRITY_CHECK_INTERVAL = 30 * time.Second
 )
 
 type SignatureTracker struct {
 	mu sync.RWMutex
 
-	// Global signature tracking
-	gotLS map[string]bool // laserstream signatures
-	gotYS map[string]bool // yellowstone signatures
+	gotLS map[string]bool
+	gotYS map[string]bool
 
-	// Slot tracking
-	slotLS map[string]string // signature -> slot
-	slotYS map[string]string // signature -> slot
+	slotLS map[string]string
+	slotYS map[string]string
 
-	// Per-slot tracking
 	lsBySlot  map[uint64]map[string]bool
 	ysBySlot  map[uint64]map[string]bool
 	maxSlotLS uint64
 	maxSlotYS uint64
 
-	// Counters
 	newLS int
 	newYS int
 	errLS int
 	errYS int
 
-	// Status tracking for matches
-	statusMap map[string]map[string]string // sig -> {slotLS, slotYS}
+	statusMap map[string]map[string]string
 }
 
 func NewSignatureTracker() *SignatureTracker {
@@ -87,7 +82,6 @@ func (st *SignatureTracker) addLaserstream(sig string, slot uint64) {
 		st.maxSlotLS = slot
 	}
 
-	// Status tracking
 	if st.statusMap[sig] == nil {
 		st.statusMap[sig] = make(map[string]string)
 	}
@@ -117,7 +111,6 @@ func (st *SignatureTracker) addYellowstone(sig string, slot uint64) {
 		st.maxSlotYS = slot
 	}
 
-	// Status tracking
 	if st.statusMap[sig] == nil {
 		st.statusMap[sig] = make(map[string]string)
 	}
@@ -175,8 +168,8 @@ func (st *SignatureTracker) doIntegrityCheck() {
 			setYS = make(map[string]bool)
 		}
 
-		var missingLS []string // present in YS but not LS
-		var missingYS []string // present in LS but not YS
+		var missingLS []string
+		var missingYS []string
 
 		for sig := range setYS {
 			if !setLS[sig] {
@@ -211,7 +204,6 @@ func (st *SignatureTracker) doIntegrityCheck() {
 	log.Printf("[%s] laserstream+%d yellowstone+%d processedSlots:%d missingLS:%d missingYS:%d LS_errors:%d YS_errors:%d",
 		now, st.newLS, st.newYS, len(slotsToProcess), totalMissingLS, totalMissingYS, st.errLS, st.errYS)
 
-	// Reset counters
 	st.newLS = 0
 	st.newYS = 0
 }
@@ -241,24 +233,22 @@ func extractSigAndSlotYS(resp *pb.SubscribeUpdate) (string, uint64, bool) {
 }
 
 func startLaserstreamStream(tracker *SignatureTracker) error {
-	// Get configuration from environment variables
 	endpoint := os.Getenv("LASERSTREAM_ENDPOINT")
 	if endpoint == "" {
-		log.Fatalf("❌ LASERSTREAM_ENDPOINT environment variable is required")
+		endpoint = "localhost:4003" // Default to chaos proxy
 	}
 	apiKey := os.Getenv("LASERSTREAM_API_KEY")
 	if apiKey == "" {
-		log.Fatalf("❌ LASERSTREAM_API_KEY environment variable is required")
+		log.Fatal("LASERSTREAM_API_KEY required")
 	}
 
 	config := laserstream.LaserstreamConfig{
-		Endpoint:             endpoint,
-		APIKey:               apiKey,
-		Insecure:             false,
-		MaxReconnectAttempts: nil,
+		Endpoint: endpoint,
+		APIKey:   apiKey,
+		Insecure: true, // localhost connection through chaos proxy
 	}
 
-	commitmentLevel := laserstream.CommitmentLevel_PROCESSED
+	commitmentLevel := laserstream.CommitmentLevel_CONFIRMED
 	voteFilterBool := false
 	failedFilterBool := false
 
@@ -290,14 +280,13 @@ func startLaserstreamStream(tracker *SignatureTracker) error {
 }
 
 func startYellowstoneStream(tracker *SignatureTracker) error {
-	// Get configuration from environment variables
 	endpoint := os.Getenv("YELLOWSTONE_ENDPOINT")
 	if endpoint == "" {
-		log.Fatalf("❌ YELLOWSTONE_ENDPOINT environment variable is required")
+		log.Fatal("YELLOWSTONE_ENDPOINT required")
 	}
 	apiKey := os.Getenv("YELLOWSTONE_API_KEY")
 	if apiKey == "" {
-		log.Fatalf("❌ YELLOWSTONE_API_KEY environment variable is required")
+		log.Fatal("YELLOWSTONE_API_KEY required")
 	}
 
 	conn, err := grpc.Dial(endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -316,7 +305,7 @@ func startYellowstoneStream(tracker *SignatureTracker) error {
 		return fmt.Errorf("failed to create yellowstone stream: %w", err)
 	}
 
-	commitmentLevel := pb.CommitmentLevel_PROCESSED
+	pbCommitmentLevel := pb.CommitmentLevel_CONFIRMED
 	voteFilterBool := false
 	failedFilterBool := false
 
@@ -328,7 +317,7 @@ func startYellowstoneStream(tracker *SignatureTracker) error {
 				Failed:         &failedFilterBool,
 			},
 		},
-		Commitment: &commitmentLevel,
+		Commitment: &pbCommitmentLevel,
 	}
 
 	if err := stream.Send(subscriptionRequest); err != nil {
@@ -355,16 +344,11 @@ func startYellowstoneStream(tracker *SignatureTracker) error {
 
 func main() {
 	log.SetFlags(0)
-	log.Println("Starting transaction integrity test…")
 
-	// Load .env file
-	if err := godotenv.Load("../examples/.env"); err != nil {
-		log.Printf("Warning: Could not load .env file: %v", err)
-	}
+	godotenv.Load("../.env")
 
 	tracker := NewSignatureTracker()
 
-	// Start integrity check timer
 	go func() {
 		ticker := time.NewTicker(INTEGRITY_CHECK_INTERVAL)
 		defer ticker.Stop()
@@ -373,7 +357,6 @@ func main() {
 		}
 	}()
 
-	// Start both streams
 	go func() {
 		if err := startLaserstreamStream(tracker); err != nil {
 			log.Fatalf("Failed to start Laserstream: %v", err)
@@ -388,6 +371,5 @@ func main() {
 
 	log.Println("Both streams started. Running integrity test...")
 
-	// Keep alive
 	select {}
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	pb "github.com/rpcpool/yellowstone-grpc/examples/golang/proto"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -358,13 +359,30 @@ func (c *Client) connect(ctx context.Context) error {
 	c.cleanup()
 
 	endpoint := c.config.Endpoint
-	u, err := url.Parse(endpoint)
-	if err != nil {
-		return fmt.Errorf("error parsing endpoint: %w", err)
-	}
 
-	// Use port 443 for gRPC
-	target := u.Hostname() + ":443"
+	// Handle different endpoint formats
+	var target string
+	if strings.Contains(endpoint, "://") {
+		// Full URL format (e.g., https://example.com or grpc://localhost:4003)
+		u, err := url.Parse(endpoint)
+		if err != nil {
+			return fmt.Errorf("error parsing endpoint: %w", err)
+		}
+		if u.Port() != "" {
+			target = u.Host
+		} else {
+			target = u.Hostname() + ":443"
+		}
+	} else {
+		// Simple host:port format (e.g., localhost:4003 or example.com)
+		if strings.Contains(endpoint, ":") {
+			// Already has port
+			target = endpoint
+		} else {
+			// No port, add default 443
+			target = endpoint + ":443"
+		}
+	}
 
 	var opts []grpc.DialOption
 	if c.config.Insecure {
@@ -380,6 +398,23 @@ func (c *Client) connect(ctx context.Context) error {
 		Timeout:             5 * time.Second,
 		PermitWithoutStream: true,
 	}))
+
+	// Message size limits (matching JavaScript and Rust implementations)
+	opts = append(opts, grpc.WithDefaultCallOptions(
+		grpc.MaxCallRecvMsgSize(1024*1024*1024), // 1GB - matches JavaScript/Rust
+		grpc.MaxCallSendMsgSize(32*1024*1024),   // 32MB - matches Rust
+	))
+
+	// Additional performance and reliability options
+	opts = append(opts, grpc.WithConnectParams(grpc.ConnectParams{
+		Backoff:           backoff.DefaultConfig,
+		MinConnectTimeout: 10 * time.Second,
+	}))
+
+	// Set initial window size for better throughput
+	opts = append(opts, grpc.WithInitialWindowSize(4*1024*1024))     // 4MB per stream
+	opts = append(opts, grpc.WithInitialConnWindowSize(8*1024*1024)) // 8MB total
+	opts = append(opts, grpc.WithWriteBufferSize(64*1024))           // 64KB buffer
 
 	conn, err := grpc.DialContext(ctx, target, opts...)
 	if err != nil {
