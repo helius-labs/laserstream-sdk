@@ -1,4 +1,4 @@
-module laserstream-go-client
+module helius-laserstream
 
 go 1.23.5
 
