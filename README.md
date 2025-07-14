@@ -1,6 +1,6 @@
 # LaserStream
 
-LaserStream provides real-time Solana data streaming via gRPC. We have two official SDKs:
+LaserStream provides real-time Solana data streaming via gRPC. We have three official SDKs:
 
 ## JavaScript/TypeScript SDK
 - Located in [`/javascript`](/javascript)
@@ -12,6 +12,4 @@ LaserStream provides real-time Solana data streaming via gRPC. We have two offic
 
 ## Go SDK
 - Located in [`/go`](/go)
-- Go SDK for Laserstream is currently under active development.
-
-Stay tuned for updates!
+- Install via go get: `go get github.com/helius-labs/laserstream-sdk/go`
