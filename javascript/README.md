@@ -91,7 +91,7 @@ The library uses Node-API (NAPI) bindings which are supported natively by both r
 
 This library is built with Rust NAPI bindings, providing significant performance improvements:
 
-**16.7x faster throughput** compared to the standard Yellowstone gRPC client - Laserstream can pull past **500MB/s** compared to only **30MB/s** with the Yellowstone client.
+**40x faster throughput** compared to the standard Yellowstone gRPC client - Laserstream can pull past **1.3GB/s** compared to only **30MB/s** with the Yellowstone client.
 
 To subscribe to all account updates you need a minimum **70MB/s** and to subscribe to all transaction data you need a minimum of **10MB/s**. These numbers will likely grow in the future so we recommend using the new LS Rust based client over the standard Yellowstone gRPC client to avoid streaming delays.
 
