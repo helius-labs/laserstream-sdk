@@ -1,8 +1,8 @@
 use crate::{LaserstreamConfig, LaserstreamError};
-use async_stream::try_stream;
-use futures::TryStreamExt;
+use async_stream::stream;
+use futures::{StreamExt, TryStreamExt};
 use futures_channel::mpsc as futures_mpsc;
-use futures_util::{sink::SinkExt, Stream, StreamExt};
+use futures_util::{sink::SinkExt, Stream};
 use std::{pin::Pin, time::Duration};
 use tokio::time::sleep;
 use tonic::Status;
@@ -24,7 +24,7 @@ pub fn subscribe(
     config: LaserstreamConfig,
     request: SubscribeRequest,
 ) -> impl Stream<Item = Result<SubscribeUpdate, LaserstreamError>> {
-    try_stream! {
+    stream! {
         let mut reconnect_attempts = 0;
         let mut tracked_slot: u64 = 0;
 
@@ -52,9 +52,16 @@ pub fn subscribe(
                 );
             }
 
-            // On reconnection, use the last tracked slot
+            // On reconnection, use the last tracked slot with fork safety
             if reconnect_attempts > 0 && tracked_slot > 0 {
-                attempt_request.from_slot = Some(tracked_slot);
+                // Apply fork safety margin for PROCESSED commitment (default)
+                let commitment_level = attempt_request.commitment.unwrap_or(0);
+                let from_slot = match commitment_level {
+                    0 => tracked_slot.saturating_sub(31), // PROCESSED: rewind by 31 slots
+                    1 | 2 => tracked_slot,                 // CONFIRMED/FINALIZED: exact slot
+                    _ => tracked_slot.saturating_sub(31),  // Unknown: default to safe behavior
+                };
+                attempt_request.from_slot = Some(from_slot);
             }
 
             match connect_and_subscribe_once(&config, attempt_request, api_key_string.clone()).await {
@@ -91,37 +98,35 @@ pub fn subscribe(
                                 }
 
                                 // For non-internal updates:
-                                yield update;
+                                yield Ok(update);
                             }
                             Err(status) => {
-                                // Pass through the error as-is
-                                warn!(error = %status, "Stream error, attempting reconnection");
+                                // Yield the error to consumer AND continue with reconnection
+                                warn!(error = %status, "Stream error, will reconnect after 5s delay");
+                                yield Err(LaserstreamError::Status(status.clone()));
                                 break;
                             }
                         }
                     }
-                    warn!("Stream ended, preparing to reconnect...");
                 }
                 Err(err) => {
-                    // Pass through connection/subscription errors as-is
-                    error!(error = %err, "Failed to connect/subscribe");
-                    Err(LaserstreamError::Status(err))?;
+                    // Log connection error and continue reconnection loop
+                    error!(error = %err, "Connection failed, will retry after 5s delay");
                 }
             }
 
             reconnect_attempts += 1;
             if reconnect_attempts >= effective_max_attempts {
-                error!(attempts = effective_max_attempts, config_value = ?config.max_reconnect_attempts, "Max reconnection attempts reached");
-                Err(LaserstreamError::MaxReconnectAttempts(Status::cancelled(
+                error!(attempts = effective_max_attempts, "Max reconnection attempts reached");
+                yield Err(LaserstreamError::MaxReconnectAttempts(Status::cancelled(
                     format!("Max reconnection attempts ({}) reached", effective_max_attempts)
-                )))?;
+                )));
+                return;
             }
 
-            // Use fixed interval delay, but only after the first failed attempt
-            if reconnect_attempts > 1 {
-                let delay = Duration::from_millis(FIXED_RECONNECT_INTERVAL_MS);
-                sleep(delay).await;
-            }
+            // Wait 5s before retry
+            let delay = Duration::from_millis(FIXED_RECONNECT_INTERVAL_MS);
+            sleep(delay).await;
         }
     }
 }
