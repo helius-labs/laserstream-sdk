@@ -49,3 +49,7 @@ path = "test/transaction_integrity.rs"
 [[bin]]
 name = "block_integrity_test"
 path = "test/block_integrity.rs"
+
+[[bin]]
+name = "basic_usage"
+path = "examples/basic_usage.rs"

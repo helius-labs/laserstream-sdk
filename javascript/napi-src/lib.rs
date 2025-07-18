@@ -110,14 +110,24 @@ pub struct LaserstreamClient {
 impl LaserstreamClient {
     #[napi(constructor)]
     pub fn new(
+        env: Env,
         endpoint: String,
         token: Option<String>,
         max_reconnect_attempts: Option<u32>,
+        channel_options: Option<Object>,
     ) -> Result<Self> {
+        let parsed_channel_options = if let Some(opts_obj) = channel_options {
+            let opts: client::ChannelOptions = env.from_js_value(opts_obj)?;
+            Some(opts)
+        } else {
+            None
+        };
+        
         let inner = Arc::new(client::ClientInner::new(
             endpoint,
             token,
             max_reconnect_attempts,
+            parsed_channel_options,
         )?);
         Ok(Self { inner })
     }
@@ -166,6 +176,23 @@ impl StreamHandle {
         
         // Then cancel the actual stream
         self.inner.cancel()
+    }
+    
+    #[napi(ts_args_type = "request: any")]
+    pub fn write(&self, env: Env, request: Object) -> Result<()> {
+        // Parse the JavaScript request object into a protobuf SubscribeRequest
+        println!("🏦 Write Request");
+        let client_inner = client::ClientInner::new(
+            String::new(), // dummy values, we only need the parsing functionality
+            None,
+            None,
+            None,
+        )?;
+        let subscribe_request = client_inner.js_to_subscribe_request(&env, request)?;
+        println!("🏦 Subscribe Request: {:?}", subscribe_request);
+        
+        // Send the request through the write channel
+        self.inner.write(subscribe_request)
     }
 }
 

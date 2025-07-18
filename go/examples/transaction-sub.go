@@ -6,7 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	laserstream "laserstream-go-client"
+	laserstream "github.com/helius-labs/laserstream-sdk/go"
 
 	"github.com/joho/godotenv"
 )
@@ -28,7 +28,7 @@ func main() {
 	clientConfig := laserstream.LaserstreamConfig{
 		Endpoint: endpoint,
 		APIKey:   apiKey,
-		Insecure: false,
+		
 	}
 
 	commitmentLevel := laserstream.CommitmentLevel_PROCESSED
@@ -62,5 +62,5 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
 
-	client.Close()
+	client.Unsubscribe()
 }

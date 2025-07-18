@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/encoding/gzip"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -40,7 +41,35 @@ const (
 type LaserstreamConfig struct {
 	Endpoint             string
 	APIKey               string
-	MaxReconnectAttempts *int // nil uses default (240 attempts)
+	MaxReconnectAttempts *int            // nil uses default (240 attempts)
+	ChannelOptions       *ChannelOptions // nil uses defaults
+}
+
+// ChannelOptions configures gRPC channel behavior
+type ChannelOptions struct {
+	// Connection timeouts
+	ConnectTimeoutSecs int // Default: 10
+	MinConnectTimeoutSecs int // Default: 10
+
+	// Message size limits
+	MaxRecvMsgSize int // Max message size in bytes for receiving. Default: 1GB
+	MaxSendMsgSize int // Max message size in bytes for sending. Default: 32MB
+
+	// Keepalive settings
+	KeepaliveTimeSecs    int  // Default: 30
+	KeepaliveTimeoutSecs int  // Default: 5
+	PermitWithoutStream  bool // Default: true
+
+	// Window sizes for flow control
+	InitialWindowSize     int32 // Per-stream window size. Default: 4MB
+	InitialConnWindowSize int32 // Connection window size. Default: 8MB
+
+	// Buffer settings
+	WriteBufferSize int // Default: 64KB
+	ReadBufferSize  int // Default: 64KB
+	
+	// Compression settings
+	UseCompression bool // Enable gzip compression. Default: false
 }
 
 // DataCallback defines the function signature for handling received data.
@@ -68,12 +97,18 @@ type Client struct {
 	originalRequest   *SubscribeRequest
 	internalSlotSubID string
 	commitmentLevel   int32
+	
+	// Bidirectional streaming support
+	writeChan     chan *SubscribeRequest
+	writeStopChan chan struct{}
 }
 
 // NewClient creates a new Laserstream client instance.
 func NewClient(config LaserstreamConfig) *Client {
 	return &Client{
-		config: config,
+		config:        config,
+		writeChan:     make(chan *SubscribeRequest, 100),
+		writeStopChan: make(chan struct{}),
 	}
 }
 
@@ -124,6 +159,24 @@ func (c *Client) Subscribe(
 	go c.streamLoop(ctx)
 
 	return nil
+}
+
+// Write sends a new subscription request to update the active subscription.
+// This allows dynamic modification of the subscription filters.
+func (c *Client) Write(req *SubscribeRequest) error {
+	c.mu.RLock()
+	if !c.running {
+		c.mu.RUnlock()
+		return fmt.Errorf("client is not connected")
+	}
+	c.mu.RUnlock()
+
+	select {
+	case c.writeChan <- req:
+		return nil
+	case <-time.After(5 * time.Second):
+		return fmt.Errorf("write timeout: channel full")
+	}
 }
 
 // Close terminates the subscription and closes the connection.
@@ -252,6 +305,26 @@ func (c *Client) connectAndStream(ctx context.Context) error {
 
 // handleStream processes messages from the stream
 func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeClient) error {
+	// Start a goroutine to handle write requests
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-c.writeStopChan:
+				return
+			case req := <-c.writeChan:
+				if req != nil {
+					if err := stream.Send(req); err != nil {
+						if c.errorCallback != nil {
+							c.errorCallback(fmt.Errorf("failed to send write request: %w", err))
+						}
+					}
+				}
+			}
+		}
+	}()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -388,29 +461,89 @@ func (c *Client) connect(ctx context.Context) error {
 	creds := credentials.NewClientTLSFromCert(nil, "")
 	opts = append(opts, grpc.WithTransportCredentials(creds))
 
-	// Enhanced keepalive parameters
+	// Apply channel options with defaults
+	channelOpts := c.config.ChannelOptions
+	if channelOpts == nil {
+		channelOpts = &ChannelOptions{} // Use all defaults
+	}
+
+	// Keepalive parameters
+	keepaliveTime := 30 * time.Second
+	keepaliveTimeout := 5 * time.Second
+	permitWithoutStream := true
+	
+	if channelOpts.KeepaliveTimeSecs > 0 {
+		keepaliveTime = time.Duration(channelOpts.KeepaliveTimeSecs) * time.Second
+	}
+	if channelOpts.KeepaliveTimeoutSecs > 0 {
+		keepaliveTimeout = time.Duration(channelOpts.KeepaliveTimeoutSecs) * time.Second
+	}
+	permitWithoutStream = channelOpts.PermitWithoutStream
+	
 	opts = append(opts, grpc.WithKeepaliveParams(keepalive.ClientParameters{
-		Time:                30 * time.Second,
-		Timeout:             5 * time.Second,
-		PermitWithoutStream: true,
+		Time:                keepaliveTime,
+		Timeout:             keepaliveTimeout,
+		PermitWithoutStream: permitWithoutStream,
 	}))
 
-	// Message size limits (matching JavaScript and Rust implementations)
-	opts = append(opts, grpc.WithDefaultCallOptions(
-		grpc.MaxCallRecvMsgSize(1024*1024*1024), // 1GB - matches JavaScript/Rust
-		grpc.MaxCallSendMsgSize(32*1024*1024),   // 32MB - matches Rust
-	))
+	// Message size limits
+	maxRecvMsgSize := 1024 * 1024 * 1024 // 1GB default
+	maxSendMsgSize := 32 * 1024 * 1024   // 32MB default
+	
+	if channelOpts.MaxRecvMsgSize > 0 {
+		maxRecvMsgSize = channelOpts.MaxRecvMsgSize
+	}
+	if channelOpts.MaxSendMsgSize > 0 {
+		maxSendMsgSize = channelOpts.MaxSendMsgSize
+	}
+	
+	// Configure default call options
+	callOpts := []grpc.CallOption{
+		grpc.MaxCallRecvMsgSize(maxRecvMsgSize),
+		grpc.MaxCallSendMsgSize(maxSendMsgSize),
+	}
+	
+	// Add compression if enabled
+	if channelOpts.UseCompression {
+		callOpts = append(callOpts, grpc.UseCompressor(gzip.Name))
+	}
+	
+	opts = append(opts, grpc.WithDefaultCallOptions(callOpts...))
 
-	// Additional performance and reliability options
+	// Connection parameters
+	minConnectTimeout := 10 * time.Second
+	if channelOpts.MinConnectTimeoutSecs > 0 {
+		minConnectTimeout = time.Duration(channelOpts.MinConnectTimeoutSecs) * time.Second
+	}
+	
 	opts = append(opts, grpc.WithConnectParams(grpc.ConnectParams{
 		Backoff:           backoff.DefaultConfig,
-		MinConnectTimeout: 10 * time.Second,
+		MinConnectTimeout: minConnectTimeout,
 	}))
 
-	// Set initial window size for better throughput
-	opts = append(opts, grpc.WithInitialWindowSize(4*1024*1024))     // 4MB per stream
-	opts = append(opts, grpc.WithInitialConnWindowSize(8*1024*1024)) // 8MB total
-	opts = append(opts, grpc.WithWriteBufferSize(64*1024))           // 64KB buffer
+	// Window sizes
+	if channelOpts.InitialWindowSize > 0 {
+		opts = append(opts, grpc.WithInitialWindowSize(channelOpts.InitialWindowSize))
+	} else {
+		opts = append(opts, grpc.WithInitialWindowSize(4*1024*1024)) // 4MB default
+	}
+	
+	if channelOpts.InitialConnWindowSize > 0 {
+		opts = append(opts, grpc.WithInitialConnWindowSize(channelOpts.InitialConnWindowSize))
+	} else {
+		opts = append(opts, grpc.WithInitialConnWindowSize(8*1024*1024)) // 8MB default
+	}
+	
+	// Buffer sizes
+	if channelOpts.WriteBufferSize > 0 {
+		opts = append(opts, grpc.WithWriteBufferSize(channelOpts.WriteBufferSize))
+	} else {
+		opts = append(opts, grpc.WithWriteBufferSize(64*1024)) // 64KB default
+	}
+	
+	if channelOpts.ReadBufferSize > 0 {
+		opts = append(opts, grpc.WithReadBufferSize(channelOpts.ReadBufferSize))
+	}
 
 	conn, err := grpc.DialContext(ctx, target, opts...)
 	if err != nil {
@@ -421,8 +554,28 @@ func (c *Client) connect(ctx context.Context) error {
 	return nil
 }
 
+// Unsubscribe closes the stream and cleans up resources
+func (c *Client) Unsubscribe() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	
+	if c.cancel != nil {
+		c.cancel()
+		c.cancel = nil
+	}
+	
+	c.cleanup()
+	c.running = false
+}
+
 // cleanup closes connections and streams
 func (c *Client) cleanup() {
+	// Signal write goroutine to stop
+	select {
+	case c.writeStopChan <- struct{}{}:
+	default:
+	}
+	
 	if c.stream != nil {
 		c.stream.CloseSend()
 		c.stream = nil

@@ -1671,6 +1671,7 @@ dependencies = [
  "bytes",
  "fastrand",
  "futures",
+ "futures-channel",
  "futures-util",
  "napi",
  "napi-build",

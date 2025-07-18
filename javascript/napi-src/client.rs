@@ -23,6 +23,46 @@ pub struct ClientInner {
     endpoint: String,
     token: Option<String>,
     max_reconnect_attempts: u32,
+    channel_options: Option<ChannelOptions>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct ChannelOptions {
+    // Connection timeouts
+    #[serde(rename = "connectTimeoutSecs")]
+    pub connect_timeout_secs: Option<u64>,
+    #[serde(rename = "timeoutSecs")]
+    pub timeout_secs: Option<u64>,
+    
+    // Message size limits
+    #[serde(rename = "maxDecodingMessageSize")]
+    pub max_decoding_message_size: Option<usize>,
+    #[serde(rename = "maxEncodingMessageSize")]
+    pub max_encoding_message_size: Option<usize>,
+    
+    // Keep-alive settings
+    #[serde(rename = "http2KeepAliveIntervalSecs")]
+    pub http2_keep_alive_interval_secs: Option<u64>,
+    #[serde(rename = "keepAliveTimeoutSecs")]
+    pub keep_alive_timeout_secs: Option<u64>,
+    #[serde(rename = "keepAliveWhileIdle")]
+    pub keep_alive_while_idle: Option<bool>,
+    
+    // Window sizes
+    #[serde(rename = "initialStreamWindowSize")]
+    pub initial_stream_window_size: Option<u32>,
+    #[serde(rename = "initialConnectionWindowSize")]
+    pub initial_connection_window_size: Option<u32>,
+    
+    // Performance options
+    #[serde(rename = "http2AdaptiveWindow")]
+    pub http2_adaptive_window: Option<bool>,
+    #[serde(rename = "tcpNodelay")]
+    pub tcp_nodelay: Option<bool>,
+    #[serde(rename = "tcpKeepaliveSecs")]
+    pub tcp_keepalive_secs: Option<u64>,
+    #[serde(rename = "bufferSize")]
+    pub buffer_size: Option<usize>,
 }
 
 // Complete serde-based structures matching yellowstone-grpc proto exactly
@@ -145,11 +185,13 @@ impl ClientInner {
         endpoint: String,
         token: Option<String>,
         max_reconnect_attempts: Option<u32>,
+        channel_options: Option<ChannelOptions>,
     ) -> Result<Self> {
         Ok(Self {
             endpoint,
             token,
             max_reconnect_attempts: max_reconnect_attempts.unwrap_or(120),
+            channel_options,
         })
     }
 
@@ -412,6 +454,7 @@ impl ClientInner {
             subscribe_request,
             ts_callback,
             self.max_reconnect_attempts,
+            self.channel_options.clone(),
         )?);
 
         // Register stream in global registry for lifecycle management
