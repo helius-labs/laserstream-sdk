@@ -19,6 +19,7 @@ tonic = { version = "0.11", features = ["transport", "tls"] }
 bytes = "1"
 futures = "0.3"
 futures-util = "0.3"
+futures-channel = "0.3"
 parking_lot = "0.12"
 uuid = { version = "1", features = ["v4"] }
 yellowstone-grpc-client = "6.1.0"

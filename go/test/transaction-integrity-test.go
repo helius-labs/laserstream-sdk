@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	laserstream "laserstream-go-client"
+	laserstream "github.com/helius-labs/laserstream-sdk/go"
 
 	"github.com/joho/godotenv"
 

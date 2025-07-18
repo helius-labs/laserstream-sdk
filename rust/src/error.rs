@@ -35,4 +35,7 @@ pub enum LaserstreamError {
 
     #[error("Invalid API Key format")]
     InvalidApiKeyFormat,
+    
+    #[error("Connection error: {0}")]
+    ConnectionError(String),
 }

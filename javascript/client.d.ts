@@ -1,10 +1,37 @@
 // TypeScript declarations for Laserstream client with protobuf decoding
 
+// Channel options interface
+export interface ChannelOptions {
+  // Connection timeouts
+  connectTimeoutSecs?: number;
+  timeoutSecs?: number;
+  
+  // Message size limits
+  maxDecodingMessageSize?: number;
+  maxEncodingMessageSize?: number;
+  
+  // Keep-alive settings
+  http2KeepAliveIntervalSecs?: number;
+  keepAliveTimeoutSecs?: number;
+  keepAliveWhileIdle?: boolean;
+  
+  // Window sizes for flow control
+  initialStreamWindowSize?: number;
+  initialConnectionWindowSize?: number;
+  
+  // Performance options
+  http2AdaptiveWindow?: boolean;
+  tcpNodelay?: boolean;
+  tcpKeepaliveSecs?: number;
+  bufferSize?: number;
+}
+
 // Configuration interface
 export interface LaserstreamConfig {
   apiKey: string;
   endpoint: string;
   maxReconnectAttempts?: number;
+  channelOptions?: ChannelOptions;
 }
 
 // Subscription request interface
@@ -41,6 +68,7 @@ export interface SubscribeUpdate {
 export interface StreamHandle {
   id: string;
   cancel(): void;
+  write(request: SubscribeRequest): Promise<void>;
 }
 
 // Commitment level enum

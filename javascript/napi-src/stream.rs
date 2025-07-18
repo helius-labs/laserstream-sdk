@@ -1,4 +1,5 @@
 use futures_util::{StreamExt, SinkExt};
+use tokio::sync::mpsc;
 use napi::threadsafe_function::{ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi::bindgen_prelude::*;
 use parking_lot::Mutex;
@@ -10,6 +11,7 @@ use yellowstone_grpc_client::{GeyserGrpcClient, ClientTlsConfig};
 use yellowstone_grpc_proto::geyser;
 use uuid;
 use prost::Message;
+use crate::client::ChannelOptions;
 
 // Constants for reconnect logic
 const HARD_CAP_RECONNECT_ATTEMPTS: u32 = (20 * 60) / 5; // 20 mins / 5 sec interval = 240 attempts
@@ -18,6 +20,7 @@ const FORK_DEPTH_SAFETY_MARGIN: u64 = 31; // Max fork depth for processed commit
 
 pub struct StreamInner {
     cancel_tx: Mutex<Option<oneshot::Sender<()>>>,
+    write_tx: Mutex<Option<mpsc::UnboundedSender<geyser::SubscribeRequest>>>,
 }
 
 impl StreamInner {
@@ -28,8 +31,10 @@ impl StreamInner {
         mut initial_request: geyser::SubscribeRequest,
         ts_callback: ThreadsafeFunction<crate::SubscribeUpdateBytes, ErrorStrategy::CalleeHandled>,
         max_reconnect_attempts: u32,
+        channel_options: Option<ChannelOptions>,
     ) -> Result<Self> {
         let (cancel_tx, mut cancel_rx) = oneshot::channel();
+        let (write_tx, mut write_rx) = mpsc::unbounded_channel();
         let tracked_slot = Arc::new(AtomicU64::new(0));
         let made_progress = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
@@ -76,6 +81,8 @@ impl StreamInner {
                         tracked_slot_clone,
                         internal_slot_id_clone,
                         progress_flag_clone,
+                        &channel_options,
+                        &mut write_rx,
                     ) => {
                         match result {
                             Ok(()) => {
@@ -141,6 +148,7 @@ impl StreamInner {
 
         Ok(Self {
             cancel_tx: Mutex::new(Some(cancel_tx)),
+            write_tx: Mutex::new(Some(write_tx)),
         })
     }
 
@@ -152,14 +160,57 @@ impl StreamInner {
         tracked_slot: Arc<AtomicU64>,
         internal_slot_sub_id: String,
         progress_flag: Arc<std::sync::atomic::AtomicBool>,
+        channel_options: &Option<ChannelOptions>,
+        write_rx: &mut mpsc::UnboundedReceiver<geyser::SubscribeRequest>,
     ) -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
         
-        let mut builder = GeyserGrpcClient::build_from_shared(endpoint.to_string())?
-            .connect_timeout(Duration::from_secs(10))
-            .max_decoding_message_size(1_000_000_000)
-            .timeout(Duration::from_secs(10))
-            .tls_config(ClientTlsConfig::new().with_enabled_roots())?;
-
+        let mut builder = GeyserGrpcClient::build_from_shared(endpoint.to_string())?;
+        
+        // Apply channel options or use defaults
+        if let Some(ref opts) = channel_options {
+            builder = builder
+                .connect_timeout(Duration::from_secs(opts.connect_timeout_secs.unwrap_or(10)))
+                .timeout(Duration::from_secs(opts.timeout_secs.unwrap_or(30)))
+                .max_decoding_message_size(opts.max_decoding_message_size.unwrap_or(1_000_000_000))
+                .max_encoding_message_size(opts.max_encoding_message_size.unwrap_or(32_000_000));
+            
+            if let Some(interval) = opts.http2_keep_alive_interval_secs {
+                builder = builder.http2_keep_alive_interval(Duration::from_secs(interval));
+            }
+            if let Some(timeout) = opts.keep_alive_timeout_secs {
+                builder = builder.keep_alive_timeout(Duration::from_secs(timeout));
+            }
+            if let Some(idle) = opts.keep_alive_while_idle {
+                builder = builder.keep_alive_while_idle(idle);
+            }
+            if let Some(size) = opts.initial_stream_window_size {
+                builder = builder.initial_stream_window_size(Some(size));
+            }
+            if let Some(size) = opts.initial_connection_window_size {
+                builder = builder.initial_connection_window_size(Some(size));
+            }
+            if let Some(adaptive) = opts.http2_adaptive_window {
+                builder = builder.http2_adaptive_window(adaptive);
+            }
+            if let Some(nodelay) = opts.tcp_nodelay {
+                builder = builder.tcp_nodelay(nodelay);
+            }
+            if let Some(keepalive) = opts.tcp_keepalive_secs {
+                builder = builder.tcp_keepalive(Some(Duration::from_secs(keepalive)));
+            }
+            if let Some(size) = opts.buffer_size {
+                builder = builder.buffer_size(Some(size));
+            }
+        } else {
+            // Use defaults
+            builder = builder
+                .connect_timeout(Duration::from_secs(10))
+                .max_decoding_message_size(1_000_000_000)
+                .timeout(Duration::from_secs(10));
+        }
+        
+        builder = builder.tls_config(ClientTlsConfig::new().with_enabled_roots())?;
+        
         if let Some(ref token) = token {
             builder = builder.x_token(Some(token.clone()))?;
         }
@@ -168,8 +219,11 @@ impl StreamInner {
         
         let (mut sender, mut stream) = client.subscribe_with_request(Some(request.clone())).await?;
         
-        while let Some(result) = stream.next().await {
-            match result {
+        loop {
+            tokio::select! {
+                // Handle incoming messages from the server
+                Some(result) = stream.next() => {
+                    match result {
                 Ok(message) => {
                     // Handle ping/pong mechanism for connection health
                     if let Some(geyser::subscribe_update::UpdateOneof::Ping(_ping)) = &message.update_oneof {
@@ -220,9 +274,21 @@ impl StreamInner {
                         // Continue processing other messages instead of breaking the stream
                     }
                 }
-                Err(e) => {
-                    return Err(Box::new(e));
-                }
+                        Err(e) => {
+                            return Err(Box::new(e));
+                        }
+                    }
+                },
+                
+                // Handle write requests from the JavaScript client
+                Some(write_request) = write_rx.recv() => {
+                    if let Err(e) = sender.send(write_request).await {
+                        return Err(Box::new(e));
+                    }
+                },
+                
+                // If both streams are closed, exit
+                else => break,
             }
         }
         
@@ -232,6 +298,17 @@ impl StreamInner {
     pub fn cancel(&self) -> Result<()> {
         if let Some(tx) = self.cancel_tx.lock().take() {
             let _ = tx.send(());
+        }
+        Ok(())
+    }
+    
+    pub fn write(&self, request: geyser::SubscribeRequest) -> Result<()> {
+        let tx_guard = self.write_tx.lock();
+        if let Some(ref tx) = *tx_guard {
+            tx.send(request)
+                .map_err(|_| napi::Error::from_reason("Failed to send write request: channel closed"))?;
+        } else {
+            return Err(napi::Error::from_reason("Stream is not active"));
         }
         Ok(())
     }

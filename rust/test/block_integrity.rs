@@ -49,7 +49,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting block integrity test. Subscribing to slots…");
 
     let api_key_clone = cfg.api_key.clone();
-    let mut stream = subscribe(cfg, req);
+    let (stream, _handle) = subscribe(cfg, req);
     futures::pin_mut!(stream);
 
     while let Some(res) = stream.next().await {

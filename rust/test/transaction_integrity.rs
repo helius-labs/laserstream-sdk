@@ -73,7 +73,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let status_map = Arc::clone(&status_map);
         let err_ls_counter = Arc::clone(&err_ls);
         tokio::spawn(async move {
-            let mut stream = subscribe(laser_cfg, req);
+            let (stream, _handle) = subscribe(laser_cfg, req);
             futures::pin_mut!(stream);
             while let Some(res) = stream.next().await {
                 match res {
