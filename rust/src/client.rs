@@ -1,4 +1,4 @@
-use crate::{LaserstreamConfig, LaserstreamError};
+use crate::{LaserstreamConfig, LaserstreamError, config::CompressionEncoding as ConfigCompressionEncoding};
 use async_stream::stream;
 use futures::{StreamExt, TryStreamExt};
 use futures_channel::mpsc as futures_mpsc;
@@ -6,7 +6,7 @@ use futures_util::{sink::SinkExt, Stream};
 use std::{pin::Pin, time::Duration};
 use tokio::sync::mpsc;
 use tokio::time::sleep;
-use tonic::Status;
+use tonic::{Status, codec::CompressionEncoding};
 use tracing::{error, instrument, warn};
 use uuid;
 use yellowstone_grpc_client::{ClientTlsConfig, GeyserGrpcClient};
@@ -65,13 +65,11 @@ pub fn subscribe(
 
             let mut attempt_request = current_request.clone();
 
-            // Add slot tracking if not present
-            if attempt_request.slots.is_empty() {
-                attempt_request.slots.insert(
-                    internal_slot_sub_id.clone(),
-                    SubscribeRequestFilterSlots::default()
-                );
-            }
+            // Always add internal slot tracking subscription
+            attempt_request.slots.insert(
+                internal_slot_sub_id.clone(),
+                SubscribeRequestFilterSlots::default()
+            );
 
             // On reconnection, use the last tracked slot with fork safety
             if reconnect_attempts > 0 && tracked_slot > 0 {
@@ -120,10 +118,21 @@ pub fn subscribe(
                                 // Always track the latest slot if the update is a Slot update
                                 if let Some(UpdateOneof::Slot(s)) = &update.update_oneof {
                                     tracked_slot = s.slot;
+                                    
+                                    // Skip if this slot update is from our internal subscription
+                                    if update.filters.len() == 1 && update.filters.contains(&internal_slot_sub_id) {
+                                        continue;
+                                    }
                                 }
 
-                                            // For non-internal updates:
-                                            yield Ok(update);
+                                            // Filter out internal subscription from filters before yielding
+                                            let mut clean_update = update;
+                                            clean_update.filters.retain(|f| f != &internal_slot_sub_id);
+                                            
+                                            // Only yield if there are still filters after cleaning
+                                            if !clean_update.filters.is_empty() {
+                                                yield Ok(clean_update);
+                                            }
                                         }
                                         Err(status) => {
                                             // Yield the error to consumer AND continue with reconnection
@@ -204,7 +213,34 @@ async fn connect_and_subscribe_once(
         .tcp_keepalive(options.tcp_keepalive_secs.map(Duration::from_secs))           // TCP keepalive
         .buffer_size(options.buffer_size.or(Some(1024 * 64)))                           // 64KB default
         .tls_config(ClientTlsConfig::new().with_enabled_roots())
-        .map_err(|e| tonic::Status::internal(format!("TLS config error: {}", e)))?
+        .map_err(|e| tonic::Status::internal(format!("TLS config error: {}", e)))?;
+    
+    // Configure compression if specified
+    if let Some(send_comp) = options.send_compression {
+        let encoding = match send_comp {
+            ConfigCompressionEncoding::Gzip => CompressionEncoding::Gzip,
+            ConfigCompressionEncoding::Zstd => CompressionEncoding::Zstd,
+        };
+        builder = builder.send_compressed(encoding);
+    }
+    
+    // Configure accepted compression encodings
+    if let Some(ref accept_comps) = options.accept_compression {
+        for comp in accept_comps {
+            let encoding = match comp {
+                ConfigCompressionEncoding::Gzip => CompressionEncoding::Gzip,
+                ConfigCompressionEncoding::Zstd => CompressionEncoding::Zstd,
+            };
+            builder = builder.accept_compressed(encoding);
+        }
+    } else {
+        // Default: accept both gzip and zstd like yellowstone-grpc
+        builder = builder
+            .accept_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Zstd);
+    }
+    
+    let mut builder = builder
         .connect()
         .await
         .map_err(|e| tonic::Status::unavailable(format!("Connection failed: {}", e)))?;

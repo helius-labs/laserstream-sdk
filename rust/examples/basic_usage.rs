@@ -10,6 +10,9 @@ use std::collections::HashMap;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Load .env file from root directory
+    dotenv::from_path("../.env").ok();
+    
 
     let api_key = String::from("");
     let endpoint_url = String::from("");
@@ -40,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // --- Subscribe and Process ---
     println!("Connecting and subscribing...");
-    let stream = subscribe(config, request);
+    let (stream, _handle) = subscribe(config, request);
 
     // Pin the stream to the stack
     futures::pin_mut!(stream);

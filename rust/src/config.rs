@@ -1,3 +1,15 @@
+use serde::{Deserialize, Serialize};
+
+/// Compression encoding options
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CompressionEncoding {
+    /// Gzip compression
+    Gzip,
+    /// Zstd compression (5x more efficient than gzip)
+    Zstd,
+}
+
 #[derive(Debug, Clone)]
 pub struct LaserstreamConfig {
     /// API Key for authentication.
@@ -39,6 +51,10 @@ pub struct ChannelOptions {
     pub tcp_keepalive_secs: Option<u64>,
     /// Buffer size in bytes. Default: 64KB
     pub buffer_size: Option<usize>,
+    /// Compression encodings to accept from server. Default: ["gzip", "zstd"]
+    pub accept_compression: Option<Vec<CompressionEncoding>>,
+    /// Compression encoding to use when sending. Default: None
+    pub send_compression: Option<CompressionEncoding>,
 }
 
 impl Default for ChannelOptions {
@@ -57,7 +73,25 @@ impl Default for ChannelOptions {
             tcp_nodelay: None,
             tcp_keepalive_secs: None,
             buffer_size: None,
+            accept_compression: None,
+            send_compression: None,
         }
+    }
+}
+
+impl ChannelOptions {
+    /// Enable zstd compression for both sending and receiving
+    pub fn with_zstd_compression(mut self) -> Self {
+        self.send_compression = Some(CompressionEncoding::Zstd);
+        self.accept_compression = Some(vec![CompressionEncoding::Zstd, CompressionEncoding::Gzip]);
+        self
+    }
+    
+    /// Enable gzip compression for both sending and receiving
+    pub fn with_gzip_compression(mut self) -> Self {
+        self.send_compression = Some(CompressionEncoding::Gzip);
+        self.accept_compression = Some(vec![CompressionEncoding::Gzip, CompressionEncoding::Zstd]);
+        self
     }
 }
 

@@ -1,4 +1,4 @@
-import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '../client';
+import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig, CompressionAlgorithms } from '../client';
 const credentials = require('../test-config');
 
 async function runBlockSubscription() {
@@ -7,6 +7,9 @@ async function runBlockSubscription() {
   const config: LaserstreamConfig = {
     apiKey: credentials.laserstreamProduction.apiKey,
     endpoint: credentials.laserstreamProduction.endpoint,
+    channelOptions: {
+      'grpc.default_compression_algorithm': CompressionAlgorithms.zstd,
+    },
   };
 
   // Subscribe to block updates
@@ -14,9 +17,9 @@ async function runBlockSubscription() {
     blocks: {
       "all-blocks": {
         accountInclude: [],
-        includeTransactions: false,
-        includeAccounts: false,
-        includeEntries: false
+        includeTransactions: true,
+        includeAccounts: true,
+        includeEntries: true
       }
     },
     commitment: CommitmentLevel.PROCESSED,

@@ -9,6 +9,7 @@ use std::time::Duration;
 use tokio::sync::oneshot;
 use yellowstone_grpc_client::{GeyserGrpcClient, ClientTlsConfig};
 use yellowstone_grpc_proto::geyser;
+use yellowstone_grpc_proto::tonic::codec::CompressionEncoding;
 use uuid;
 use prost::Message;
 use crate::client::ChannelOptions;
@@ -168,38 +169,51 @@ impl StreamInner {
         
         // Apply channel options or use defaults
         if let Some(ref opts) = channel_options {
-            builder = builder
-                .connect_timeout(Duration::from_secs(opts.connect_timeout_secs.unwrap_or(10)))
-                .timeout(Duration::from_secs(opts.timeout_secs.unwrap_or(30)))
-                .max_decoding_message_size(opts.max_decoding_message_size.unwrap_or(1_000_000_000))
-                .max_encoding_message_size(opts.max_encoding_message_size.unwrap_or(32_000_000));
+            // Set standard message size limits
+            if let Some(max_send) = opts.grpc_max_send_message_length {
+                builder = builder.max_encoding_message_size(max_send as usize);
+            } else {
+                builder = builder.max_encoding_message_size(32_000_000); // 32MB default
+            }
             
-            if let Some(interval) = opts.http2_keep_alive_interval_secs {
-                builder = builder.http2_keep_alive_interval(Duration::from_secs(interval));
+            if let Some(max_recv) = opts.grpc_max_receive_message_length {
+                builder = builder.max_decoding_message_size(max_recv as usize);
+            } else {
+                builder = builder.max_decoding_message_size(1_000_000_000); // 1GB default
             }
-            if let Some(timeout) = opts.keep_alive_timeout_secs {
-                builder = builder.keep_alive_timeout(Duration::from_secs(timeout));
+            
+            // Set keep-alive options
+            if let Some(keepalive_time) = opts.grpc_keepalive_time_ms {
+                builder = builder.http2_keep_alive_interval(Duration::from_millis(keepalive_time as u64));
             }
-            if let Some(idle) = opts.keep_alive_while_idle {
-                builder = builder.keep_alive_while_idle(idle);
+            if let Some(keepalive_timeout) = opts.grpc_keepalive_timeout_ms {
+                builder = builder.keep_alive_timeout(Duration::from_millis(keepalive_timeout as u64));
             }
-            if let Some(size) = opts.initial_stream_window_size {
-                builder = builder.initial_stream_window_size(Some(size));
+            if let Some(permit_without_calls) = opts.grpc_keepalive_permit_without_calls {
+                builder = builder.keep_alive_while_idle(permit_without_calls != 0);
             }
-            if let Some(size) = opts.initial_connection_window_size {
-                builder = builder.initial_connection_window_size(Some(size));
-            }
-            if let Some(adaptive) = opts.http2_adaptive_window {
-                builder = builder.http2_adaptive_window(adaptive);
-            }
-            if let Some(nodelay) = opts.tcp_nodelay {
-                builder = builder.tcp_nodelay(nodelay);
-            }
-            if let Some(keepalive) = opts.tcp_keepalive_secs {
-                builder = builder.tcp_keepalive(Some(Duration::from_secs(keepalive)));
-            }
-            if let Some(size) = opts.buffer_size {
-                builder = builder.buffer_size(Some(size));
+            
+            // Apply other common options with sensible defaults
+            builder = builder
+                .connect_timeout(Duration::from_secs(10))
+                .timeout(Duration::from_secs(30));
+            
+            // Configure compression if specified
+            if let Some(compression_algo) = opts.grpc_default_compression_algorithm {
+                match compression_algo {
+                    0 => {}, // identity (no compression)
+                    2 => {
+                        // gzip compression
+                        builder = builder.send_compressed(CompressionEncoding::Gzip)
+                                       .accept_compressed(CompressionEncoding::Gzip);
+                    },
+                    3 => {
+                        // zstd compression
+                        builder = builder.send_compressed(CompressionEncoding::Zstd)
+                                       .accept_compressed(CompressionEncoding::Zstd);
+                    },
+                    _ => return Err(format!("Unsupported compression algorithm: {}. Supported: identity (0), gzip (2), zstd (3).", compression_algo).into()),
+                }
             }
         } else {
             // Use defaults

@@ -27,6 +27,8 @@
     "example:block-meta-sub": "ts-node examples/block-meta-sub.ts",
     "example:entry-sub": "ts-node examples/entry-sub.ts",
     "example:channel-options": "ts-node examples/channel-options-example.ts",
+    "example:compression": "ts-node examples/compression-example.ts",
+    "example:compression-zstd": "ts-node examples/compression-zstd-example.ts",
     "perf:test": "ts-node performance/pump-raydium-performance-test.ts",
     "perf:slot": "ts-node performance/slot-performance-test.ts",
     "perf:token": "ts-node performance/token-performance-test.ts",

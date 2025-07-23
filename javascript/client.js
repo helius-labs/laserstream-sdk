@@ -1,6 +1,14 @@
 const { LaserstreamClient: NapiClient, CommitmentLevel, shutdownAllStreams, getActiveStreamCount } = require('./index');
 const { initProtobuf, decodeSubscribeUpdate } = require('./proto-decoder');
 
+// Compression algorithms enum
+const CompressionAlgorithms = {
+  identity: 0,
+  deflate: 1,
+  gzip: 2,
+  zstd: 3  // zstd is supported in our Rust NAPI bindings
+};
+
 // Initialize protobuf on module load
 let protobufInitialized = false;
 
@@ -57,6 +65,7 @@ async function subscribe(config, request, onData, onError) {
 module.exports = {
   subscribe,
   CommitmentLevel,
+  CompressionAlgorithms,
   initProtobuf,
   decodeSubscribeUpdate,
   // re-export lifecycle helpers from native binding

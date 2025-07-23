@@ -181,7 +181,6 @@ impl StreamHandle {
     #[napi(ts_args_type = "request: any")]
     pub fn write(&self, env: Env, request: Object) -> Result<()> {
         // Parse the JavaScript request object into a protobuf SubscribeRequest
-        println!("🏦 Write Request");
         let client_inner = client::ClientInner::new(
             String::new(), // dummy values, we only need the parsing functionality
             None,
@@ -189,7 +188,6 @@ impl StreamHandle {
             None,
         )?;
         let subscribe_request = client_inner.js_to_subscribe_request(&env, request)?;
-        println!("🏦 Subscribe Request: {:?}", subscribe_request);
         
         // Send the request through the write channel
         self.inner.write(subscribe_request)

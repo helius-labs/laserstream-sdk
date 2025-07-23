@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
 use serde::Deserialize;
+use serde_json;
 use base64::{Engine as _, engine::general_purpose};
 
 use yellowstone_grpc_proto::geyser::{
@@ -28,41 +29,23 @@ pub struct ClientInner {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct ChannelOptions {
-    // Connection timeouts
-    #[serde(rename = "connectTimeoutSecs")]
-    pub connect_timeout_secs: Option<u64>,
-    #[serde(rename = "timeoutSecs")]
-    pub timeout_secs: Option<u64>,
+    // gRPC standard channel options
+    #[serde(rename = "grpc.max_send_message_length")]
+    pub grpc_max_send_message_length: Option<i32>,
+    #[serde(rename = "grpc.max_receive_message_length")]
+    pub grpc_max_receive_message_length: Option<i32>,
+    #[serde(rename = "grpc.keepalive_time_ms")]
+    pub grpc_keepalive_time_ms: Option<i32>,
+    #[serde(rename = "grpc.keepalive_timeout_ms")]
+    pub grpc_keepalive_timeout_ms: Option<i32>,
+    #[serde(rename = "grpc.keepalive_permit_without_calls")]
+    pub grpc_keepalive_permit_without_calls: Option<i32>,
+    #[serde(rename = "grpc.default_compression_algorithm")]
+    pub grpc_default_compression_algorithm: Option<i32>,
     
-    // Message size limits
-    #[serde(rename = "maxDecodingMessageSize")]
-    pub max_decoding_message_size: Option<usize>,
-    #[serde(rename = "maxEncodingMessageSize")]
-    pub max_encoding_message_size: Option<usize>,
-    
-    // Keep-alive settings
-    #[serde(rename = "http2KeepAliveIntervalSecs")]
-    pub http2_keep_alive_interval_secs: Option<u64>,
-    #[serde(rename = "keepAliveTimeoutSecs")]
-    pub keep_alive_timeout_secs: Option<u64>,
-    #[serde(rename = "keepAliveWhileIdle")]
-    pub keep_alive_while_idle: Option<bool>,
-    
-    // Window sizes
-    #[serde(rename = "initialStreamWindowSize")]
-    pub initial_stream_window_size: Option<u32>,
-    #[serde(rename = "initialConnectionWindowSize")]
-    pub initial_connection_window_size: Option<u32>,
-    
-    // Performance options
-    #[serde(rename = "http2AdaptiveWindow")]
-    pub http2_adaptive_window: Option<bool>,
-    #[serde(rename = "tcpNodelay")]
-    pub tcp_nodelay: Option<bool>,
-    #[serde(rename = "tcpKeepaliveSecs")]
-    pub tcp_keepalive_secs: Option<u64>,
-    #[serde(rename = "bufferSize")]
-    pub buffer_size: Option<usize>,
+    // Catch-all for other options
+    #[serde(flatten)]
+    pub other: HashMap<String, serde_json::Value>,
 }
 
 // Complete serde-based structures matching yellowstone-grpc proto exactly

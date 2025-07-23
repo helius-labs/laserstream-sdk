@@ -1,29 +1,14 @@
 // TypeScript declarations for Laserstream client with protobuf decoding
 
-// Channel options interface
-export interface ChannelOptions {
-  // Connection timeouts
-  connectTimeoutSecs?: number;
-  timeoutSecs?: number;
-  
-  // Message size limits
-  maxDecodingMessageSize?: number;
-  maxEncodingMessageSize?: number;
-  
-  // Keep-alive settings
-  http2KeepAliveIntervalSecs?: number;
-  keepAliveTimeoutSecs?: number;
-  keepAliveWhileIdle?: boolean;
-  
-  // Window sizes for flow control
-  initialStreamWindowSize?: number;
-  initialConnectionWindowSize?: number;
-  
-  // Performance options
-  http2AdaptiveWindow?: boolean;
-  tcpNodelay?: boolean;
-  tcpKeepaliveSecs?: number;
-  bufferSize?: number;
+// Re-export gRPC types directly
+export { ChannelOptions } from '@grpc/grpc-js';
+
+// Compression algorithms enum
+export declare enum CompressionAlgorithms {
+  identity = 0,
+  deflate = 1,
+  gzip = 2,
+  zstd = 3
 }
 
 // Configuration interface

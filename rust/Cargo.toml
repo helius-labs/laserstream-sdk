@@ -1,6 +1,6 @@
 [package]
 name = "helius-laserstream"
-version = "0.0.7"
+version = "0.0.8"
 edition = "2021"
 authors = ["Helius <support@helius.xyz>"]
 description = "Rust client for Helius LaserStream gRPC with robust reconnection and slot tracking"
@@ -14,7 +14,7 @@ readme = "README.md"
 [dependencies]
 yellowstone-grpc-proto = "8.0.0"
 yellowstone-grpc-client = "8.0.0"
-tonic = { version = "0.12.1", features = ["transport", "tls"] }
+tonic = { version = "0.12.1", features = ["transport", "tls", "zstd", "gzip"] }
 prost = "0.12"
 prost-types = "0.12"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
@@ -29,6 +29,7 @@ rand = "0.8"
 url = "2.5"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 uuid = { version = "1.7.0", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde", "clock"] }
@@ -50,6 +51,6 @@ path = "test/transaction_integrity.rs"
 name = "block_integrity_test"
 path = "test/block_integrity.rs"
 
-[[bin]]
-name = "basic_usage"
-path = "examples/basic_usage.rs"
+
+[dev-dependencies]
+dotenv = "0.15.0"

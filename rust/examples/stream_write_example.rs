@@ -1,4 +1,4 @@
-use helius_laserstream::{subscribe, LaserstreamConfig, SubscribeRequest, SubscribeRequestFilterSlots};
+use helius_laserstream::{subscribe, LaserstreamConfig, grpc::{SubscribeRequest, SubscribeRequestFilterSlots}};
 use futures::StreamExt;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -7,6 +7,9 @@ use tokio::time::{sleep, Duration};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Load .env file from root directory
+    dotenv::from_path("../.env").ok();
+    
     let endpoint = std::env::var("LASERSTREAM_PRODUCTION_ENDPOINT")
         .unwrap_or_else(|_| "".to_string());
     let api_key = std::env::var("LASERSTREAM_PRODUCTION_API_KEY")
@@ -53,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut transactions_filter = HashMap::new();
         transactions_filter.insert(
             "client".to_string(),
-            helius_laserstream::SubscribeRequestFilterTransactions {
+            helius_laserstream::grpc::SubscribeRequestFilterTransactions {
                 vote: Some(false),
                 failed: Some(false),
                 ..Default::default()
@@ -81,7 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut blocks_filter = HashMap::new();
         blocks_filter.insert(
             "client".to_string(),
-            helius_laserstream::SubscribeRequestFilterBlocks {
+            helius_laserstream::grpc::SubscribeRequestFilterBlocks {
                 include_transactions: Some(true),
                 include_accounts: Some(false),
                 include_entries: Some(false),
@@ -112,12 +115,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         println!("🎰 Slot update #{}: {}", count, slot.slot);
                     }
                     Some(helius_laserstream::grpc::subscribe_update::UpdateOneof::Transaction(tx)) => {
-                        println!("💸 Transaction update: {} bytes", tx.transaction.as_ref().map_or(0, |t| t.data.len()));
+                        println!("💸 Transaction update - Slot: {}", tx.slot);
                     }
                     Some(helius_laserstream::grpc::subscribe_update::UpdateOneof::Block(block)) => {
                         println!("📦 Block update: slot {}, {} transactions", 
                             block.slot,
-                            block.transactions.as_ref().map_or(0, |txs| txs.len())
+                            block.transactions.len()
                         );
                     }
                     _ => {}
