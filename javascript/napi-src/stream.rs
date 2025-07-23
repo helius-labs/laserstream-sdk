@@ -263,13 +263,11 @@ impl StreamInner {
                     0 => {}, // identity (no compression)
                     2 => {
                         // gzip compression
-                        builder = builder.send_compressed(CompressionEncoding::Gzip)
-                                       .accept_compressed(CompressionEncoding::Gzip);
+                        builder = builder.send_compressed(CompressionEncoding::Gzip);
                     },
                     3 => {
                         // zstd compression
-                        builder = builder.send_compressed(CompressionEncoding::Zstd)
-                                       .accept_compressed(CompressionEncoding::Zstd);
+                        builder = builder.send_compressed(CompressionEncoding::Zstd);
                     },
                     _ => return Err(format!("Unsupported compression algorithm: {}. Supported: identity (0), gzip (2), zstd (3).", compression_algo).into()),
                 }
@@ -281,6 +279,12 @@ impl StreamInner {
                 .max_decoding_message_size(1_000_000_000)
                 .timeout(Duration::from_secs(10));
         }
+        
+        // Always accept both compression types regardless of configuration
+        // This matches yellowstone-grpc's default behavior
+        builder = builder
+            .accept_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Zstd);
         
         builder = builder.tls_config(ClientTlsConfig::new().with_enabled_roots())?;
         
