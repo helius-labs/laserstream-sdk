@@ -3,12 +3,14 @@ const credentials = require('../test-config');
 
 async function runBlockSubscription() {
   console.log('🧱 Laserstream Block Subscription Example');
+  console.log('🔧 Testing compression with zstd...');
 
   const config: LaserstreamConfig = {
     apiKey: credentials.laserstreamProduction.apiKey,
     endpoint: credentials.laserstreamProduction.endpoint,
     channelOptions: {
-      'grpc.default_compression_algorithm': CompressionAlgorithms.zstd,
+      'grpc.default_compression_algorithm': CompressionAlgorithms.gzip,  // Try gzip instead
+      'grpc.default_compression_level': 'high',  // High compression level
     },
   };
 
