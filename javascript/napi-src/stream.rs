@@ -169,7 +169,7 @@ impl StreamInner {
         
         // Apply channel options or use defaults
         if let Some(ref opts) = channel_options {
-            // Set standard message size limits
+            // Message size limits
             if let Some(max_send) = opts.grpc_max_send_message_length {
                 builder = builder.max_encoding_message_size(max_send as usize);
             } else {
@@ -182,7 +182,7 @@ impl StreamInner {
                 builder = builder.max_decoding_message_size(1_000_000_000); // 1GB default
             }
             
-            // Set keep-alive options
+            // Keep-alive options
             if let Some(keepalive_time) = opts.grpc_keepalive_time_ms {
                 builder = builder.http2_keep_alive_interval(Duration::from_millis(keepalive_time as u64));
             }
@@ -193,10 +193,69 @@ impl StreamInner {
                 builder = builder.keep_alive_while_idle(permit_without_calls != 0);
             }
             
-            // Apply other common options with sensible defaults
+            // Process other gRPC options from the catch-all HashMap
+            for (key, value) in &opts.other {
+                match key.as_str() {
+                    // Additional keepalive/timeout options
+                    "grpc.http2.max_pings_without_data" => {
+                        // Not directly supported by yellowstone-grpc-client
+                    }
+                    "grpc.http2.min_time_between_pings_ms" => {
+                        // Could map to http2_keep_alive_interval if not already set
+                        if opts.grpc_keepalive_time_ms.is_none() {
+                            if let Some(ms) = value.as_i64() {
+                                builder = builder.http2_keep_alive_interval(Duration::from_millis(ms as u64));
+                            }
+                        }
+                    }
+                    "grpc.http2.max_ping_strikes" => {
+                        // Not directly supported
+                    }
+                    "grpc.client_idle_timeout_ms" => {
+                        if let Some(ms) = value.as_i64() {
+                            builder = builder.timeout(Duration::from_millis(ms as u64));
+                        }
+                    }
+                    // HTTP/2 flow control
+                    "grpc.http2.write_buffer_size" => {
+                        if let Some(size) = value.as_i64() {
+                            builder = builder.buffer_size(Some(size as usize));
+                        }
+                    }
+                    "grpc-node.max_session_memory" => {
+                        // Could influence buffer sizes
+                        if let Some(size) = value.as_i64() {
+                            // Use a portion of session memory for initial windows
+                            let window_size = (size / 4).min(16 * 1024 * 1024) as u32;
+                            builder = builder.initial_stream_window_size(Some(window_size));
+                        }
+                    }
+                    // Connection options
+                    "grpc.http2.max_frame_size" => {
+                        // Not directly supported, but influences message sizes
+                    }
+                    "grpc.max_connection_idle_ms" => {
+                        // Similar to client_idle_timeout
+                        if opts.other.get("grpc.client_idle_timeout_ms").is_none() {
+                            if let Some(ms) = value.as_i64() {
+                                builder = builder.timeout(Duration::from_millis(ms as u64));
+                            }
+                        }
+                    }
+                    _ => {
+                        // Ignore unknown options
+                    }
+                }
+            }
+            
+            // Apply sensible defaults for options not specified
             builder = builder
                 .connect_timeout(Duration::from_secs(10))
-                .timeout(Duration::from_secs(30));
+                .timeout(Duration::from_secs(30))
+                .http2_adaptive_window(true)
+                .tcp_nodelay(true)
+                .initial_stream_window_size(Some(4 * 1024 * 1024))      // 4MB
+                .initial_connection_window_size(Some(8 * 1024 * 1024)); // 8MB
             
             // Configure compression if specified
             if let Some(compression_algo) = opts.grpc_default_compression_algorithm {
