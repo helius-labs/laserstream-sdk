@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
 use serde::Deserialize;
+use serde_json;
 use base64::{Engine as _, engine::general_purpose};
 
 use yellowstone_grpc_proto::geyser::{
@@ -23,6 +24,28 @@ pub struct ClientInner {
     endpoint: String,
     token: Option<String>,
     max_reconnect_attempts: u32,
+    channel_options: Option<ChannelOptions>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct ChannelOptions {
+    // gRPC standard channel options
+    #[serde(rename = "grpc.max_send_message_length")]
+    pub grpc_max_send_message_length: Option<i32>,
+    #[serde(rename = "grpc.max_receive_message_length")]
+    pub grpc_max_receive_message_length: Option<i32>,
+    #[serde(rename = "grpc.keepalive_time_ms")]
+    pub grpc_keepalive_time_ms: Option<i32>,
+    #[serde(rename = "grpc.keepalive_timeout_ms")]
+    pub grpc_keepalive_timeout_ms: Option<i32>,
+    #[serde(rename = "grpc.keepalive_permit_without_calls")]
+    pub grpc_keepalive_permit_without_calls: Option<i32>,
+    #[serde(rename = "grpc.default_compression_algorithm")]
+    pub grpc_default_compression_algorithm: Option<i32>,
+    
+    // Catch-all for other options
+    #[serde(flatten)]
+    pub other: HashMap<String, serde_json::Value>,
 }
 
 // Complete serde-based structures matching yellowstone-grpc proto exactly
@@ -145,11 +168,13 @@ impl ClientInner {
         endpoint: String,
         token: Option<String>,
         max_reconnect_attempts: Option<u32>,
+        channel_options: Option<ChannelOptions>,
     ) -> Result<Self> {
         Ok(Self {
             endpoint,
             token,
             max_reconnect_attempts: max_reconnect_attempts.unwrap_or(120),
+            channel_options,
         })
     }
 
@@ -412,6 +437,7 @@ impl ClientInner {
             subscribe_request,
             ts_callback,
             self.max_reconnect_attempts,
+            self.channel_options.clone(),
         )?);
 
         // Register stream in global registry for lifecycle management

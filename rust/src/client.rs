@@ -1,11 +1,12 @@
-use crate::{LaserstreamConfig, LaserstreamError};
+use crate::{LaserstreamConfig, LaserstreamError, config::CompressionEncoding as ConfigCompressionEncoding};
 use async_stream::stream;
 use futures::{StreamExt, TryStreamExt};
 use futures_channel::mpsc as futures_mpsc;
 use futures_util::{sink::SinkExt, Stream};
 use std::{pin::Pin, time::Duration};
+use tokio::sync::mpsc;
 use tokio::time::sleep;
-use tonic::Status;
+use tonic::{Status, codec::CompressionEncoding};
 use tracing::{error, instrument, warn};
 use uuid;
 use yellowstone_grpc_client::{ClientTlsConfig, GeyserGrpcClient};
@@ -17,14 +18,34 @@ use yellowstone_grpc_proto::geyser::{
 const HARD_CAP_RECONNECT_ATTEMPTS: u32 = (20 * 60) / 5; // 20 mins / 5 sec interval
 const FIXED_RECONNECT_INTERVAL_MS: u64 = 5000; // 5 seconds fixed interval
 
+/// Handle for managing a bidirectional streaming subscription.
+#[derive(Clone)]
+pub struct StreamHandle {
+    write_tx: mpsc::UnboundedSender<SubscribeRequest>,
+}
+
+impl StreamHandle {
+    /// Send a new subscription request to update the active subscription.
+    pub async fn write(&self, request: SubscribeRequest) -> Result<(), LaserstreamError> {
+        self.write_tx
+            .send(request)
+            .map_err(|_| LaserstreamError::ConnectionError("Write channel closed".to_string()))
+    }
+}
+
 /// Establishes a gRPC connection, handles the subscription lifecycle,
 /// and provides a stream of updates. Automatically reconnects on failure.
 #[instrument(skip(config, request))]
 pub fn subscribe(
     config: LaserstreamConfig,
     request: SubscribeRequest,
-) -> impl Stream<Item = Result<SubscribeUpdate, LaserstreamError>> {
-    stream! {
+) -> (
+    impl Stream<Item = Result<SubscribeUpdate, LaserstreamError>>,
+    StreamHandle,
+) {
+    let (write_tx, mut write_rx) = mpsc::unbounded_channel::<SubscribeRequest>();
+    let handle = StreamHandle { write_tx };
+    let update_stream = stream! {
         let mut reconnect_attempts = 0;
         let mut tracked_slot: u64 = 0;
 
@@ -44,13 +65,11 @@ pub fn subscribe(
 
             let mut attempt_request = current_request.clone();
 
-            // Add slot tracking if not present
-            if attempt_request.slots.is_empty() {
-                attempt_request.slots.insert(
-                    internal_slot_sub_id.clone(),
-                    SubscribeRequestFilterSlots::default()
-                );
-            }
+            // Always add internal slot tracking subscription
+            attempt_request.slots.insert(
+                internal_slot_sub_id.clone(),
+                SubscribeRequestFilterSlots::default()
+            );
 
             // On reconnection, use the last tracked slot with fork safety
             if reconnect_attempts > 0 && tracked_slot > 0 {
@@ -79,32 +98,61 @@ pub fn subscribe(
                             tonic::Status::new(code, ystatus.message())
                         }));
 
-                    while let Some(result) = stream.next().await {
-                        match result {
-                            Ok(update) => {
-                                // Handle ping/pong
-                                if matches!(&update.update_oneof, Some(UpdateOneof::Ping(_))) {
-                                    let pong_req = SubscribeRequest { ping: Some(SubscribeRequestPing { id: 1 }), ..Default::default() };
-                                    if let Err(e) = sender.send(pong_req).await {
-                                        warn!(error = %e, "Failed to send pong");
-                                        break;
-                                    }
-                                    continue;
-                                }
+                    loop {
+                        tokio::select! {
+                            // Handle incoming messages from the server
+                            result = stream.next() => {
+                                if let Some(result) = result {
+                                    match result {
+                                        Ok(update) => {
+                                            // Handle ping/pong
+                                            if matches!(&update.update_oneof, Some(UpdateOneof::Ping(_))) {
+                                                let pong_req = SubscribeRequest { ping: Some(SubscribeRequestPing { id: 1 }), ..Default::default() };
+                                                if let Err(e) = sender.send(pong_req).await {
+                                                    warn!(error = %e, "Failed to send pong");
+                                                    break;
+                                                }
+                                                continue;
+                                            }
 
                                 // Always track the latest slot if the update is a Slot update
                                 if let Some(UpdateOneof::Slot(s)) = &update.update_oneof {
                                     tracked_slot = s.slot;
+                                    
+                                    // Skip if this slot update is from our internal subscription
+                                    if update.filters.len() == 1 && update.filters.contains(&internal_slot_sub_id) {
+                                        continue;
+                                    }
                                 }
 
-                                // For non-internal updates:
-                                yield Ok(update);
+                                            // Filter out internal subscription from filters before yielding
+                                            let mut clean_update = update;
+                                            clean_update.filters.retain(|f| f != &internal_slot_sub_id);
+                                            
+                                            // Only yield if there are still filters after cleaning
+                                            if !clean_update.filters.is_empty() {
+                                                yield Ok(clean_update);
+                                            }
+                                        }
+                                        Err(status) => {
+                                            // Yield the error to consumer AND continue with reconnection
+                                            warn!(error = %status, "Stream error, will reconnect after 5s delay");
+                                            yield Err(LaserstreamError::Status(status.clone()));
+                                            break;
+                                        }
+                                    }
+                                } else {
+                                    // Stream ended
+                                    break;
+                                }
                             }
-                            Err(status) => {
-                                // Yield the error to consumer AND continue with reconnection
-                                warn!(error = %status, "Stream error, will reconnect after 5s delay");
-                                yield Err(LaserstreamError::Status(status.clone()));
-                                break;
+                            
+                            // Handle write requests from the user
+                            Some(write_request) = write_rx.recv() => {
+                                if let Err(e) = sender.send(write_request).await {
+                                    warn!(error = %e, "Failed to send write request");
+                                    // Continue processing; don't break the stream
+                                }
                             }
                         }
                     }
@@ -128,7 +176,9 @@ pub fn subscribe(
             let delay = Duration::from_millis(FIXED_RECONNECT_INTERVAL_MS);
             sleep(delay).await;
         }
-    }
+    };
+    
+    (update_stream, handle)
 }
 
 #[instrument(skip(config, request, api_key))]
@@ -143,25 +193,54 @@ async fn connect_and_subscribe_once(
     ),
     tonic::Status,
 > {
+    let options = &config.channel_options;
+    
     let mut builder = GeyserGrpcClient::build_from_shared(config.endpoint.clone())
         .map_err(|e| tonic::Status::internal(format!("Failed to build client: {}", e)))?
         .x_token(Some(api_key))
         .map_err(|e| tonic::Status::unauthenticated(format!("Failed to set API key: {}", e)))?
-        .connect_timeout(Duration::from_secs(10))
-        .timeout(Duration::from_secs(30))
-        .max_decoding_message_size(1_000_000_000) // 1GB max
-        .max_encoding_message_size(32_000_000)    // 32MB max
-        .http2_keep_alive_interval(Duration::from_secs(30))
-        .keep_alive_timeout(Duration::from_secs(5))  
-        .keep_alive_while_idle(true)
-        .initial_stream_window_size(Some(1024 * 1024 * 4))      // 4MB per stream
-        .initial_connection_window_size(Some(1024 * 1024 * 8))  // 8MB total
-        .http2_adaptive_window(true)                             // Dynamic window sizing
-        .tcp_nodelay(true)                                       // Disable Nagle's algorithm
-        .tcp_keepalive(Some(Duration::from_secs(60)))           // TCP keepalive
-        .buffer_size(Some(1024 * 64))                           // 64KB buffer
+        .connect_timeout(Duration::from_secs(options.connect_timeout_secs.unwrap_or(10)))
+        .timeout(Duration::from_secs(options.timeout_secs.unwrap_or(30)))
+        .max_decoding_message_size(options.max_decoding_message_size.unwrap_or(1_000_000_000)) // 1GB default
+        .max_encoding_message_size(options.max_encoding_message_size.unwrap_or(32_000_000))    // 32MB default
+        .http2_keep_alive_interval(Duration::from_secs(options.http2_keep_alive_interval_secs.unwrap_or(30)))
+        .keep_alive_timeout(Duration::from_secs(options.keep_alive_timeout_secs.unwrap_or(5)))  
+        .keep_alive_while_idle(options.keep_alive_while_idle.unwrap_or(true))
+        .initial_stream_window_size(options.initial_stream_window_size.or(Some(1024 * 1024 * 4)))      // 4MB default
+        .initial_connection_window_size(options.initial_connection_window_size.or(Some(1024 * 1024 * 8)))  // 8MB default
+        .http2_adaptive_window(options.http2_adaptive_window.unwrap_or(true))                             // Dynamic window sizing
+        .tcp_nodelay(options.tcp_nodelay.unwrap_or(true))                                       // Disable Nagle's algorithm
+        .tcp_keepalive(options.tcp_keepalive_secs.map(Duration::from_secs))           // TCP keepalive
+        .buffer_size(options.buffer_size.or(Some(1024 * 64)))                           // 64KB default
         .tls_config(ClientTlsConfig::new().with_enabled_roots())
-        .map_err(|e| tonic::Status::internal(format!("TLS config error: {}", e)))?
+        .map_err(|e| tonic::Status::internal(format!("TLS config error: {}", e)))?;
+    
+    // Configure compression if specified
+    if let Some(send_comp) = options.send_compression {
+        let encoding = match send_comp {
+            ConfigCompressionEncoding::Gzip => CompressionEncoding::Gzip,
+            ConfigCompressionEncoding::Zstd => CompressionEncoding::Zstd,
+        };
+        builder = builder.send_compressed(encoding);
+    }
+    
+    // Configure accepted compression encodings
+    if let Some(ref accept_comps) = options.accept_compression {
+        for comp in accept_comps {
+            let encoding = match comp {
+                ConfigCompressionEncoding::Gzip => CompressionEncoding::Gzip,
+                ConfigCompressionEncoding::Zstd => CompressionEncoding::Zstd,
+            };
+            builder = builder.accept_compressed(encoding);
+        }
+    } else {
+        // Default: accept both gzip and zstd like yellowstone-grpc
+        builder = builder
+            .accept_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Zstd);
+    }
+    
+    let mut builder = builder
         .connect()
         .await
         .map_err(|e| tonic::Status::unavailable(format!("Connection failed: {}", e)))?;

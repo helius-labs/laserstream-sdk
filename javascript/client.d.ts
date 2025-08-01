@@ -1,10 +1,55 @@
 // TypeScript declarations for Laserstream client with protobuf decoding
 
+// Re-export gRPC types directly
+export { ChannelOptions } from '@grpc/grpc-js';
+
+// Re-export Yellowstone proto types directly
+export {
+  SubscribeUpdate,
+  SubscribeUpdateAccount,
+  SubscribeUpdateAccountInfo,
+  SubscribeUpdateBlock,
+  SubscribeUpdateBlockMeta,
+  SubscribeUpdateSlot,
+  SubscribeUpdateTransaction,
+  SubscribeUpdateTransactionInfo,
+  SubscribeUpdateTransactionStatus,
+  SubscribeUpdateEntry,
+  SubscribeUpdatePing,
+  SubscribeUpdatePong,
+  SubscribeRequest,
+  SubscribeRequestFilterAccounts,
+  SubscribeRequestFilterSlots,
+  SubscribeRequestFilterTransactions,
+  SubscribeRequestFilterBlocks,
+  SubscribeRequestFilterBlocksMeta,
+  SubscribeRequestFilterEntry,
+  SubscribeRequestAccountsDataSlice,
+  SubscribeRequestPing,
+} from '@triton-one/yellowstone-grpc/dist/types/grpc/geyser';
+
+export {
+  MessageAddressTableLookup,
+  Message,
+  Transaction,
+  TransactionStatusMeta,
+  TransactionError,
+} from '@triton-one/yellowstone-grpc/dist/types/grpc/solana-storage';
+
+// Compression algorithms enum
+export declare enum CompressionAlgorithms {
+  identity = 0,
+  deflate = 1,
+  gzip = 2,
+  zstd = 3
+}
+
 // Configuration interface
 export interface LaserstreamConfig {
   apiKey: string;
   endpoint: string;
   maxReconnectAttempts?: number;
+  channelOptions?: ChannelOptions;
 }
 
 // Subscription request interface
@@ -22,25 +67,14 @@ export interface SubscribeRequest {
   fromSlot?: number;
 }
 
-// Subscribe update interface
-export interface SubscribeUpdate {
-  filters: string[];
-  createdAt: Date;
-  account?: any;
-  slot?: any;
-  transaction?: any;
-  transactionStatus?: any;
-  block?: any;
-  blockMeta?: any;
-  entry?: any;
-  ping?: any;
-  pong?: any;
-}
+// Re-export SubscribeUpdate from proto-types
+// (already exported via export * from './proto-types')
 
 // Stream handle interface
 export interface StreamHandle {
   id: string;
   cancel(): void;
+  write(request: SubscribeRequest): Promise<void>;
 }
 
 // Commitment level enum

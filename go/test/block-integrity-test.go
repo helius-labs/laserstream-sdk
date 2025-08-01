@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	laserstream "laserstream-go-client"
+	laserstream "github.com/helius-labs/laserstream-sdk/go"
 
 	"github.com/joho/godotenv"
 )
@@ -112,7 +112,6 @@ func main() {
 	config := laserstream.LaserstreamConfig{
 		Endpoint: endpoint,
 		APIKey:   apiKey,
-		Insecure: true, // localhost connection through chaos proxy
 	}
 
 	commitmentLevel := laserstream.CommitmentLevel_PROCESSED

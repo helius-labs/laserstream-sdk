@@ -1,4 +1,5 @@
 use futures_util::{StreamExt, SinkExt};
+use tokio::sync::mpsc;
 use napi::threadsafe_function::{ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi::bindgen_prelude::*;
 use parking_lot::Mutex;
@@ -8,8 +9,10 @@ use std::time::Duration;
 use tokio::sync::oneshot;
 use yellowstone_grpc_client::{GeyserGrpcClient, ClientTlsConfig};
 use yellowstone_grpc_proto::geyser;
+use yellowstone_grpc_proto::tonic::codec::CompressionEncoding;
 use uuid;
 use prost::Message;
+use crate::client::ChannelOptions;
 
 // Constants for reconnect logic
 const HARD_CAP_RECONNECT_ATTEMPTS: u32 = (20 * 60) / 5; // 20 mins / 5 sec interval = 240 attempts
@@ -18,6 +21,7 @@ const FORK_DEPTH_SAFETY_MARGIN: u64 = 31; // Max fork depth for processed commit
 
 pub struct StreamInner {
     cancel_tx: Mutex<Option<oneshot::Sender<()>>>,
+    write_tx: Mutex<Option<mpsc::UnboundedSender<geyser::SubscribeRequest>>>,
 }
 
 impl StreamInner {
@@ -28,8 +32,10 @@ impl StreamInner {
         mut initial_request: geyser::SubscribeRequest,
         ts_callback: ThreadsafeFunction<crate::SubscribeUpdateBytes, ErrorStrategy::CalleeHandled>,
         max_reconnect_attempts: u32,
+        channel_options: Option<ChannelOptions>,
     ) -> Result<Self> {
         let (cancel_tx, mut cancel_rx) = oneshot::channel();
+        let (write_tx, mut write_rx) = mpsc::unbounded_channel();
         let tracked_slot = Arc::new(AtomicU64::new(0));
         let made_progress = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
@@ -76,6 +82,8 @@ impl StreamInner {
                         tracked_slot_clone,
                         internal_slot_id_clone,
                         progress_flag_clone,
+                        &channel_options,
+                        &mut write_rx,
                     ) => {
                         match result {
                             Ok(()) => {
@@ -141,6 +149,7 @@ impl StreamInner {
 
         Ok(Self {
             cancel_tx: Mutex::new(Some(cancel_tx)),
+            write_tx: Mutex::new(Some(write_tx)),
         })
     }
 
@@ -152,14 +161,131 @@ impl StreamInner {
         tracked_slot: Arc<AtomicU64>,
         internal_slot_sub_id: String,
         progress_flag: Arc<std::sync::atomic::AtomicBool>,
+        channel_options: &Option<ChannelOptions>,
+        write_rx: &mut mpsc::UnboundedReceiver<geyser::SubscribeRequest>,
     ) -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
         
-        let mut builder = GeyserGrpcClient::build_from_shared(endpoint.to_string())?
-            .connect_timeout(Duration::from_secs(10))
-            .max_decoding_message_size(1_000_000_000)
-            .timeout(Duration::from_secs(10))
-            .tls_config(ClientTlsConfig::new().with_enabled_roots())?;
-
+        let mut builder = GeyserGrpcClient::build_from_shared(endpoint.to_string())?;
+        
+        // Apply channel options or use defaults
+        if let Some(ref opts) = channel_options {
+            // Message size limits
+            if let Some(max_send) = opts.grpc_max_send_message_length {
+                builder = builder.max_encoding_message_size(max_send as usize);
+            } else {
+                builder = builder.max_encoding_message_size(32_000_000); // 32MB default
+            }
+            
+            if let Some(max_recv) = opts.grpc_max_receive_message_length {
+                builder = builder.max_decoding_message_size(max_recv as usize);
+            } else {
+                builder = builder.max_decoding_message_size(1_000_000_000); // 1GB default
+            }
+            
+            // Keep-alive options
+            if let Some(keepalive_time) = opts.grpc_keepalive_time_ms {
+                builder = builder.http2_keep_alive_interval(Duration::from_millis(keepalive_time as u64));
+            }
+            if let Some(keepalive_timeout) = opts.grpc_keepalive_timeout_ms {
+                builder = builder.keep_alive_timeout(Duration::from_millis(keepalive_timeout as u64));
+            }
+            if let Some(permit_without_calls) = opts.grpc_keepalive_permit_without_calls {
+                builder = builder.keep_alive_while_idle(permit_without_calls != 0);
+            }
+            
+            // Process other gRPC options from the catch-all HashMap
+            for (key, value) in &opts.other {
+                match key.as_str() {
+                    // Additional keepalive/timeout options
+                    "grpc.http2.max_pings_without_data" => {
+                        // Not directly supported by yellowstone-grpc-client
+                    }
+                    "grpc.http2.min_time_between_pings_ms" => {
+                        // Could map to http2_keep_alive_interval if not already set
+                        if opts.grpc_keepalive_time_ms.is_none() {
+                            if let Some(ms) = value.as_i64() {
+                                builder = builder.http2_keep_alive_interval(Duration::from_millis(ms as u64));
+                            }
+                        }
+                    }
+                    "grpc.http2.max_ping_strikes" => {
+                        // Not directly supported
+                    }
+                    "grpc.client_idle_timeout_ms" => {
+                        if let Some(ms) = value.as_i64() {
+                            builder = builder.timeout(Duration::from_millis(ms as u64));
+                        }
+                    }
+                    // HTTP/2 flow control
+                    "grpc.http2.write_buffer_size" => {
+                        if let Some(size) = value.as_i64() {
+                            builder = builder.buffer_size(Some(size as usize));
+                        }
+                    }
+                    "grpc-node.max_session_memory" => {
+                        // Could influence buffer sizes
+                        if let Some(size) = value.as_i64() {
+                            // Use a portion of session memory for initial windows
+                            let window_size = (size / 4).min(16 * 1024 * 1024) as u32;
+                            builder = builder.initial_stream_window_size(Some(window_size));
+                        }
+                    }
+                    // Connection options
+                    "grpc.http2.max_frame_size" => {
+                        // Not directly supported, but influences message sizes
+                    }
+                    "grpc.max_connection_idle_ms" => {
+                        // Similar to client_idle_timeout
+                        if opts.other.get("grpc.client_idle_timeout_ms").is_none() {
+                            if let Some(ms) = value.as_i64() {
+                                builder = builder.timeout(Duration::from_millis(ms as u64));
+                            }
+                        }
+                    }
+                    _ => {
+                        // Ignore unknown options
+                    }
+                }
+            }
+            
+            // Apply sensible defaults for options not specified
+            builder = builder
+                .connect_timeout(Duration::from_secs(10))
+                .timeout(Duration::from_secs(30))
+                .http2_adaptive_window(true)
+                .tcp_nodelay(true)
+                .initial_stream_window_size(Some(4 * 1024 * 1024))      // 4MB
+                .initial_connection_window_size(Some(8 * 1024 * 1024)); // 8MB
+            
+            // Configure compression if specified
+            if let Some(compression_algo) = opts.grpc_default_compression_algorithm {
+                match compression_algo {
+                    0 => {}, // identity (no compression)
+                    2 => {
+                        // gzip compression
+                        builder = builder
+                            .send_compressed(CompressionEncoding::Gzip)
+                            .accept_compressed(CompressionEncoding::Gzip);
+                    },
+                    3 => {
+                        // zstd compression  
+                        builder = builder
+                            .send_compressed(CompressionEncoding::Zstd)
+                            .accept_compressed(CompressionEncoding::Zstd);
+                    },
+                    _ => return Err(format!("Unsupported compression algorithm: {}. Supported: identity (0), gzip (2), zstd (3).", compression_algo).into()),
+                }
+            }
+        } else {
+            // Use defaults
+            builder = builder
+                .connect_timeout(Duration::from_secs(10))
+                .max_decoding_message_size(1_000_000_000)
+                .timeout(Duration::from_secs(10));
+        }
+        
+        builder = builder.tls_config(ClientTlsConfig::new().with_enabled_roots())?;
+        
         if let Some(ref token) = token {
             builder = builder.x_token(Some(token.clone()))?;
         }
@@ -168,8 +294,11 @@ impl StreamInner {
         
         let (mut sender, mut stream) = client.subscribe_with_request(Some(request.clone())).await?;
         
-        while let Some(result) = stream.next().await {
-            match result {
+        loop {
+            tokio::select! {
+                // Handle incoming messages from the server
+                Some(result) = stream.next() => {
+                    match result {
                 Ok(message) => {
                     // Handle ping/pong mechanism for connection health
                     if let Some(geyser::subscribe_update::UpdateOneof::Ping(_ping)) = &message.update_oneof {
@@ -220,9 +349,21 @@ impl StreamInner {
                         // Continue processing other messages instead of breaking the stream
                     }
                 }
-                Err(e) => {
-                    return Err(Box::new(e));
-                }
+                        Err(e) => {
+                            return Err(Box::new(e));
+                        }
+                    }
+                },
+                
+                // Handle write requests from the JavaScript client
+                Some(write_request) = write_rx.recv() => {
+                    if let Err(e) = sender.send(write_request).await {
+                        return Err(Box::new(e));
+                    }
+                },
+                
+                // If both streams are closed, exit
+                else => break,
             }
         }
         
@@ -232,6 +373,17 @@ impl StreamInner {
     pub fn cancel(&self) -> Result<()> {
         if let Some(tx) = self.cancel_tx.lock().take() {
             let _ = tx.send(());
+        }
+        Ok(())
+    }
+    
+    pub fn write(&self, request: geyser::SubscribeRequest) -> Result<()> {
+        let tx_guard = self.write_tx.lock();
+        if let Some(ref tx) = *tx_guard {
+            tx.send(request)
+                .map_err(|_| napi::Error::from_reason("Failed to send write request: channel closed"))?;
+        } else {
+            return Err(napi::Error::from_reason("Stream is not active"));
         }
         Ok(())
     }

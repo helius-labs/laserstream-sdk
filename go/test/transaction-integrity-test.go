@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	laserstream "laserstream-go-client"
+	laserstream "github.com/helius-labs/laserstream-sdk/go"
 
 	"github.com/joho/godotenv"
 
@@ -245,7 +245,6 @@ func startLaserstreamStream(tracker *SignatureTracker) error {
 	config := laserstream.LaserstreamConfig{
 		Endpoint: endpoint,
 		APIKey:   apiKey,
-		Insecure: true, // localhost connection through chaos proxy
 	}
 
 	commitmentLevel := laserstream.CommitmentLevel_CONFIRMED

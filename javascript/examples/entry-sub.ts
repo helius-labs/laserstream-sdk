@@ -1,4 +1,11 @@
-import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '../client';
+import { 
+  subscribe, 
+  CommitmentLevel, 
+  SubscribeUpdate,
+  SubscribeUpdateEntry,
+  LaserstreamConfig 
+} from '../client';
+import * as bs58 from 'bs58';
 const credentials = require('../test-config');
 
 async function runEntrySubscription() {
@@ -28,7 +35,16 @@ async function runEntrySubscription() {
     config,
     request,
     async (update: SubscribeUpdate) => {
-      console.log('📝 Entry Update:', update);
+      if (update.entry) {
+        const entryUpdate: SubscribeUpdateEntry = update.entry;
+        console.log('\n📝 Entry Update Received!');
+        console.log('  - Slot:', entryUpdate.slot);
+        console.log('  - Index:', entryUpdate.index);
+        console.log('  - Num Hashes:', entryUpdate.numHashes);
+        console.log('  - Hash:', entryUpdate.hash ? bs58.encode(entryUpdate.hash) : 'N/A');
+        console.log('  - Executed Transaction Count:', entryUpdate.executedTransactionCount);
+        console.log('  - Starting Transaction Index:', entryUpdate.startingTransactionIndex);
+      }
     },
     async (error: Error) => {
       console.error('❌ Stream error:', error);

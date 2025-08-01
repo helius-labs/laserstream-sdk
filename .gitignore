@@ -52,3 +52,5 @@ dist/
 build/
 out/
 go/test/remote-integrity-test.sh
+
+ClAUDE.md

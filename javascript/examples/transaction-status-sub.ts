@@ -1,4 +1,12 @@
-import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '../client';
+import { 
+  subscribe, 
+  CommitmentLevel, 
+  SubscribeUpdate,
+  SubscribeUpdateTransactionStatus,
+  TransactionError,
+  LaserstreamConfig 
+} from '../client';
+import * as bs58 from 'bs58';
 const credentials = require('../test-config');
 
 async function runTransactionStatusSubscription() {
@@ -34,7 +42,21 @@ async function runTransactionStatusSubscription() {
     config,
     request,
     async (update: SubscribeUpdate) => {
-      console.log('📊 Transaction Status Update:', update);
+      if (update.transactionStatus) {
+        const txStatus: SubscribeUpdateTransactionStatus = update.transactionStatus;
+        console.log('\n📊 Transaction Status Update Received!');
+        console.log('  - Slot:', txStatus.slot);
+        console.log('  - Signature:', txStatus.signature ? bs58.encode(txStatus.signature) : 'N/A');
+        console.log('  - Is Vote:', txStatus.isVote);
+        console.log('  - Index:', txStatus.index);
+        
+        if (txStatus.err) {
+          const error: TransactionError = txStatus.err;
+          console.log('  - Error:', error.err ? Buffer.from(error.err).toString() : 'N/A');
+        } else {
+          console.log('  - Status: Success');
+        }
+      }
     },
     async (error: Error) => {
       console.error('❌ Stream error:', error);
