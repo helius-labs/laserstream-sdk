@@ -1,4 +1,7 @@
-use helius_laserstream::{subscribe, LaserstreamConfig, grpc::{SubscribeRequest, SubscribeRequestFilterSlots}};
+use helius_laserstream::{
+    subscribe, LaserstreamConfig, 
+    grpc::{SubscribeRequest, SubscribeRequestFilterSlots, SubscribeRequestFilterTransactions, SubscribeRequestFilterBlocks}
+};
 use futures::StreamExt;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -7,13 +10,15 @@ use tokio::time::{sleep, Duration};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Load .env file from root directory
-    dotenv::from_path("../.env").ok();
+    // Try to load .env file from current directory or parent directory
+    dotenv::dotenv().ok();
     
     let endpoint = std::env::var("LASERSTREAM_PRODUCTION_ENDPOINT")
+        .or_else(|_| std::env::var("LASERSTREAM_ENDPOINT"))
         .unwrap_or_else(|_| "".to_string());
     let api_key = std::env::var("LASERSTREAM_PRODUCTION_API_KEY")
-        .expect("LASERSTREAM_PRODUCTION_API_KEY environment variable must be set");
+        .or_else(|_| std::env::var("LASERSTREAM_API_KEY"))
+        .expect("LASERSTREAM_PRODUCTION_API_KEY or LASERSTREAM_API_KEY environment variable must be set");
 
     let config = LaserstreamConfig::new(endpoint, api_key)
         .with_max_reconnect_attempts(5);
@@ -56,7 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut transactions_filter = HashMap::new();
         transactions_filter.insert(
             "client".to_string(),
-            helius_laserstream::grpc::SubscribeRequestFilterTransactions {
+            SubscribeRequestFilterTransactions {
                 vote: Some(false),
                 failed: Some(false),
                 ..Default::default()
@@ -84,7 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut blocks_filter = HashMap::new();
         blocks_filter.insert(
             "client".to_string(),
-            helius_laserstream::grpc::SubscribeRequestFilterBlocks {
+            SubscribeRequestFilterBlocks {
                 include_transactions: Some(true),
                 include_accounts: Some(false),
                 include_entries: Some(false),

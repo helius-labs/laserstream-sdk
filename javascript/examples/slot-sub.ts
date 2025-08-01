@@ -1,4 +1,10 @@
-import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '../client';
+import { 
+  subscribe, 
+  CommitmentLevel, 
+  SubscribeUpdate,
+  SubscribeUpdateSlot,
+  LaserstreamConfig 
+} from '../client';
 // Type imports removed to avoid dependency issues
 const credentials = require('../test-config');
 
@@ -28,7 +34,14 @@ async function main() {
     config,
     request,
     async (update: SubscribeUpdate) => {
-      console.log('🎰 Slot Update:', update);
+      if (update.slot) {
+        const slotUpdate: SubscribeUpdateSlot = update.slot;
+        console.log('\n🎰 Slot Update Received!');
+        console.log('  - Slot:', slotUpdate.slot);
+        console.log('  - Parent:', slotUpdate.parent || 'N/A');
+        console.log('  - Status:', slotUpdate.status);
+        console.log('  - Dead Error:', slotUpdate.deadError || 'None');
+      }
     },
     async (err) => console.error('❌ Stream error:', err)
   );

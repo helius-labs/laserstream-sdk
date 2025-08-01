@@ -1,4 +1,14 @@
-import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig, CompressionAlgorithms } from '../client';
+import { 
+  subscribe, 
+  CommitmentLevel, 
+  SubscribeUpdate,
+  SubscribeUpdateBlock,
+  SubscribeUpdateAccountInfo,
+  SubscribeUpdateTransactionInfo,
+  LaserstreamConfig, 
+  CompressionAlgorithms 
+} from '../client';
+import * as bs58 from 'bs58';
 const credentials = require('../test-config');
 
 async function runBlockSubscription() {
@@ -51,7 +61,39 @@ async function runBlockSubscription() {
     config,
     request,
     async (update: SubscribeUpdate) => {
-      console.log('🧱 Block Update:', update);
+      if (update.block) {
+        const blockUpdate: SubscribeUpdateBlock = update.block;
+        console.log('\n🧱 Block Update Received!');
+        console.log('  - Slot:', blockUpdate.slot);
+        console.log('  - Blockhash:', blockUpdate.blockhash);
+        console.log('  - Parent Slot:', blockUpdate.parentSlot);
+        console.log('  - Parent Blockhash:', blockUpdate.parentBlockhash);
+        console.log('  - Block Height:', blockUpdate.blockHeight?.blockHeight || 'N/A');
+        console.log('  - Block Time:', blockUpdate.blockTime?.timestamp || 'N/A');
+        console.log('  - Executed Transaction Count:', blockUpdate.executedTransactionCount);
+        console.log('  - Updated Account Count:', blockUpdate.updatedAccountCount);
+        console.log('  - Entries Count:', blockUpdate.entriesCount);
+        console.log('  - Rewards:', blockUpdate.rewards?.rewards?.length || 0);
+        
+        // Show transaction details
+        if (blockUpdate.transactions && blockUpdate.transactions.length > 0) {
+          console.log(`  - Transactions: ${blockUpdate.transactions.length}`);
+          const firstTx: SubscribeUpdateTransactionInfo = blockUpdate.transactions[0];
+          console.log('    First Transaction:');
+          console.log('      - Signature:', firstTx.signature ? bs58.encode(firstTx.signature) : 'N/A');
+          console.log('      - Is Vote:', firstTx.isVote);
+          console.log('      - Index:', firstTx.index);
+        }
+        
+        // Show account details
+        if (blockUpdate.accounts && blockUpdate.accounts.length > 0) {
+          console.log(`  - Accounts: ${blockUpdate.accounts.length}`);
+          const firstAccount: SubscribeUpdateAccountInfo = blockUpdate.accounts[0];
+          console.log('    First Account:');
+          console.log('      - Pubkey:', firstAccount.pubkey ? bs58.encode(firstAccount.pubkey) : 'N/A');
+          console.log('      - Lamports:', firstAccount.lamports);
+        }
+      }
       
       // Measure the message size
       const messageSize = calculateMessageSize(update);
@@ -65,7 +107,7 @@ async function runBlockSubscription() {
         const mbReceived = totalBytes / (1024 * 1024);
         const mbPerSecond = mbReceived / elapsedSeconds;
         
-        console.log(`\n📊 Bandwidth Report (with zstd compression):`);
+        console.log(`\n📊 Bandwidth Report (with compression):`);
         console.log(`   Total data received: ${mbReceived.toFixed(2)} MB`);
         console.log(`   Messages received: ${messageCount}`);
         console.log(`   Average message size: ${(totalBytes / messageCount / 1024).toFixed(2)} KB`);

@@ -1,4 +1,10 @@
-import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '../client';
+import { 
+  subscribe, 
+  CommitmentLevel, 
+  SubscribeUpdate,
+  SubscribeUpdateBlockMeta,
+  LaserstreamConfig 
+} from '../client';
 const credentials = require('../test-config');
 
 async function main() {
@@ -32,7 +38,18 @@ async function main() {
     config,
     request,
     async (update: SubscribeUpdate) => {
-      console.log('🏗️ Block Meta Update:', update);
+      if (update.blockMeta) {
+        const blockMeta: SubscribeUpdateBlockMeta = update.blockMeta;
+        console.log('\n🏗️ Block Meta Update Received!');
+        console.log('  - Slot:', blockMeta.slot);
+        console.log('  - Blockhash:', blockMeta.blockhash);
+        console.log('  - Parent Slot:', blockMeta.parentSlot);
+        console.log('  - Parent Blockhash:', blockMeta.parentBlockhash);
+        console.log('  - Block Height:', blockMeta.blockHeight?.blockHeight || 'N/A');
+        console.log('  - Block Time:', blockMeta.blockTime?.timestamp || 'N/A');
+        console.log('  - Executed Transaction Count:', blockMeta.executedTransactionCount);
+        console.log('  - Rewards:', blockMeta.rewards?.rewards?.length || 0);
+      }
     },
     async (error: any) => {
       console.error('❌ Stream error:', error);

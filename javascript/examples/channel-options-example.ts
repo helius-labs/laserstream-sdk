@@ -49,13 +49,6 @@ async function main() {
     commitment: CommitmentLevel.CONFIRMED
   };
 
-  console.log('📡 Subscribing with custom channel options:');
-  console.log('   - Connect timeout: 20s');
-  console.log('   - Max receive message size: 2GB');
-  console.log('   - Keep-alive interval: 15s');
-  console.log('   - Initial stream window: 8MB');
-  console.log('   - Buffer size: 128KB');
-
   try {
     const stream: StreamHandle = await subscribe(
       config,

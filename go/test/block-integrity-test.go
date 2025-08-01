@@ -112,7 +112,6 @@ func main() {
 	config := laserstream.LaserstreamConfig{
 		Endpoint: endpoint,
 		APIKey:   apiKey,
-		Insecure: true, // localhost connection through chaos proxy
 	}
 
 	commitmentLevel := laserstream.CommitmentLevel_PROCESSED

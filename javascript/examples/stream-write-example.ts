@@ -36,7 +36,7 @@ async function main() {
     async (update: SubscribeUpdate) => {
       message+=1
       if(update.account){
-      console.log('🏦 Account Update:', bs58.encode(update.account?.account?.owner))
+      console.log('🏦 Account Update:', update.account?.account?.owner ? bs58.encode(update.account.account.owner) : 'N/A')
       }
       console.log(message)
       if(message == 50){

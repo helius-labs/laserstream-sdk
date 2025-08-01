@@ -48,7 +48,7 @@ type LaserstreamConfig struct {
 // ChannelOptions configures gRPC channel behavior
 type ChannelOptions struct {
 	// Connection timeouts
-	ConnectTimeoutSecs int // Default: 10
+	ConnectTimeoutSecs    int // Default: 10
 	MinConnectTimeoutSecs int // Default: 10
 
 	// Message size limits
@@ -67,7 +67,7 @@ type ChannelOptions struct {
 	// Buffer settings
 	WriteBufferSize int // Default: 64KB
 	ReadBufferSize  int // Default: 64KB
-	
+
 	// Compression settings
 	UseCompression bool // Enable gzip compression. Default: false
 }
@@ -97,7 +97,7 @@ type Client struct {
 	originalRequest   *SubscribeRequest
 	internalSlotSubID string
 	commitmentLevel   int32
-	
+
 	// Bidirectional streaming support
 	writeChan     chan *SubscribeRequest
 	writeStopChan chan struct{}
@@ -471,7 +471,7 @@ func (c *Client) connect(ctx context.Context) error {
 	keepaliveTime := 30 * time.Second
 	keepaliveTimeout := 5 * time.Second
 	permitWithoutStream := true
-	
+
 	if channelOpts.KeepaliveTimeSecs > 0 {
 		keepaliveTime = time.Duration(channelOpts.KeepaliveTimeSecs) * time.Second
 	}
@@ -479,7 +479,7 @@ func (c *Client) connect(ctx context.Context) error {
 		keepaliveTimeout = time.Duration(channelOpts.KeepaliveTimeoutSecs) * time.Second
 	}
 	permitWithoutStream = channelOpts.PermitWithoutStream
-	
+
 	opts = append(opts, grpc.WithKeepaliveParams(keepalive.ClientParameters{
 		Time:                keepaliveTime,
 		Timeout:             keepaliveTimeout,
@@ -489,25 +489,25 @@ func (c *Client) connect(ctx context.Context) error {
 	// Message size limits
 	maxRecvMsgSize := 1024 * 1024 * 1024 // 1GB default
 	maxSendMsgSize := 32 * 1024 * 1024   // 32MB default
-	
+
 	if channelOpts.MaxRecvMsgSize > 0 {
 		maxRecvMsgSize = channelOpts.MaxRecvMsgSize
 	}
 	if channelOpts.MaxSendMsgSize > 0 {
 		maxSendMsgSize = channelOpts.MaxSendMsgSize
 	}
-	
+
 	// Configure default call options
 	callOpts := []grpc.CallOption{
 		grpc.MaxCallRecvMsgSize(maxRecvMsgSize),
 		grpc.MaxCallSendMsgSize(maxSendMsgSize),
 	}
-	
+
 	// Add compression if enabled
 	if channelOpts.UseCompression {
 		callOpts = append(callOpts, grpc.UseCompressor(gzip.Name))
 	}
-	
+
 	opts = append(opts, grpc.WithDefaultCallOptions(callOpts...))
 
 	// Connection parameters
@@ -515,7 +515,7 @@ func (c *Client) connect(ctx context.Context) error {
 	if channelOpts.MinConnectTimeoutSecs > 0 {
 		minConnectTimeout = time.Duration(channelOpts.MinConnectTimeoutSecs) * time.Second
 	}
-	
+
 	opts = append(opts, grpc.WithConnectParams(grpc.ConnectParams{
 		Backoff:           backoff.DefaultConfig,
 		MinConnectTimeout: minConnectTimeout,
@@ -527,20 +527,20 @@ func (c *Client) connect(ctx context.Context) error {
 	} else {
 		opts = append(opts, grpc.WithInitialWindowSize(4*1024*1024)) // 4MB default
 	}
-	
+
 	if channelOpts.InitialConnWindowSize > 0 {
 		opts = append(opts, grpc.WithInitialConnWindowSize(channelOpts.InitialConnWindowSize))
 	} else {
 		opts = append(opts, grpc.WithInitialConnWindowSize(8*1024*1024)) // 8MB default
 	}
-	
+
 	// Buffer sizes
 	if channelOpts.WriteBufferSize > 0 {
 		opts = append(opts, grpc.WithWriteBufferSize(channelOpts.WriteBufferSize))
 	} else {
 		opts = append(opts, grpc.WithWriteBufferSize(64*1024)) // 64KB default
 	}
-	
+
 	if channelOpts.ReadBufferSize > 0 {
 		opts = append(opts, grpc.WithReadBufferSize(channelOpts.ReadBufferSize))
 	}
@@ -558,12 +558,12 @@ func (c *Client) connect(ctx context.Context) error {
 func (c *Client) Unsubscribe() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	if c.cancel != nil {
 		c.cancel()
 		c.cancel = nil
 	}
-	
+
 	c.cleanup()
 	c.running = false
 }
@@ -575,7 +575,7 @@ func (c *Client) cleanup() {
 	case c.writeStopChan <- struct{}{}:
 	default:
 	}
-	
+
 	if c.stream != nil {
 		c.stream.CloseSend()
 		c.stream = nil
@@ -622,9 +622,10 @@ type (
 
 // Account filter types for more advanced filtering
 type (
-	SubscribeRequestFilterAccountsFilter         = pb.SubscribeRequestFilterAccountsFilter
-	SubscribeRequestFilterAccountsFilterMemcmp   = pb.SubscribeRequestFilterAccountsFilterMemcmp
-	SubscribeRequestFilterAccountsFilterLamports = pb.SubscribeRequestFilterAccountsFilterLamports
+	SubscribeRequestFilterAccountsFilter          = pb.SubscribeRequestFilterAccountsFilter
+	SubscribeRequestFilterAccountsFilterMemcmp    = pb.SubscribeRequestFilterAccountsFilterMemcmp
+	SubscribeRequestFilterAccountsFilterLamports  = pb.SubscribeRequestFilterAccountsFilterLamports
+	SubscribeRequestFilterAccountsFilter_Datasize = pb.SubscribeRequestFilterAccountsFilter_Datasize
 )
 
 // All SubscribeUpdate variant types for pattern matching
