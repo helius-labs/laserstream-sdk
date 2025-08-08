@@ -43,6 +43,7 @@ type LaserstreamConfig struct {
 	APIKey               string
 	MaxReconnectAttempts *int            // nil uses default (240 attempts)
 	ChannelOptions       *ChannelOptions // nil uses defaults
+	Replay               bool            // When true, enable replay on reconnects (uses fromSlot and internal slot tracking). Default: true when zero value
 }
 
 // ChannelOptions configures gRPC channel behavior
@@ -103,6 +104,15 @@ type Client struct {
 	writeStopChan chan struct{}
 }
 
+// NewLaserstreamConfig creates a new LaserstreamConfig with default values.
+func NewLaserstreamConfig(endpoint, apiKey string) LaserstreamConfig {
+	return LaserstreamConfig{
+		Endpoint: endpoint,
+		APIKey:   apiKey,
+		Replay:   true, // Default to true
+	}
+}
+
 // NewClient creates a new Laserstream client instance.
 func NewClient(config LaserstreamConfig) *Client {
 	return &Client{
@@ -110,6 +120,11 @@ func NewClient(config LaserstreamConfig) *Client {
 		writeChan:     make(chan *SubscribeRequest, 100),
 		writeStopChan: make(chan struct{}),
 	}
+}
+
+// isReplayEnabled returns the effective replay setting
+func (c *Client) isReplayEnabled() bool {
+	return c.config.Replay
 }
 
 // Subscribe initiates a subscription to the Laserstream service.
@@ -139,16 +154,23 @@ func (c *Client) Subscribe(
 	// Generate unique internal slot subscription ID
 	c.internalSlotSubID = fmt.Sprintf("__internal_slot_tracker_%s", strings.ReplaceAll(uuid.New().String(), "-", "")[:8])
 
-	// Add internal slot subscription for tracking (will be filtered out)
-	if c.originalRequest.Slots == nil {
-		c.originalRequest.Slots = make(map[string]*SubscribeRequestFilterSlots)
+	// Add internal slot subscription for tracking only when replay is enabled
+	if c.isReplayEnabled() {
+		if c.originalRequest.Slots == nil {
+			c.originalRequest.Slots = make(map[string]*SubscribeRequestFilterSlots)
+		}
+
+		filterByCommitment := true
+		interslotUpdates := false
+		c.originalRequest.Slots[c.internalSlotSubID] = &SubscribeRequestFilterSlots{
+			FilterByCommitment: &filterByCommitment,
+			InterslotUpdates:   &interslotUpdates,
+		}
 	}
 
-	filterByCommitment := true
-	interslotUpdates := false
-	c.originalRequest.Slots[c.internalSlotSubID] = &SubscribeRequestFilterSlots{
-		FilterByCommitment: &filterByCommitment,
-		InterslotUpdates:   &interslotUpdates,
+	// Clear any user-provided FromSlot if replay is disabled
+	if !c.isReplayEnabled() {
+		c.originalRequest.FromSlot = nil
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -360,26 +382,35 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 			continue
 		}
 
-		// Track slot updates for reconnection
+		// Track slot updates for reconnection only when replay is enabled
 		if slotUpdate, ok := resp.UpdateOneof.(*pb.SubscribeUpdate_Slot); ok {
-			if slotUpdate.Slot != nil {
+			if slotUpdate.Slot != nil && c.isReplayEnabled() {
 				atomic.StoreUint64(&c.trackedSlot, slotUpdate.Slot.Slot)
+			}
 
-				// Check if this slot update is EXCLUSIVELY from our internal subscription
-				if len(resp.Filters) == 1 && resp.Filters[0] == c.internalSlotSubID {
-					continue // Skip forwarding this message
+			// Check if this slot update is EXCLUSIVELY from our internal subscription
+			if c.isReplayEnabled() && len(resp.Filters) == 1 && resp.Filters[0] == c.internalSlotSubID {
+				continue // Skip forwarding this message
+			}
+		}
+
+		// Also track slots from block updates when replay is enabled (for cases where no slot subscription exists)
+		if blockUpdate, ok := resp.UpdateOneof.(*pb.SubscribeUpdate_Block); ok {
+			if blockUpdate.Block != nil && c.isReplayEnabled() {
+				atomic.StoreUint64(&c.trackedSlot, blockUpdate.Block.Slot)
+			}
+		}
+
+		// Clean up internal filter ID from ALL message types (only when replay is enabled)
+		if c.isReplayEnabled() {
+			cleanedFilters := make([]string, 0, len(resp.Filters))
+			for _, filter := range resp.Filters {
+				if filter != c.internalSlotSubID {
+					cleanedFilters = append(cleanedFilters, filter)
 				}
 			}
+			resp.Filters = cleanedFilters
 		}
-
-		// Clean up internal filter ID from ALL message types
-		cleanedFilters := make([]string, 0, len(resp.Filters))
-		for _, filter := range resp.Filters {
-			if filter != c.internalSlotSubID {
-				cleanedFilters = append(cleanedFilters, filter)
-			}
-		}
-		resp.Filters = cleanedFilters
 
 		// Mark that at least one message was forwarded in this session
 		atomic.StoreUint64(&c.madeProgress, 1)
@@ -393,6 +424,12 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 
 // updateRequestForReconnection updates the request with from_slot for reconnection
 func (c *Client) updateRequestForReconnection() {
+	// Only use from_slot when replay is enabled
+	if !c.isReplayEnabled() {
+		c.originalRequest.FromSlot = nil
+		return
+	}
+
 	lastTrackedSlot := atomic.LoadUint64(&c.trackedSlot)
 
 	if lastTrackedSlot > 0 {

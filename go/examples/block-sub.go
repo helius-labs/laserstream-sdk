@@ -42,7 +42,9 @@ func main() {
 	client := laserstream.NewClient(clientConfig)
 
 	dataCallback := func(data *laserstream.SubscribeUpdate) {
-		log.Printf("Block Update: %+v", data)
+		if blockUpdate := data.GetBlock(); blockUpdate != nil {
+			log.Printf("Block: %d", blockUpdate.Slot)
+		}
 	}
 
 	errorCallback := func(err error) {
