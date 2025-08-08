@@ -25,6 +25,9 @@ pub struct ClientInner {
     token: Option<String>,
     max_reconnect_attempts: u32,
     channel_options: Option<ChannelOptions>,
+    // When true, enable replay behavior (internal slot tracking + from_slot on reconnects)
+    // When false, disable replay (no internal slot tracking and no from_slot on reconnects)
+    replay: bool,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -169,12 +172,15 @@ impl ClientInner {
         token: Option<String>,
         max_reconnect_attempts: Option<u32>,
         channel_options: Option<ChannelOptions>,
+        replay: Option<bool>,
     ) -> Result<Self> {
         Ok(Self {
             endpoint,
             token,
             max_reconnect_attempts: max_reconnect_attempts.unwrap_or(120),
             channel_options,
+            // Default to true (replay enabled) unless explicitly set to false
+            replay: replay.unwrap_or(true),
         })
     }
 
@@ -438,6 +444,7 @@ impl ClientInner {
             ts_callback,
             self.max_reconnect_attempts,
             self.channel_options.clone(),
+            self.replay,
         )?);
 
         // Register stream in global registry for lifecycle management

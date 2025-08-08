@@ -115,6 +115,7 @@ impl LaserstreamClient {
         token: Option<String>,
         max_reconnect_attempts: Option<u32>,
         channel_options: Option<Object>,
+        replay: Option<bool>,
     ) -> Result<Self> {
         let parsed_channel_options = if let Some(opts_obj) = channel_options {
             let opts: client::ChannelOptions = env.from_js_value(opts_obj)?;
@@ -128,6 +129,7 @@ impl LaserstreamClient {
             token,
             max_reconnect_attempts,
             parsed_channel_options,
+            replay,
         )?);
         Ok(Self { inner })
     }
@@ -183,6 +185,7 @@ impl StreamHandle {
         // Parse the JavaScript request object into a protobuf SubscribeRequest
         let client_inner = client::ClientInner::new(
             String::new(), // dummy values, we only need the parsing functionality
+            None,
             None,
             None,
             None,

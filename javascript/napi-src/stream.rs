@@ -33,6 +33,7 @@ impl StreamInner {
         ts_callback: ThreadsafeFunction<crate::SubscribeUpdateBytes, ErrorStrategy::CalleeHandled>,
         max_reconnect_attempts: u32,
         channel_options: Option<ChannelOptions>,
+        replay: bool,
     ) -> Result<Self> {
         let (cancel_tx, mut cancel_rx) = oneshot::channel();
         let (write_tx, mut write_rx) = mpsc::unbounded_channel();
@@ -41,13 +42,20 @@ impl StreamInner {
 
         // Generate unique internal slot subscription ID to avoid conflicts with user subscriptions
         let internal_slot_sub_id = format!("__internal_slot_tracker_{}", uuid::Uuid::new_v4());
-        
-        // Add internal slot subscription for tracking (will be filtered out)
-        initial_request.slots.insert(internal_slot_sub_id.clone(), geyser::SubscribeRequestFilterSlots {
-            filter_by_commitment: Some(true),
-            interslot_updates: Some(false),
-            ..Default::default()
-        });
+
+        // Add internal slot subscription for tracking only when replay is enabled
+        if replay {
+            initial_request.slots.insert(internal_slot_sub_id.clone(), geyser::SubscribeRequestFilterSlots {
+                filter_by_commitment: Some(true),
+                interslot_updates: Some(false),
+                ..Default::default()
+            });
+        }
+
+        // If replay is disabled, ensure any user-provided from_slot is cleared on initial connect
+        if !replay {
+            initial_request.from_slot = None;
+        }
 
         let id_for_cleanup = id.clone();
         tokio::spawn(async move {
@@ -116,7 +124,8 @@ impl StreamInner {
                                                 // Determine where to resume based on commitment level.
                         let last_tracked_slot = tracked_slot.load(Ordering::SeqCst);
 
-                        if last_tracked_slot > 0 {
+                        // Only use from_slot when replay is enabled
+                        if last_tracked_slot > 0 && replay {
                             // Always calculate from_slot based on current tracked_slot and commitment level
                             let from_slot = match commitment_level {
                                 // Processed – always rewind by 31 slots for fork safety
@@ -307,13 +316,15 @@ impl StreamInner {
                             ping: Some(geyser::SubscribeRequestPing { id: 1 }),
                             ..Default::default()
                         };
-                        
                         // Send pong response (ignore errors as connection issues will be handled by reconnect logic)
                         let _ = sender.send(pong_request).await;
-                        
                         // Don't forward ping messages to JavaScript - they're internal connection health
                         continue;
                     }
+                        // Do not forward server 'Pong' updates to JavaScript either
+                        if let Some(geyser::subscribe_update::UpdateOneof::Pong(_pong)) = &message.update_oneof {
+                            continue;
+                        }
                     
                     // Track slot updates for reconnection (only decode when necessary)
                     if let Some(geyser::subscribe_update::UpdateOneof::Slot(slot)) = &message.update_oneof {

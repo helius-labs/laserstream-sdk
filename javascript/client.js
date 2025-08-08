@@ -25,7 +25,13 @@ async function subscribe(config, request, onData, onError) {
   await ensureProtobufInitialized();
 
   // Create NAPI client instance directly
-  const napiClient = new NapiClient(config.endpoint, config.apiKey, config.maxReconnectAttempts, config.channelOptions);
+  const napiClient = new NapiClient(
+    config.endpoint,
+    config.apiKey,
+    config.maxReconnectAttempts,
+    config.channelOptions,
+    config.replay
+  );
 
   // Wrap the callbacks to decode protobuf bytes
   const wrappedCallback = (error, updateBytes) => {
