@@ -21,6 +21,10 @@ pub struct LaserstreamConfig {
     pub max_reconnect_attempts: Option<u32>,
     /// gRPC channel options
     pub channel_options: ChannelOptions,
+    /// When true, enable replay on reconnects (uses from_slot and internal slot tracking).
+    /// When false, no replay - start from current slot on reconnects.
+    /// Default: true
+    pub replay: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -102,6 +106,7 @@ impl Default for LaserstreamConfig {
             endpoint: String::new(),
             max_reconnect_attempts: None, // Default to None
             channel_options: ChannelOptions::default(),
+            replay: true, // Default to true
         }
     }
 }
@@ -113,6 +118,7 @@ impl LaserstreamConfig {
             api_key,
             max_reconnect_attempts: None, // Default to None
             channel_options: ChannelOptions::default(),
+            replay: true, // Default to true
         }
     }
 
@@ -125,6 +131,14 @@ impl LaserstreamConfig {
     /// Sets custom channel options.
     pub fn with_channel_options(mut self, options: ChannelOptions) -> Self {
         self.channel_options = options;
+        self
+    }
+
+    /// Sets replay behavior on reconnects.
+    /// When true (default), uses from_slot and internal slot tracking for replay.
+    /// When false, starts from current slot on reconnects (no replay).
+    pub fn with_replay(mut self, replay: bool) -> Self {
+        self.replay = replay;
         self
     }
 }

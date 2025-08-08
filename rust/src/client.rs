@@ -56,8 +56,27 @@ pub fn subscribe(
             .min(HARD_CAP_RECONNECT_ATTEMPTS); // Enforce hard cap
 
         // Keep original request for reconnection attempts
-        let current_request = request.clone();
+        let mut current_request = request.clone();
         let internal_slot_sub_id = format!("internal-{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap());
+        
+        // Get replay behavior from config
+        let replay_enabled = config.replay;
+        
+        // Add internal slot subscription only when replay is enabled
+        if replay_enabled {
+            current_request.slots.insert(
+                internal_slot_sub_id.clone(),
+                SubscribeRequestFilterSlots {
+                    filter_by_commitment: Some(true), // Use same commitment as user request
+                    ..Default::default()
+                }
+            );
+        }
+        
+        // Clear any user-provided from_slot if replay is disabled
+        if !replay_enabled {
+            current_request.from_slot = None;
+        }
 
         let api_key_string = config.api_key.clone(); 
 
@@ -65,22 +84,20 @@ pub fn subscribe(
 
             let mut attempt_request = current_request.clone();
 
-            // Always add internal slot tracking subscription
-            attempt_request.slots.insert(
-                internal_slot_sub_id.clone(),
-                SubscribeRequestFilterSlots::default()
-            );
-
-            // On reconnection, use the last tracked slot with fork safety
-            if reconnect_attempts > 0 && tracked_slot > 0 {
+            // On reconnection, use the last tracked slot with fork safety only if replay is enabled
+            if reconnect_attempts > 0 && tracked_slot > 0 && replay_enabled {
                 // Apply fork safety margin for PROCESSED commitment (default)
                 let commitment_level = attempt_request.commitment.unwrap_or(0);
                 let from_slot = match commitment_level {
                     0 => tracked_slot.saturating_sub(31), // PROCESSED: rewind by 31 slots
                     1 | 2 => tracked_slot,                 // CONFIRMED/FINALIZED: exact slot
                     _ => tracked_slot.saturating_sub(31),  // Unknown: default to safe behavior
-                };
+                    };
+                    
                 attempt_request.from_slot = Some(from_slot);
+            } else if !replay_enabled {
+                // Ensure from_slot is always None when replay is disabled
+                attempt_request.from_slot = None;
             }
 
             match connect_and_subscribe_once(&config, attempt_request, api_key_string.clone()).await {
@@ -114,23 +131,35 @@ pub fn subscribe(
                                                 }
                                                 continue;
                                             }
+                                            
+                                            // Do not forward server 'Pong' updates to consumers either
+                                            if matches!(&update.update_oneof, Some(UpdateOneof::Pong(_))) {
+                                                continue;
+                                            }
 
-                                // Always track the latest slot if the update is a Slot update
+                                // Track the latest slot from any slot update (including internal subscription)
                                 if let Some(UpdateOneof::Slot(s)) = &update.update_oneof {
-                                    tracked_slot = s.slot;
+                                    if replay_enabled {
+                                        tracked_slot = s.slot;
+                                    }
                                     
-                                    // Skip if this slot update is from our internal subscription
+                                    // Skip if this slot update is EXCLUSIVELY from our internal subscription
                                     if update.filters.len() == 1 && update.filters.contains(&internal_slot_sub_id) {
                                         continue;
                                     }
                                 }
 
-                                            // Filter out internal subscription from filters before yielding
+                                            // Filter out internal subscription from filters before yielding (only if replay is enabled)
                                             let mut clean_update = update;
-                                            clean_update.filters.retain(|f| f != &internal_slot_sub_id);
-                                            
-                                            // Only yield if there are still filters after cleaning
-                                            if !clean_update.filters.is_empty() {
+                                            if replay_enabled {
+                                                clean_update.filters.retain(|f| f != &internal_slot_sub_id);
+                                                
+                                                // Only yield if there are still filters after cleaning
+                                                if !clean_update.filters.is_empty() {
+                                                    yield Ok(clean_update);
+                                                }
+                                            } else {
+                                                // When replay is disabled, yield all updates as-is
                                                 yield Ok(clean_update);
                                             }
                                         }
@@ -158,8 +187,9 @@ pub fn subscribe(
                     }
                 }
                 Err(err) => {
-                    // Log connection error and continue reconnection loop
+                    // Log connection error and yield to consumer, then continue reconnection loop
                     error!(error = %err, "Connection failed, will retry after 5s delay");
+                    yield Err(LaserstreamError::Status(err));
                 }
             }
 

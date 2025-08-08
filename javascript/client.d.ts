@@ -50,6 +50,8 @@ export interface LaserstreamConfig {
   endpoint: string;
   maxReconnectAttempts?: number;
   channelOptions?: ChannelOptions;
+  // When true, enable replay on reconnects (uses fromSlot and internal slot tracking). When false, no replay.
+  replay?: boolean;
 }
 
 // Subscription request interface
@@ -67,8 +69,6 @@ export interface SubscribeRequest {
   fromSlot?: number;
 }
 
-// Re-export SubscribeUpdate from proto-types
-// (already exported via export * from './proto-types')
 
 // Stream handle interface
 export interface StreamHandle {

@@ -11,7 +11,7 @@ export const enum CommitmentLevel {
   FINALIZED = 2
 }
 export declare class LaserstreamClient {
-  constructor(endpoint: string, token?: string | undefined | null, maxReconnectAttempts?: number | undefined | null, channelOptions?: object | undefined | null)
+  constructor(endpoint: string, token?: string | undefined | null, maxReconnectAttempts?: number | undefined | null, channelOptions?: object | undefined | null, replay?: boolean | undefined | null)
   subscribe(request: any, callback: (error: Error | null, updateBytes: Uint8Array) => void): Promise<StreamHandle>
 }
 export declare class StreamHandle {
