@@ -63,7 +63,7 @@ async function main() {
   };
 
   console.log('📊 Channel Options Summary:');
-  console.log('   Compression: zstd (5x more efficient than gzip)');
+  console.log('   Compression: zstd (more efficient than gzip)');
   console.log('   Max receive size: 2GB (for large blocks)');
   console.log('   Max send size: 64MB');
   console.log('   Keep-alive: 20s interval, 10s timeout');

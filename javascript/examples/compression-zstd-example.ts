@@ -37,7 +37,7 @@ async function main() {
     commitment: CommitmentLevel.PROCESSED,
   };
 
-  console.log('🚀 Starting stream with zstd compression (5x more efficient than gzip!)...');
+  console.log('🚀 Starting stream with zstd compression (more efficient than gzip!)...');
   
   let slotCount = 0;
   const maxSlots = 10;
@@ -63,7 +63,7 @@ async function main() {
   );
 
   console.log(`✅ Stream connected with ID: ${stream.id}`);
-  console.log('🔄 Using zstd compression for maximum efficiency (5x better than gzip)');
+  console.log('🔄 Using zstd compression for maximum efficiency');
 }
 
 main().catch(console.error);

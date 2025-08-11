@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 pub enum CompressionEncoding {
     /// Gzip compression
     Gzip,
-    /// Zstd compression (5x more efficient than gzip)
+    /// Zstd compression
     Zstd,
 }
 

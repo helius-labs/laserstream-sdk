@@ -16,7 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Example 1: Manual compression configuration
     let mut channel_options = ChannelOptions::default();
     
-    // Send using zstd (5x more efficient than gzip)
+    // Send using zstd compression
     channel_options.send_compression = Some(CompressionEncoding::Zstd);
     
     // Accept both compression types (order matters - first is preferred)
@@ -94,7 +94,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("\nBoth compression methods work successfully!");
-    println!("Note: zstd is 5x more efficient than gzip for Solana data");
+    println!("Note: zstd provides better compression than gzip for Solana data");
     
     Ok(())
 }
