@@ -1,12 +1,12 @@
 # LaserStream
 
-High-performance gRPC client for streaming real-time Solana blockchain data with **40x faster throughput** compared to standard Yellowstone gRPC (1.3GB/s vs 30MB/s).
+High-performance gRPC client for streaming real-time Solana blockchain data. Built for developers who need reliable, low-latency Solana data with automatic reconnection and historical replay capabilities.
 
 ## 🚀 Key Features
 
-- **Extreme Performance**: 1.3GB/s throughput vs 30MB/s with standard Yellowstone gRPC
 - **Auto Reconnection**: Robust reconnection with configurable retry limits  
 - **Slot Tracking**: Automatic replay from last processed slot on reconnect (no data loss)
+- **Historical Replay**: Backfill missed data up to 3000 slots (~20 minutes)
 - **Channel Options**: Fine-tune gRPC performance, compression, timeouts, buffer sizes
 - **Stream Write**: Dynamic subscription updates without reconnecting
 - **Replay Control**: Enable/disable slot replay behavior for different use cases
@@ -19,15 +19,18 @@ High-performance gRPC client for streaming real-time Solana blockchain data with
 - **Location**: [`/javascript`](/javascript)  
 - **Install**: `npm install helius-laserstream`
 - **Architecture**: Rust core with NAPI bindings for zero-copy performance
+- **Performance**: 40x faster than Yellowstone JavaScript client (1.3GB/s vs 30MB/s)
 - **Runtime Support**: Node.js 16+ and Bun
 
 ### Rust SDK  
 - **Location**: [`/rust`](/rust)
 - **Install**: `cargo add helius-laserstream`
+- **Architecture**: Native Rust implementation with zero overhead
 
 ### Go SDK
 - **Location**: [`/go`](/go)  
 - **Install**: `go get github.com/helius-labs/laserstream-sdk/go`
+- **Architecture**: Native Go implementation with goroutine safety
 
 ## 🔧 Core Concepts
 
@@ -108,7 +111,24 @@ req := &laserstream.SubscribeRequest{
 client.Subscribe(req, dataHandler, errorHandler)
 ```
 
+## 📚 Documentation & Guides
 
+### Official Documentation
+- **[LaserStream Overview](https://www.helius.dev/docs/laserstream)** - Complete LaserStream documentation
+- **[LaserStream Clients](https://www.helius.dev/docs/laserstream/clients)** - Client SDKs
+
+### LaserStream Guides
+- **[Decoding Transaction Data](https://www.helius.dev/docs/laserstream/guides/decoding-transaction-data)** - Learn how to decode and parse transaction data for better understanding
+- **[Account Subscription](https://www.helius.dev/docs/laserstream/guides/account-subscription)** - Subscribe to account updates and efficiently track on-chain state changes
+- **[Measuring Latency](https://www.helius.dev/docs/laserstream/guides/measuring-latency)** - Measure and optimize LaserStream latency for your application
+
+### Getting Started
+Each SDK directory contains:
+- **Installation instructions** and dependencies
+- **Comprehensive examples** for all subscription types  
+- **Channel options configuration** examples
+- **Stream write usage** patterns
+- **Language-specific best practices**
 
 ## 📄 License
 
