@@ -1,6 +1,6 @@
 # Laserstream Go Client
 
-A high-performance Go client for streaming real-time Solana data via gRPC.
+High-performance Go client for streaming real-time Solana data via Laserstream with automatic reconnection and slot tracking.
 
 ## Installation
 
@@ -14,35 +14,30 @@ go get github.com/helius-labs/laserstream-sdk/go
 package main
 
 import (
-    "context"
-    "fmt"
     "log"
+    "os/signal"
+    "syscall"
     
     laserstream "github.com/helius-labs/laserstream-sdk/go"
 )
 
 func main() {
-    // Initialize client
     client := laserstream.NewClient(laserstream.LaserstreamConfig{
         Endpoint: "https://laserstream-mainnet-tyo.helius-rpc.com",
         APIKey:   "your-api-key",
     })
-    
-    // Create subscription request
+
     req := &laserstream.SubscribeRequest{
         Slots: map[string]*laserstream.SubscribeRequestFilterSlots{
             "client": {},
         },
     }
-    
-    // Subscribe to updates
+
     err := client.Subscribe(req, 
         func(update *laserstream.SubscribeUpdate) {
-            // Handle incoming data
-            fmt.Printf("Received update: %+v\n", update)
+            log.Printf("Received: %+v", update)
         },
         func(err error) {
-            // Handle errors
             log.Printf("Error: %v", err)
         },
     )
@@ -50,85 +45,196 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
+
+    // Wait for interrupt
+    c := make(chan os.Signal, 1)
+    signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+    <-c
     
-    // Keep the program running
-    select {}
+    client.Close()
 }
 ```
 
-## Features
+## Configuration Examples
 
-- **High Performance**: Optimized gRPC client with configurable message sizes and keepalive
-- **Automatic Reconnection**: Built-in reconnection logic with exponential backoff
-- **Slot Tracking**: Advanced slot tracking for reliable stream resumption
-- **Flexible Endpoints**: Support for both URL and host:port endpoint formats
-- **Comprehensive Types**: Full type definitions for all Solana data structures
-
-## Configuration
-
+### Basic Configuration
 ```go
 config := laserstream.LaserstreamConfig{
-    Endpoint:             "https://laserstream-mainnet-tyo.helius-rpc.com",
-    APIKey:               "your-api-key",
-    MaxReconnectAttempts: &maxAttempts, // Optional: custom reconnect limit
+    Endpoint: "https://laserstream-mainnet-tyo.helius-rpc.com",
+    APIKey:   "your-api-key",
 }
 ```
 
-## Subscription Types
+### Advanced Configuration with Channel Options
+```go
+maxAttempts := 10
+config := laserstream.LaserstreamConfig{
+    Endpoint:             endpoint,
+    APIKey:               apiKey,
+    MaxReconnectAttempts: &maxAttempts,
+    Replay:               true, // Enable/disable replay
+    ChannelOptions: &laserstream.ChannelOptions{
+        // Connection settings
+        ConnectTimeoutSecs:    20,
+        MaxRecvMsgSize:        2 * 1024 * 1024 * 1024, // 2GB
+        MaxSendMsgSize:        64 * 1024 * 1024,       // 64MB
+        
+        // Keepalive settings
+        KeepaliveTimeSecs:     15,
+        KeepaliveTimeoutSecs:  10,
+        PermitWithoutStream:   true,
+        
+        // Flow control
+        InitialWindowSize:     8 * 1024 * 1024,  // 8MB
+        InitialConnWindowSize: 16 * 1024 * 1024, // 16MB
+        
+        // Performance
+        UseCompression: true, // Enable gzip
+        WriteBufferSize: 128 * 1024,
+        ReadBufferSize:  128 * 1024,
+    },
+}
+```
 
-### Accounts
+### Replay Control
+```go
+// Disable replay - start from current slot on reconnect
+config := laserstream.LaserstreamConfig{
+    Endpoint: endpoint,
+    APIKey:   apiKey,
+    Replay:   false, // Potential data gaps
+}
+
+// Enable replay (default) - resume from last processed slot
+config.Replay = true // No data loss
+```
+
+## Subscription Examples
+
+### Account Subscriptions
+```go
+commitmentLevel := laserstream.CommitmentLevel_CONFIRMED
+req := &laserstream.SubscribeRequest{
+    Accounts: map[string]*laserstream.SubscribeRequestFilterAccounts{
+        "usdc-accounts": {
+            Account: []string{"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"},
+        },
+        "token-program": {
+            Owner: []string{"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"},
+        },
+    },
+    Commitment: &commitmentLevel,
+}
+```
+
+### Transaction Subscriptions
+```go
+vote := false
+failed := false
+req := &laserstream.SubscribeRequest{
+    Transactions: map[string]*laserstream.SubscribeRequestFilterTransactions{
+        "token-txs": {
+            AccountInclude: []string{"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"},
+            Vote:           &vote,
+            Failed:         &failed,
+        },
+        "pump-txs": {
+            AccountInclude: []string{"pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"},
+        },
+    },
+    Commitment: &commitmentLevel,
+}
+```
+
+### Block Subscriptions
+```go
+includeTransactions := true
+includeAccounts := true
+req := &laserstream.SubscribeRequest{
+    Blocks: map[string]*laserstream.SubscribeRequestFilterBlocks{
+        "all-blocks": {
+            IncludeTransactions: &includeTransactions,
+            IncludeAccounts:     &includeAccounts,
+        },
+    },
+    Commitment: &commitmentLevel,
+}
+```
+
+### Slot Subscriptions
+```go
+filterByCommitment := true
+req := &laserstream.SubscribeRequest{
+    Slots: map[string]*laserstream.SubscribeRequestFilterSlots{
+        "confirmed-slots": {
+            FilterByCommitment: &filterByCommitment,
+        },
+        "all-slots": {},
+    },
+    Commitment: &commitmentLevel,
+}
+```
+
+### Multiple Subscriptions
 ```go
 req := &laserstream.SubscribeRequest{
     Accounts: map[string]*laserstream.SubscribeRequestFilterAccounts{
-        "account-filter": {
-            Account: []string{"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"},
+        "usdc": {
+            Account: []string{"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"},
         },
     },
-}
-```
-
-### Transactions
-```go
-req := &laserstream.SubscribeRequest{
     Transactions: map[string]*laserstream.SubscribeRequestFilterTransactions{
-        "tx-filter": {
+        "token-txs": {
             AccountInclude: []string{"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"},
+            Vote:           &[]bool{false}[0],
         },
     },
-}
-```
-
-### Blocks
-```go
-req := &laserstream.SubscribeRequest{
-    Blocks: map[string]*laserstream.SubscribeRequestFilterBlocks{
-        "block-filter": {},
-    },
-}
-```
-
-### Slots
-```go
-req := &laserstream.SubscribeRequest{
     Slots: map[string]*laserstream.SubscribeRequestFilterSlots{
-        "slot-filter": {
-            FilterByCommitment: &filterByCommitment,
+        "slots": {},
+    },
+    Commitment: &commitmentLevel,
+}
+```
+
+## Stream Write - Dynamic Updates
+
+```go
+// Initial subscription
+client.Subscribe(initialRequest, dataHandler, errorHandler)
+
+// Later, update subscription dynamically
+newRequest := &laserstream.SubscribeRequest{
+    Accounts: map[string]*laserstream.SubscribeRequestFilterAccounts{
+        "new-program": {
+            Owner: []string{"new-program-id"},
         },
     },
+}
+
+err := client.Write(newRequest)
+if err != nil {
+    log.Printf("Write error: %v", err)
 }
 ```
 
 ## Error Handling
 
-The client provides robust error handling with automatic reconnection:
-
 ```go
 err := client.Subscribe(req,
     func(update *laserstream.SubscribeUpdate) {
-        // Handle updates
+        // Handle different update types
+        if update.Account != nil {
+            log.Printf("Account update: %s", update.Account.Account.Pubkey)
+        }
+        if update.Transaction != nil {
+            log.Printf("Transaction: %s", update.Transaction.Transaction.Signature)
+        }
+        if update.Slot != nil {
+            log.Printf("Slot: %d", update.Slot.Slot)
+        }
     },
     func(err error) {
-        // Handle connection errors, reconnection attempts, etc.
+        // Handle errors, reconnection attempts
         log.Printf("Stream error: %v", err)
     },
 )
@@ -136,24 +242,112 @@ err := client.Subscribe(req,
 
 ## Commitment Levels
 
-- `CommitmentLevel_PROCESSED`: Latest processed data (may be rolled back)
-- `CommitmentLevel_CONFIRMED`: Confirmed by majority of cluster
-- `CommitmentLevel_FINALIZED`: Finalized and cannot be rolled back
+```go
+// Latest data (may be rolled back)
+commitmentLevel := laserstream.CommitmentLevel_PROCESSED
 
-## Examples
+// Confirmed by cluster majority  
+commitmentLevel := laserstream.CommitmentLevel_CONFIRMED
 
-See the [examples directory](./examples) for complete usage examples:
+// Finalized, cannot be rolled back
+commitmentLevel := laserstream.CommitmentLevel_FINALIZED
 
-- [Account Subscriptions](./examples/account-sub.go)
-- [Transaction Subscriptions](./examples/transaction-sub.go)
-- [Block Subscriptions](./examples/block-sub.go)
-- [Slot Subscriptions](./examples/slot-sub.go)
+req := &laserstream.SubscribeRequest{
+    Commitment: &commitmentLevel,
+    // ... filters
+}
+```
+
+## Complete Example with Signal Handling
+
+```go
+package main
+
+import (
+    "log"
+    "os"
+    "os/signal"
+    "syscall"
+
+    laserstream "github.com/helius-labs/laserstream-sdk/go"
+    "github.com/joho/godotenv"
+)
+
+func main() {
+    // Load environment variables
+    godotenv.Load()
+    
+    endpoint := os.Getenv("LASERSTREAM_ENDPOINT")
+    apiKey := os.Getenv("LASERSTREAM_API_KEY")
+    
+    if endpoint == "" || apiKey == "" {
+        log.Fatal("LASERSTREAM_ENDPOINT and LASERSTREAM_API_KEY required")
+    }
+
+    // Configure client
+    config := laserstream.LaserstreamConfig{
+        Endpoint: endpoint,
+        APIKey:   apiKey,
+    }
+    
+    client := laserstream.NewClient(config)
+    defer client.Close()
+
+    // Create subscription
+    commitmentLevel := laserstream.CommitmentLevel_CONFIRMED
+    req := &laserstream.SubscribeRequest{
+        Slots: map[string]*laserstream.SubscribeRequestFilterSlots{
+            "client": {},
+        },
+        Commitment: &commitmentLevel,
+    }
+
+    // Subscribe with handlers
+    err := client.Subscribe(req,
+        func(update *laserstream.SubscribeUpdate) {
+            if update.Slot != nil {
+                log.Printf("Slot %d: parent=%d", 
+                    update.Slot.Slot, 
+                    update.Slot.Parent)
+            }
+        },
+        func(err error) {
+            log.Printf("Error: %v", err)
+        },
+    )
+    
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Wait for interrupt signal
+    sigChan := make(chan os.Signal, 1)
+    signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+    <-sigChan
+    
+    log.Println("Shutting down...")
+}
+```
+
+## Go-Specific Features
+
+- **Context Support**: All operations respect Go context cancellation
+- **Goroutine Safe**: Client can be safely used across multiple goroutines
+- **Memory Efficient**: Optimized for Go's garbage collector
+- **Native Types**: Uses Go's native types and error handling patterns
 
 ## Requirements
 
 - Go 1.23.5 or later
 - Valid Laserstream API key
 
-## License
+## Examples Directory
 
-Licensed under the Apache License, Version 2.0. 
+See [`./examples/`](./examples/) for complete working examples:
+
+- [`account-sub.go`](./examples/account-sub.go) - Account subscriptions
+- [`transaction-sub.go`](./examples/transaction-sub.go) - Transaction filtering  
+- [`block-sub.go`](./examples/block-sub.go) - Block data streaming
+- [`slot-sub.go`](./examples/slot-sub.go) - Slot progression
+- [`channel-options-example.go`](./examples/channel-options-example.go) - Performance tuning
+- [`stream-write-example.go`](./examples/stream-write-example.go) - Dynamic updates
