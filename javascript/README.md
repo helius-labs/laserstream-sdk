@@ -390,12 +390,6 @@ bun your-app.ts
 
 Both runtimes support Node-API (NAPI) bindings natively.
 
-## TypeScript Features
-
-- **Full Type Safety**: Complete TypeScript definitions for all APIs
-- **Runtime Validation**: Type checking for subscription requests
-- **Zero-copy Performance**: Rust NAPI bindings with minimal JavaScript overhead
-
 ## Requirements
 
 - Node.js 16.0.0 or later

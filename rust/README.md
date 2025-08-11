@@ -455,14 +455,6 @@ let options = ChannelOptions::default()
     .with_zstd_compression();
 ```
 
-## Rust-Specific Features
-
-- **Zero-Copy Performance**: Direct Rust implementation with no overhead
-- **Memory Safety**: Guaranteed memory safety with Rust's ownership system
-- **Async/Await**: Native Tokio async support with backpressure handling
-- **Type Safety**: Compile-time guarantees for all gRPC message types
-- **Error Handling**: Rich error types with detailed context
-
 ## Requirements
 
 - Rust 1.70 or later
