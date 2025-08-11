@@ -1,6 +1,6 @@
 # LaserStream
 
-High-performance gRPC client for streaming real-time Solana blockchain data. Built for developers who need reliable, low-latency Solana data with automatic reconnection and historical replay capabilities.
+High-performance gRPC client for streaming real-time Solana data. Built for developers who need reliable, low-latency Solana data with automatic reconnection and historical replay capabilities.
 
 ## 🚀 Key Features
 
@@ -11,7 +11,6 @@ High-performance gRPC client for streaming real-time Solana blockchain data. Bui
 - **Stream Write**: Dynamic subscription updates without reconnecting
 - **Replay Control**: Enable/disable slot replay behavior for different use cases
 - **Compression**: Gzip and Zstd support (70-80% bandwidth reduction with Zstd)
-- **Multiple Runtimes**: Node.js, Bun (JavaScript), native Rust, native Go
 
 ## 📦 Official SDKs
 
