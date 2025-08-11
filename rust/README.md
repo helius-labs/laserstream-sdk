@@ -76,7 +76,7 @@ let channel_options = ChannelOptions::default()
     .with_keepalive_timeout_secs(10)
     .with_initial_stream_window_size(8_388_608)     // 8MB
     .with_initial_connection_window_size(16_777_216) // 16MB
-    .with_zstd_compression(); // 5x more efficient than gzip
+    .with_zstd_compression();
 
 let config = LaserstreamConfig::new(endpoint, api_key)
     .with_max_reconnect_attempts(10)
@@ -277,7 +277,7 @@ while let Some(result) = stream.next().await {
 ### Zstd Compression (Recommended)
 ```rust
 let channel_options = ChannelOptions::default()
-    .with_zstd_compression(); // 5x more efficient than gzip
+    .with_zstd_compression();
 
 let config = LaserstreamConfig::new(endpoint, api_key)
     .with_channel_options(channel_options);

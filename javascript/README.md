@@ -227,7 +227,7 @@ const config: LaserstreamConfig = {
   apiKey: 'your-api-key',
   endpoint: 'your-endpoint',
   channelOptions: {
-    'grpc.default_compression_algorithm': CompressionAlgorithms.zstd, // 5x more efficient
+    'grpc.default_compression_algorithm': CompressionAlgorithms.zstd,
     'grpc.max_receive_message_length': 1_000_000_000,
   }
 };
