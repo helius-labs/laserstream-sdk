@@ -32,6 +32,15 @@ jobs:
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             build: npm run build -- --target x86_64-unknown-linux-gnu
+          - host: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            build: npm run build -- --target aarch64-unknown-linux-gnu
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            build: npm run build -- --target x86_64-unknown-linux-musl
+          - host: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            build: npm run build -- --target aarch64-unknown-linux-musl
     name: stable - ${{ matrix.settings.target }} - node@20
     runs-on: ${{ matrix.settings.host }}
     steps:
@@ -176,6 +185,24 @@ jobs:
                 CPU_FIELD="x64"
                 MAIN_BINARY="laserstream-napi.linux-x64-gnu.node"
                 ;;
+              "aarch64-unknown-linux-gnu") 
+                PACKAGE_NAME="helius-laserstream-linux-arm64-gnu"
+                OS_FIELD="linux"
+                CPU_FIELD="arm64"
+                MAIN_BINARY="laserstream-napi.linux-arm64-gnu.node"
+                ;;
+              "x86_64-unknown-linux-musl") 
+                PACKAGE_NAME="helius-laserstream-linux-x64-musl"
+                OS_FIELD="linux"
+                CPU_FIELD="x64"
+                MAIN_BINARY="laserstream-napi.linux-x64-musl.node"
+                ;;
+              "aarch64-unknown-linux-musl") 
+                PACKAGE_NAME="helius-laserstream-linux-arm64-musl"
+                OS_FIELD="linux"
+                CPU_FIELD="arm64"
+                MAIN_BINARY="laserstream-napi.linux-arm64-musl.node"
+                ;;
               *) echo "❌ Unknown target: $target"; exit 1 ;;
             esac
             
@@ -212,8 +239,8 @@ jobs:
           done
           
           # Verify we published expected number of packages
-          if [ "$PUBLISHED_COUNT" -ne 3 ]; then
-            echo "❌ Error: Expected 3 platform packages, but published $PUBLISHED_COUNT"
+          if [ "$PUBLISHED_COUNT" -ne 6 ]; then
+            echo "❌ Error: Expected 6 platform packages, but published $PUBLISHED_COUNT"
             exit 1
           fi
           
@@ -252,6 +279,9 @@ jobs:
             "helius-laserstream-darwin-x64"
             "helius-laserstream-darwin-arm64"
             "helius-laserstream-linux-x64-gnu"
+            "helius-laserstream-linux-arm64-gnu"
+            "helius-laserstream-linux-x64-musl"
+            "helius-laserstream-linux-arm64-musl"
           )
           
           for package in "${PLATFORM_PACKAGES[@]}"; do
