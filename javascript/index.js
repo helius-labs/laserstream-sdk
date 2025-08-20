@@ -45,19 +45,77 @@ switch (platform) {
     }
     break
   case 'linux':
-    if (arch === 'x64') {
-      localFileExisted = existsSync(join(__dirname, 'laserstream-napi.linux-x64-gnu.node'))
-      try {
+    switch (arch) {
+      case 'x64':
+        // Try local glibc build first
+        localFileExisted = existsSync(join(__dirname, 'laserstream-napi.linux-x64-gnu.node'))
         if (localFileExisted) {
-          nativeBinding = require('./laserstream-napi.linux-x64-gnu.node')
-        } else {
-          nativeBinding = require('helius-laserstream-linux-x64-gnu')
+          try {
+            nativeBinding = require('./laserstream-napi.linux-x64-gnu.node')
+            break
+          } catch (e) {
+            loadError = e
+          }
         }
-      } catch (e) {
-        loadError = e
-      }
-    } else {
-      throw new Error(`Unsupported architecture on Linux: ${arch}`)
+        
+        // Try local musl build
+        const localMuslExisted = existsSync(join(__dirname, 'laserstream-napi.linux-x64-musl.node'))
+        if (localMuslExisted) {
+          try {
+            nativeBinding = require('./laserstream-napi.linux-x64-musl.node')
+            break
+          } catch (e) {
+            loadError = e
+          }
+        }
+
+        // Try glibc package, fallback to musl package
+        try {
+          nativeBinding = require('helius-laserstream-linux-x64-gnu')
+        } catch (e) {
+          try {
+            nativeBinding = require('helius-laserstream-linux-x64-musl')
+          } catch (muslError) {
+            loadError = e
+          }
+        }
+        break
+      case 'arm64':
+        // Try local glibc build first
+        localFileExisted = existsSync(join(__dirname, 'laserstream-napi.linux-arm64-gnu.node'))
+        if (localFileExisted) {
+          try {
+            nativeBinding = require('./laserstream-napi.linux-arm64-gnu.node')
+            break
+          } catch (e) {
+            loadError = e
+          }
+        }
+        
+        // Try local musl build
+        const localMuslArm64Existed = existsSync(join(__dirname, 'laserstream-napi.linux-arm64-musl.node'))
+        if (localMuslArm64Existed) {
+          try {
+            nativeBinding = require('./laserstream-napi.linux-arm64-musl.node')
+            break
+          } catch (e) {
+            loadError = e
+          }
+        }
+
+        // Try glibc package, fallback to musl package
+        try {
+          nativeBinding = require('helius-laserstream-linux-arm64-gnu')
+        } catch (e) {
+          try {
+            nativeBinding = require('helius-laserstream-linux-arm64-musl')
+          } catch (muslError) {
+            loadError = e
+          }
+        }
+        break
+      default:
+        throw new Error(`Unsupported architecture on Linux: ${arch}`)
     }
     break
   default:
