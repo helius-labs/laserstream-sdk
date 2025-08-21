@@ -1,6 +1,6 @@
 {
   "name": "helius-laserstream",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "High-performance Laserstream gRPC client with automatic reconnection",
   "main": "client.js",
   "types": "client.d.ts",
@@ -82,12 +82,12 @@
     }
   },
   "optionalDependencies": {
-    "helius-laserstream-darwin-arm64": "0.1.6",
-    "helius-laserstream-darwin-x64": "0.1.6",
-    "helius-laserstream-linux-x64-gnu": "0.1.6",
-    "helius-laserstream-linux-arm64-gnu": "0.1.6",
-    "helius-laserstream-linux-x64-musl": "0.1.6",
-    "helius-laserstream-linux-arm64-musl": "0.1.6"
+    "helius-laserstream-darwin-arm64": "0.1.7",
+    "helius-laserstream-darwin-x64": "0.1.7",
+    "helius-laserstream-linux-x64-gnu": "0.1.7",
+    "helius-laserstream-linux-arm64-gnu": "0.1.7",
+    "helius-laserstream-linux-x64-musl": "0.1.7",
+    "helius-laserstream-linux-arm64-musl": "0.1.7"
   },
   "dependencies": {
     "@types/protobufjs": "^6.0.0",
