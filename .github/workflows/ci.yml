@@ -60,20 +60,12 @@ jobs:
               sudo apt-get update
               sudo apt-get install -y gcc-aarch64-linux-gnu
               ;;
-            x86_64-unknown-linux-musl)
-              sudo apt-get update
-              sudo apt-get install -y musl-tools musl-dev gcc
-              # Verify musl-gcc is available
-              which musl-gcc || echo "musl-gcc not found, but musl-tools should provide it"
-              ;;
-            aarch64-unknown-linux-musl)
-              sudo apt-get update
-              sudo apt-get install -y musl-tools musl-dev
-              # Install proper musl cross-compiler for aarch64
-              wget https://github.com/richfelker/musl-cross-make/releases/download/v0.9.9/aarch64-linux-musl-cross.tgz
-              tar -xzf aarch64-linux-musl-cross.tgz
-              sudo mv aarch64-linux-musl-cross /opt/
-              echo "/opt/aarch64-linux-musl-cross/bin" >> $GITHUB_PATH
+            x86_64-unknown-linux-musl|aarch64-unknown-linux-musl)
+              # Install cross-rs for reliable musl cross-compilation
+              cargo install cross --git https://github.com/cross-rs/cross
+              # Ensure Docker is available for cross-rs
+              sudo systemctl start docker
+              sudo usermod -aG docker $USER
               ;;
           esac
       - name: Install Rust
@@ -94,17 +86,23 @@ jobs:
             ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}-
             ${{ matrix.settings.target }}-cargo-
       - name: Build
-        run: ${{ matrix.settings.build }}
+        run: |
+          case ${{ matrix.settings.target }} in
+            x86_64-unknown-linux-musl|aarch64-unknown-linux-musl)
+              # Use cross-rs for musl targets (more reliable)
+              cross build --release --target ${{ matrix.settings.target }}
+              ;;
+            *)
+              # Use regular build for other targets
+              ${{ matrix.settings.build }}
+              ;;
+          esac
         shell: bash
         working-directory: javascript
         env:
           CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
-          CC_aarch64_unknown_linux_musl: aarch64-linux-musl-gcc
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: aarch64-linux-musl-gcc
-          CC_x86_64_unknown_linux_musl: musl-gcc
-          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
-          TARGET_CC: ${{ matrix.settings.target == 'aarch64-unknown-linux-gnu' && 'aarch64-linux-gnu-gcc' || matrix.settings.target == 'aarch64-unknown-linux-musl' && 'aarch64-linux-musl-gcc' || matrix.settings.target == 'x86_64-unknown-linux-musl' && 'musl-gcc' || '' }}
+          TARGET_CC: ${{ matrix.settings.target == 'aarch64-unknown-linux-gnu' && 'aarch64-linux-gnu-gcc' || '' }}
       - name: Verify build output
         run: |
           if [ ! -f *.node ]; then
