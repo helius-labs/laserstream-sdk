@@ -43,7 +43,7 @@ type LaserstreamConfig struct {
 	APIKey               string
 	MaxReconnectAttempts *int            // nil uses default (240 attempts)
 	ChannelOptions       *ChannelOptions // nil uses defaults
-	Replay               bool            // When true, enable replay on reconnects (uses fromSlot and internal slot tracking). Default: true when zero value
+	Replay               *bool           // nil => default true; set to pointer false to disable
 }
 
 // ChannelOptions configures gRPC channel behavior
@@ -106,10 +106,11 @@ type Client struct {
 
 // NewLaserstreamConfig creates a new LaserstreamConfig with default values.
 func NewLaserstreamConfig(endpoint, apiKey string) LaserstreamConfig {
+	defaultReplay := true
 	return LaserstreamConfig{
 		Endpoint: endpoint,
 		APIKey:   apiKey,
-		Replay:   true, // Default to true
+		Replay:   &defaultReplay,
 	}
 }
 
@@ -124,11 +125,16 @@ func NewClient(config LaserstreamConfig) *Client {
 
 // isReplayEnabled returns the effective replay setting
 func (c *Client) isReplayEnabled() bool {
-	return c.config.Replay
+	if c.config.Replay == nil {
+		return true
+	}
+	return *c.config.Replay
 }
 
-// Subscribe initiates a subscription to the Laserstream service.
-func (c *Client) Subscribe(
+// SubscribeWithContext initiates a subscription using the provided context.
+// The provided context controls cancellation and deadlines for the stream loop.
+func (c *Client) SubscribeWithContext(
+	ctx context.Context,
 	req *SubscribeRequest,
 	dataCallback DataCallback,
 	errorCallback ErrorCallback,
@@ -173,7 +179,8 @@ func (c *Client) Subscribe(
 		c.originalRequest.FromSlot = nil
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	// Derive a cancelable child context so Close()/Unsubscribe() remain effective
+	ctx, cancel := context.WithCancel(ctx)
 	c.cancel = cancel
 	c.running = true
 
@@ -181,6 +188,16 @@ func (c *Client) Subscribe(
 	go c.streamLoop(ctx)
 
 	return nil
+}
+
+// Subscribe initiates a subscription to the Laserstream service.
+// It delegates to SubscribeWithContext using context.Background().
+func (c *Client) Subscribe(
+	req *SubscribeRequest,
+	dataCallback DataCallback,
+	errorCallback ErrorCallback,
+) error {
+	return c.SubscribeWithContext(context.Background(), req, dataCallback, errorCallback)
 }
 
 // Write sends a new subscription request to update the active subscription.
@@ -382,6 +399,11 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 			continue
 		}
 
+		// Hide any server-side pong updates from user callbacks
+		if _, ok := resp.UpdateOneof.(*pb.SubscribeUpdate_Pong); ok {
+			continue
+		}
+
 		// Track slot updates for reconnection only when replay is enabled
 		if slotUpdate, ok := resp.UpdateOneof.(*pb.SubscribeUpdate_Slot); ok {
 			if slotUpdate.Slot != nil && c.isReplayEnabled() {
@@ -476,11 +498,11 @@ func (c *Client) connect(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("error parsing endpoint URL: %w", err)
 		}
+
+		// Always use TLS and default HTTPS port
 		if u.Port() != "" {
-			// URL has port specified (e.g., https://example.com:443)
 			target = u.Host
 		} else {
-			// URL without port, add default 443
 			target = u.Hostname() + ":443"
 		}
 	} else {

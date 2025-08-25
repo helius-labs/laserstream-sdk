@@ -86,7 +86,6 @@ func main() {
 	config := laserstream.LaserstreamConfig{
 		Endpoint: endpoint,
 		APIKey:   apiKey,
-		
 	}
 
 	userSlotFilterID := "user-slot-test"
