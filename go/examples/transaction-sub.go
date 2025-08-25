@@ -28,7 +28,6 @@ func main() {
 	clientConfig := laserstream.LaserstreamConfig{
 		Endpoint: endpoint,
 		APIKey:   apiKey,
-		
 	}
 
 	commitmentLevel := laserstream.CommitmentLevel_PROCESSED
