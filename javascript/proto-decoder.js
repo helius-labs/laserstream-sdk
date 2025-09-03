@@ -38,7 +38,7 @@ function decodeSubscribeUpdate(bytes) {
       longs: String,           // Convert uint64 to string (like Yellowstone)
       enums: Number,           // Keep enums as numbers
       bytes: Buffer,           // Keep bytes as Buffer (exactly like Yellowstone)
-      defaults: false,         // Don't include default values
+      defaults: true,         // Include default values
       arrays: true,            // Always include arrays
       objects: true,           // Always include objects
       oneofs: false             // Do not include oneof virtual fields
