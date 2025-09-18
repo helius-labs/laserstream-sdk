@@ -12,8 +12,8 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-yellowstone-grpc-proto = "8.0.0"
-yellowstone-grpc-client = "8.0.0"
+yellowstone-grpc-proto = { git = "https://github.com/helius-labs/yellowstone-grpc", tag = "v6.1.0+solana.2.2.14" }
+yellowstone-grpc-client = { git = "https://github.com/helius-labs/yellowstone-grpc", tag = "v6.1.0+solana.2.2.14" }
 tonic = { version = "0.12.1", features = ["transport", "tls", "zstd", "gzip"] }
 prost = "0.12"
 prost-types = "0.12"
