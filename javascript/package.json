@@ -19,7 +19,7 @@
     "build:ts": "tsc",
     "build:all": "napi build --platform --release --target x86_64-apple-darwin --target aarch64-apple-darwin --target x86_64-unknown-linux-gnu",
     "build:musl": "napi build --platform --release --cargo-name laserstream-napi --cargo-cwd . --features napi/tokio_rt --zig",
-    "build:musl-rustls": "napi build --platform --release --cargo-name laserstream-napi --cargo-cwd . --features napi/tokio_rt,rustls-tls --cargo-flags='--no-default-features' --zig",
+    "build:musl-rustls": "cargo zigbuild --release --target $CARGO_BUILD_TARGET --features napi/tokio_rt,rustls-tls --no-default-features && napi build --platform --release --skip-build",
     "example:account-sub": "ts-node examples/account-sub.ts",
     "example:accounts-data-slice-sub": "ts-node examples/accounts-data-slice-sub.ts",
     "example:slot-sub": "ts-node examples/slot-sub.ts",
