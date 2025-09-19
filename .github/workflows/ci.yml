@@ -37,10 +37,10 @@ jobs:
             build: npm run build -- --target aarch64-unknown-linux-gnu
           - host: ubuntu-latest
             target: x86_64-unknown-linux-musl
-            build: npm run build -- --target x86_64-unknown-linux-musl
+            build: CARGO_BUILD_TARGET=x86_64-unknown-linux-musl npm run build:musl
           - host: ubuntu-latest
             target: aarch64-unknown-linux-musl
-            build: npm run build -- --target aarch64-unknown-linux-musl
+            build: CARGO_BUILD_TARGET=aarch64-unknown-linux-musl npm run build:musl
     name: stable - ${{ matrix.settings.target }} - node@20
     runs-on: ${{ matrix.settings.host }}
     steps:
@@ -60,24 +60,16 @@ jobs:
               sudo apt-get update
               sudo apt-get install -y gcc-aarch64-linux-gnu
               ;;
-            x86_64-unknown-linux-musl)
-              sudo apt-get update
-              sudo apt-get install -y musl-tools musl-dev
-              # Install Zig for cross-compilation
-              wget -q https://ziglang.org/download/0.11.0/zig-linux-x86_64-0.11.0.tar.xz
-              tar -xf zig-linux-x86_64-0.11.0.tar.xz
-              sudo mv zig-linux-x86_64-0.11.0 /opt/zig
-              echo "/opt/zig" >> $GITHUB_PATH
-              ;;
-            aarch64-unknown-linux-musl)
+            x86_64-unknown-linux-musl|aarch64-unknown-linux-musl)
               sudo apt-get update
               sudo apt-get install -y musl-tools musl-dev gcc-aarch64-linux-gnu
-              # Use system gcc with musl for aarch64 (more reliable than musl.cc)
               # Install Zig for cross-compilation
               wget -q https://ziglang.org/download/0.11.0/zig-linux-x86_64-0.11.0.tar.xz
               tar -xf zig-linux-x86_64-0.11.0.tar.xz
               sudo mv zig-linux-x86_64-0.11.0 /opt/zig
               echo "/opt/zig" >> $GITHUB_PATH
+              # Install cargo-zigbuild for musl support
+              cargo install cargo-zigbuild
               ;;
           esac
       - name: Install Rust
@@ -104,13 +96,8 @@ jobs:
         env:
           CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
-          CC_aarch64_unknown_linux_musl: aarch64-linux-gnu-gcc
-          CC_x86_64_unknown_linux_musl: musl-gcc
-          # Static linking and Zig linker for musl targets
-          RUSTFLAGS: ${{ matrix.settings.target == 'x86_64-unknown-linux-musl' && '-C target-feature=+crt-static -C link-self-contained=yes' || matrix.settings.target == 'aarch64-unknown-linux-musl' && '-C target-feature=+crt-static -C link-self-contained=yes' || '' }}
-          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: ${{ matrix.settings.target == 'x86_64-unknown-linux-musl' && 'zig cc -target x86_64-linux-musl' || '' }}
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: ${{ matrix.settings.target == 'aarch64-unknown-linux-musl' && 'zig cc -target aarch64-linux-musl' || '' }}
-          TARGET_CC: ${{ matrix.settings.target == 'aarch64-unknown-linux-gnu' && 'aarch64-linux-gnu-gcc' || matrix.settings.target == 'aarch64-unknown-linux-musl' && 'aarch64-linux-gnu-gcc' || matrix.settings.target == 'x86_64-unknown-linux-musl' && 'musl-gcc' || '' }}
+          # NAPI with Zig handles musl linking automatically
+          TARGET_CC: ${{ matrix.settings.target == 'aarch64-unknown-linux-gnu' && 'aarch64-linux-gnu-gcc' || '' }}
       - name: Verify build output
         run: |
           if [ ! -f *.node ]; then
