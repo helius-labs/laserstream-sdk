@@ -80,6 +80,9 @@ jobs:
           restore-keys: |
             ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}-
             ${{ matrix.settings.target }}-cargo-
+      - name: Set up QEMU for cross-compilation
+        if: matrix.settings.docker == true
+        uses: docker/setup-qemu-action@v3
       - name: Build in Docker (musl)
         if: matrix.settings.docker == true
         run: |
