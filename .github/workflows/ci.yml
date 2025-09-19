@@ -37,10 +37,10 @@ jobs:
             build: npm run build -- --target aarch64-unknown-linux-gnu
           - host: ubuntu-latest
             target: x86_64-unknown-linux-musl
-            build: CARGO_BUILD_TARGET=x86_64-unknown-linux-musl npm run build:musl
+            build: CARGO_BUILD_TARGET=x86_64-unknown-linux-musl npm run build:musl-rustls
           - host: ubuntu-latest
             target: aarch64-unknown-linux-musl
-            build: CARGO_BUILD_TARGET=aarch64-unknown-linux-musl npm run build:musl
+            build: CARGO_BUILD_TARGET=aarch64-unknown-linux-musl npm run build:musl-rustls
     name: stable - ${{ matrix.settings.target }} - node@20
     runs-on: ${{ matrix.settings.host }}
     steps:
@@ -62,9 +62,7 @@ jobs:
               ;;
             x86_64-unknown-linux-musl|aarch64-unknown-linux-musl)
               sudo apt-get update
-              sudo apt-get install -y musl-tools musl-dev gcc-aarch64-linux-gnu clang pkg-config
-              # Install cross-compilation OpenSSL headers
-              sudo apt-get install -y libssl-dev:amd64 libssl-dev:arm64 || true
+              sudo apt-get install -y musl-tools musl-dev gcc-aarch64-linux-gnu
               # Install Zig for cross-compilation
               wget -q https://ziglang.org/download/0.11.0/zig-linux-x86_64-0.11.0.tar.xz
               tar -xf zig-linux-x86_64-0.11.0.tar.xz
@@ -100,22 +98,14 @@ jobs:
           CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
           TARGET_CC: ${{ matrix.settings.target == 'aarch64-unknown-linux-gnu' && 'aarch64-linux-gnu-gcc' || '' }}
-      - name: Build (musl)
+      - name: Build (musl with rustls)
         if: ${{ contains(matrix.settings.target, 'musl') }}
         run: ${{ matrix.settings.build }}
         shell: bash
         working-directory: javascript
         env:
-          # Use vendored OpenSSL with specific configuration to avoid CT issues
-          OPENSSL_STATIC: "1"
-          OPENSSL_VENDORED: "1"
-          # Disable Certificate Transparency and other problematic features
-          OPENSSL_RUST_USE_NASM: "0"
-          # Set configure args for openssl-src
-          OPENSSL_CONFIGURE_ARGS: "no-ct no-ssl3 no-comp no-zlib no-zlib-dynamic no-md2 no-rc5 no-weak-ssl-ciphers no-camellia no-idea no-seed no-engine no-async"
-          # Force use of clang for consistent compilation
-          CC: "clang"
-          CXX: "clang++"
+          # Use rustls instead of OpenSSL to avoid compilation issues
+          RUSTFLAGS: "-C target-feature=+crt-static"
       - name: Verify build output
         run: |
           if [ ! -f *.node ]; then
