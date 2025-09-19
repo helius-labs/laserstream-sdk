@@ -62,7 +62,9 @@ jobs:
               ;;
             x86_64-unknown-linux-musl|aarch64-unknown-linux-musl)
               sudo apt-get update
-              sudo apt-get install -y musl-tools musl-dev gcc-aarch64-linux-gnu clang libssl-dev pkg-config
+              sudo apt-get install -y musl-tools musl-dev gcc-aarch64-linux-gnu clang pkg-config
+              # Install cross-compilation OpenSSL headers
+              sudo apt-get install -y libssl-dev:amd64 libssl-dev:arm64 || true
               # Install Zig for cross-compilation
               wget -q https://ziglang.org/download/0.11.0/zig-linux-x86_64-0.11.0.tar.xz
               tar -xf zig-linux-x86_64-0.11.0.tar.xz
@@ -104,14 +106,17 @@ jobs:
         shell: bash
         working-directory: javascript
         env:
-          # Bypass OpenSSL build issues by using system OpenSSL for musl
-          OPENSSL_NO_VENDOR: "1"
+          # Use vendored OpenSSL with specific configuration to avoid CT issues
           OPENSSL_STATIC: "1"
-          # Use system OpenSSL libraries to avoid compilation issues
-          OPENSSL_DIR: "/usr"
-          OPENSSL_LIB_DIR: ${{ matrix.settings.target == 'x86_64-unknown-linux-musl' && '/usr/lib/x86_64-linux-gnu' || '/usr/lib/aarch64-linux-gnu' }}
-          OPENSSL_INCLUDE_DIR: "/usr/include"
-          PKG_CONFIG_PATH: ${{ matrix.settings.target == 'x86_64-unknown-linux-musl' && '/usr/lib/x86_64-linux-gnu/pkgconfig' || '/usr/lib/aarch64-linux-gnu/pkgconfig' }}
+          OPENSSL_VENDORED: "1"
+          # Force use of clang for the host build system (not cross-compilation)
+          CC: "clang"
+          CXX: "clang++"
+          # Override OpenSSL configuration to disable Certificate Transparency
+          CFLAGS: "-DOPENSSL_NO_CT"
+          CXXFLAGS: "-DOPENSSL_NO_CT"
+          # Set additional flags to work around macro issues
+          CPPFLAGS: "-DOPENSSL_NO_CT -DOPENSSLDIR=\\\"/usr/local/ssl\\\""
       - name: Verify build output
         run: |
           if [ ! -f *.node ]; then
