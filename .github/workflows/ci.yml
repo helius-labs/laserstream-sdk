@@ -37,9 +37,11 @@ jobs:
             build: npm run build -- --target aarch64-unknown-linux-gnu
           - host: ubuntu-latest
             target: x86_64-unknown-linux-musl
+            docker: true
             build: npm run build -- --target x86_64-unknown-linux-musl
           - host: ubuntu-latest
             target: aarch64-unknown-linux-musl
+            docker: true
             build: npm run build -- --target aarch64-unknown-linux-musl
     name: stable - ${{ matrix.settings.target }} - node@20
     runs-on: ${{ matrix.settings.host }}
@@ -60,14 +62,6 @@ jobs:
               sudo apt-get update
               sudo apt-get install -y gcc-aarch64-linux-gnu
               ;;
-            x86_64-unknown-linux-musl)
-              sudo apt-get update
-              sudo apt-get install -y musl-tools
-              ;;
-            aarch64-unknown-linux-musl)
-              sudo apt-get update
-              sudo apt-get install -y musl-tools gcc-aarch64-linux-gnu
-              ;;
           esac
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -86,16 +80,39 @@ jobs:
           restore-keys: |
             ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}-
             ${{ matrix.settings.target }}-cargo-
+      - name: Set up QEMU for cross-compilation
+        if: matrix.settings.docker == true
+        uses: docker/setup-qemu-action@v3
+      - name: Build in Docker (musl)
+        if: matrix.settings.docker == true
+        run: |
+          docker run --rm \
+            -v $(pwd):/workspace \
+            --platform ${{ startsWith(matrix.settings.target, 'aarch64') && 'linux/arm64' || 'linux/amd64' }} \
+            rust:alpine sh -c "
+              apk add --no-cache nodejs npm musl-dev gcc g++ openssl-dev perl make python3 && \
+              cd /workspace && \
+              rustup target add ${{ matrix.settings.target }} && \
+              npm install && \
+              export CC=gcc && \
+              export CXX=g++ && \
+              export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=gcc && \
+              export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=gcc && \
+              export RUSTFLAGS='-C target-feature=-crt-static' && \
+              npm run build -- --target ${{ matrix.settings.target }} && \
+              echo 'Build complete' && \
+              ls -la *.node
+            "
+        working-directory: javascript
       - name: Build
+        if: matrix.settings.docker != true
         run: ${{ matrix.settings.build }}
         shell: bash
         working-directory: javascript
         env:
           CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
-          CC_aarch64_unknown_linux_musl: aarch64-linux-gnu-gcc
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: aarch64-linux-gnu-gcc
-          TARGET_CC: ${{ matrix.settings.target == 'aarch64-unknown-linux-gnu' && 'aarch64-linux-gnu-gcc' || matrix.settings.target == 'aarch64-unknown-linux-musl' && 'aarch64-linux-gnu-gcc' || '' }}
+          TARGET_CC: ${{ matrix.settings.target == 'aarch64-unknown-linux-gnu' && 'aarch64-linux-gnu-gcc' || '' }}
       - name: Verify build output
         run: |
           if [ ! -f *.node ]; then
@@ -103,6 +120,10 @@ jobs:
             exit 1
           fi
           echo "✅ Build output verified: $(ls -la *.node)"
+          
+          # Note: musl binaries built in Alpine containers will have musl linking
+          # The verification would need to run inside an Alpine container to check properly
+          echo "ℹ️ Target: ${{ matrix.settings.target }}"
         working-directory: javascript
       - name: Upload artifact
         uses: actions/upload-artifact@v4

@@ -35,5 +35,6 @@ napi-build = "2"
 lto = true
 opt-level = 3
 
+
 [package.metadata.napi]
 name = "laserstream-napi"
