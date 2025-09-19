@@ -109,14 +109,13 @@ jobs:
           # Use vendored OpenSSL with specific configuration to avoid CT issues
           OPENSSL_STATIC: "1"
           OPENSSL_VENDORED: "1"
-          # Force use of clang for the host build system (not cross-compilation)
+          # Disable Certificate Transparency and other problematic features
+          OPENSSL_RUST_USE_NASM: "0"
+          # Set configure args for openssl-src
+          OPENSSL_CONFIGURE_ARGS: "no-ct no-ssl3 no-comp no-zlib no-zlib-dynamic no-md2 no-rc5 no-weak-ssl-ciphers no-camellia no-idea no-seed no-engine no-async"
+          # Force use of clang for consistent compilation
           CC: "clang"
           CXX: "clang++"
-          # Override OpenSSL configuration to disable Certificate Transparency
-          CFLAGS: "-DOPENSSL_NO_CT"
-          CXXFLAGS: "-DOPENSSL_NO_CT"
-          # Set additional flags to work around macro issues
-          CPPFLAGS: "-DOPENSSL_NO_CT -DOPENSSLDIR=\\\"/usr/local/ssl\\\""
       - name: Verify build output
         run: |
           if [ ! -f *.node ]; then

@@ -1676,6 +1676,7 @@ dependencies = [
  "napi",
  "napi-build",
  "napi-derive",
+ "openssl-sys",
  "parking_lot",
  "prost 0.13.5",
  "serde",
