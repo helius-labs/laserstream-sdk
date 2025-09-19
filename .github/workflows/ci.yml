@@ -97,7 +97,7 @@ jobs:
               export RUSTFLAGS='-C target-feature=-crt-static -C link-arg=-lgcc' && \
               npm run build -- --target ${{ matrix.settings.target }} && \
               echo 'Build complete' && \
-              file *.node
+              ls -la *.node
             "
         working-directory: javascript
       - name: Build
