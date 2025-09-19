@@ -62,11 +62,16 @@ jobs:
               ;;
             x86_64-unknown-linux-musl)
               sudo apt-get update
-              sudo apt-get install -y musl-tools
+              sudo apt-get install -y musl-tools musl-dev
               ;;
             aarch64-unknown-linux-musl)
               sudo apt-get update
-              sudo apt-get install -y musl-tools gcc-aarch64-linux-gnu
+              sudo apt-get install -y musl-tools musl-dev
+              # Install aarch64 musl cross-compiler
+              wget https://musl.cc/aarch64-linux-musl-cross.tgz
+              tar -xf aarch64-linux-musl-cross.tgz
+              sudo mv aarch64-linux-musl-cross /opt/
+              echo "/opt/aarch64-linux-musl-cross/bin" >> $GITHUB_PATH
               ;;
           esac
       - name: Install Rust
@@ -93,9 +98,13 @@ jobs:
         env:
           CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
-          CC_aarch64_unknown_linux_musl: aarch64-linux-gnu-gcc
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: aarch64-linux-gnu-gcc
-          TARGET_CC: ${{ matrix.settings.target == 'aarch64-unknown-linux-gnu' && 'aarch64-linux-gnu-gcc' || matrix.settings.target == 'aarch64-unknown-linux-musl' && 'aarch64-linux-gnu-gcc' || '' }}
+          CC_aarch64_unknown_linux_musl: aarch64-linux-musl-gcc
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: aarch64-linux-musl-gcc
+          CC_x86_64_unknown_linux_musl: musl-gcc
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+          # Static linking for musl targets
+          RUSTFLAGS: ${{ matrix.settings.target == 'x86_64-unknown-linux-musl' && '-C target-feature=+crt-static' || matrix.settings.target == 'aarch64-unknown-linux-musl' && '-C target-feature=+crt-static' || '' }}
+          TARGET_CC: ${{ matrix.settings.target == 'aarch64-unknown-linux-gnu' && 'aarch64-linux-gnu-gcc' || matrix.settings.target == 'aarch64-unknown-linux-musl' && 'aarch64-linux-musl-gcc' || matrix.settings.target == 'x86_64-unknown-linux-musl' && 'musl-gcc' || '' }}
       - name: Verify build output
         run: |
           if [ ! -f *.node ]; then
@@ -103,6 +112,31 @@ jobs:
             exit 1
           fi
           echo "✅ Build output verified: $(ls -la *.node)"
+          
+          # Verify musl binaries are properly linked
+          case ${{ matrix.settings.target }} in
+            *musl*)
+              echo "🔍 Verifying musl binary linking..."
+              for binary in *.node; do
+                echo "Checking $binary:"
+                file "$binary"
+                # Check that it doesn't depend on glibc dynamic linker
+                if ldd "$binary" 2>/dev/null | grep -q "ld-linux"; then
+                  echo "❌ Error: $binary still links against glibc dynamic linker"
+                  ldd "$binary" || true
+                  exit 1
+                elif ldd "$binary" 2>&1 | grep -q "not a dynamic executable"; then
+                  echo "✅ $binary is statically linked (good for musl)"
+                else
+                  echo "⚠️ $binary dynamic linking info:"
+                  ldd "$binary" || true
+                fi
+              done
+              ;;
+            *)
+              echo "ℹ️ Non-musl target, skipping musl verification"
+              ;;
+          esac
         working-directory: javascript
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -112,10 +146,71 @@ jobs:
             javascript/**/*.node
           if-no-files-found: error
 
+  test-alpine:
+    name: Test Alpine Linux compatibility
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download musl artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: bindings-*musl*
+          path: artifacts
+      - name: Test Alpine Linux compatibility
+        run: |
+          # Create test package.json
+          cat > test-package.json << 'EOF'
+          {
+            "name": "alpine-test",
+            "version": "1.0.0",
+            "dependencies": {}
+          }
+          EOF
+          
+          # Create Alpine test
+          cat > test-alpine.dockerfile << 'EOF'
+          FROM node:20-alpine
+          
+          WORKDIR /app
+          
+          # Copy artifacts
+          COPY artifacts/ ./artifacts/
+          COPY test-package.json package.json
+          COPY javascript/client.js ./
+          COPY javascript/index.js ./
+          COPY javascript/proto-decoder.js ./
+          COPY javascript/proto/ ./proto/
+          
+          # Install musl binaries locally
+          RUN find artifacts -name "*.node" -path "*musl*" -exec cp {} ./ \;
+          
+          # Create simple test
+          RUN echo 'try {' > test.js && \
+              echo '  const fs = require("fs");' >> test.js && \
+              echo '  const files = fs.readdirSync(".").filter(f => f.endsWith(".node"));' >> test.js && \
+              echo '  console.log("📁 Available .node files:", files);' >> test.js && \
+              echo '  if (files.length === 0) throw new Error("No .node files found");' >> test.js && \
+              echo '  const { LaserstreamClient } = require("./index.js");' >> test.js && \
+              echo '  console.log("✅ SUCCESS: Alpine Linux compatibility verified!");' >> test.js && \
+              echo '  console.log("LaserstreamClient type:", typeof LaserstreamClient);' >> test.js && \
+              echo '} catch (error) {' >> test.js && \
+              echo '  console.error("❌ FAILED:", error.message);' >> test.js && \
+              echo '  process.exit(1);' >> test.js && \
+              echo '}' >> test.js
+          
+          CMD ["node", "test.js"]
+          EOF
+          
+          # Build and run Alpine test
+          docker build -f test-alpine.dockerfile -t laserstream-alpine-test .
+          docker run --rm laserstream-alpine-test
+
   publish:
     name: Publish
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [build, test-alpine]
     if: github.event_name == 'release'
     steps:
       - uses: actions/checkout@v4
