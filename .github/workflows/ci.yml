@@ -96,14 +96,14 @@ jobs:
         env:
           CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
-          # Fix OpenSSL build issues with musl + Zig by using vendored OpenSSL with proper configuration
+          # Bypass OpenSSL build issues by using system OpenSSL for musl
+          OPENSSL_NO_VENDOR: ${{ contains(matrix.settings.target, 'musl') && '1' || '' }}
           OPENSSL_STATIC: ${{ contains(matrix.settings.target, 'musl') && '1' || '' }}
-          OPENSSL_VENDORED: ${{ contains(matrix.settings.target, 'musl') && '1' || '' }}
-          # Force use of clang for OpenSSL compilation to avoid Zig macro issues
-          CC: ${{ contains(matrix.settings.target, 'musl') && 'clang' || '' }}
-          CXX: ${{ contains(matrix.settings.target, 'musl') && 'clang++' || '' }}
-          # Disable certificate transparency to avoid the problematic macro
-          OPENSSL_CONF: ${{ contains(matrix.settings.target, 'musl') && 'no-ct' || '' }}
+          # Use system OpenSSL libraries to avoid compilation issues
+          OPENSSL_DIR: ${{ contains(matrix.settings.target, 'musl') && '/usr' || '' }}
+          OPENSSL_LIB_DIR: ${{ matrix.settings.target == 'x86_64-unknown-linux-musl' && '/usr/lib/x86_64-linux-gnu' || matrix.settings.target == 'aarch64-unknown-linux-musl' && '/usr/lib/aarch64-linux-gnu' || '' }}
+          OPENSSL_INCLUDE_DIR: ${{ contains(matrix.settings.target, 'musl') && '/usr/include' || '' }}
+          PKG_CONFIG_PATH: ${{ matrix.settings.target == 'x86_64-unknown-linux-musl' && '/usr/lib/x86_64-linux-gnu/pkgconfig' || matrix.settings.target == 'aarch64-unknown-linux-musl' && '/usr/lib/aarch64-linux-gnu/pkgconfig' || '' }}
           TARGET_CC: ${{ matrix.settings.target == 'aarch64-unknown-linux-gnu' && 'aarch64-linux-gnu-gcc' || '' }}
       - name: Verify build output
         run: |
