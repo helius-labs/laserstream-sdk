@@ -105,7 +105,12 @@ jobs:
         working-directory: javascript
         env:
           # Use rustls instead of OpenSSL to avoid compilation issues
-          RUSTFLAGS: "-C target-feature=+crt-static"
+          RUSTFLAGS: "-C target-feature=+crt-static -C link-self-contained=yes"
+          # Configure Zig linker for musl
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: ${{ matrix.settings.target == 'x86_64-unknown-linux-musl' && 'zig cc -target x86_64-linux-musl' || '' }}
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: ${{ matrix.settings.target == 'aarch64-unknown-linux-musl' && 'zig cc -target aarch64-linux-musl' || '' }}
+          # Enable cdylib support for musl
+          CARGO_CFG_TARGET_FEATURE: "crt-static"
       - name: Verify build output
         run: |
           if [ ! -f *.node ]; then
