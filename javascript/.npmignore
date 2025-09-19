@@ -25,6 +25,9 @@ Cargo.toml
 build.rs
 package-lock.json
 
+# Include cargo config for musl builds
+!.cargo/
+
 # IDE
 .vscode/
 .idea/
