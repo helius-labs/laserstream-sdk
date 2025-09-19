@@ -94,10 +94,10 @@ jobs:
               cd /workspace && \
               rustup target add ${{ matrix.settings.target }} && \
               npm install && \
-              export CC=musl-gcc && \
-              export CXX=musl-g++ && \
-              export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc && \
-              export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc && \
+              export CC=gcc && \
+              export CXX=g++ && \
+              export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=gcc && \
+              export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=gcc && \
               export RUSTFLAGS='-C target-feature=-crt-static' && \
               npm run build -- --target ${{ matrix.settings.target }} && \
               echo 'Build complete' && \
