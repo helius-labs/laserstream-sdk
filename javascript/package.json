@@ -1,6 +1,6 @@
 {
   "name": "helius-laserstream",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "High-performance Laserstream gRPC client with automatic reconnection",
   "main": "client.js",
   "types": "client.d.ts",
@@ -83,12 +83,12 @@
     }
   },
   "optionalDependencies": {
-    "helius-laserstream-darwin-arm64": "0.1.8",
-    "helius-laserstream-darwin-x64": "0.1.8",
-    "helius-laserstream-linux-arm64-gnu": "0.1.8",
-    "helius-laserstream-linux-x64-gnu": "0.1.8",
-    "helius-laserstream-linux-arm64-musl": "0.1.8",
-    "helius-laserstream-linux-x64-musl": "0.1.8"
+    "helius-laserstream-darwin-arm64": "0.1.9",
+    "helius-laserstream-darwin-x64": "0.1.9",
+    "helius-laserstream-linux-arm64-gnu": "0.1.9",
+    "helius-laserstream-linux-arm64-musl": "0.1.9",
+    "helius-laserstream-linux-x64-gnu": "0.1.9",
+    "helius-laserstream-linux-x64-musl": "0.1.9"
   },
   "dependencies": {
     "@types/protobufjs": "^6.0.0",
@@ -102,8 +102,7 @@
     "@types/node-fetch": "^2.6.12",
     "bs58": "^5.0.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.0.0",
-    "yellowstone-grpc-types-extension": "1.0.0"
+    "typescript": "^5.0.0"
   },
   "jest": {
     "preset": "ts-jest",
