@@ -115,53 +115,33 @@ pub fn subscribe(
                             tonic::Status::new(code, ystatus.message())
                         }));
 
-                    // Create ping coordination channel
-                    let (ping_tx, ping_rx) = tokio::sync::mpsc::unbounded_channel::<SubscribeRequest>();
-                    let mut ping_rx = ping_rx;
-                    
-                    // Start periodic ping task
-                    let ping_task = tokio::spawn(async move {
-                        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
-                        interval.tick().await; // Skip first immediate tick
-                        
-                        loop {
-                            interval.tick().await;
-                            let ping_request = SubscribeRequest {
-                                ping: Some(SubscribeRequestPing { 
-                                    id: std::time::SystemTime::now()
-                                        .duration_since(std::time::UNIX_EPOCH)
-                                        .unwrap_or_default()
-                                        .as_millis() as i32
-                                }),
-                                ..Default::default()
-                            };
-                            
-                            if let Err(_) = ping_tx.send(ping_request) {
-                                break; // Connection closed, stop pinging
-                            }
-                        }
-                    });
+                    // Ping interval timer
+                    let mut ping_interval = tokio::time::interval(Duration::from_secs(30));
+                    ping_interval.tick().await; // Skip first immediate tick
+                    let mut ping_id = 0i32;
 
                     loop {
                         tokio::select! {
-                            // Handle periodic ping requests
-                            Some(ping_request) = ping_rx.recv() => {
-                                if let Err(_) = sender.send(ping_request).await {
-                                    ping_task.abort();
-                                    break;
-                                }
+                            // Send periodic ping
+                            _ = ping_interval.tick() => {
+                                ping_id = ping_id.wrapping_add(1);
+                                let ping_request = SubscribeRequest {
+                                    ping: Some(SubscribeRequestPing { id: ping_id }),
+                                    ..Default::default()
+                                };
+                                let _ = sender.send(ping_request).await;
                             },
                             // Handle incoming messages from the server
                             result = stream.next() => {
                                 if let Some(result) = result {
                                     match result {
                                         Ok(update) => {
+                                            
                                             // Handle ping/pong
                                             if matches!(&update.update_oneof, Some(UpdateOneof::Ping(_))) {
                                                 let pong_req = SubscribeRequest { ping: Some(SubscribeRequestPing { id: 1 }), ..Default::default() };
                                                 if let Err(e) = sender.send(pong_req).await {
                                                     warn!(error = %e, "Failed to send pong");
-                                                    ping_task.abort();
                                                     break;
                                                 }
                                                 continue;
@@ -201,14 +181,12 @@ pub fn subscribe(
                                         Err(status) => {
                                             // Yield the error to consumer AND continue with reconnection
                                             warn!(error = %status, "Stream error, will reconnect after 5s delay");
-                                            ping_task.abort();
                                             yield Err(LaserstreamError::Status(status.clone()));
                                             break;
                                         }
                                     }
                                 } else {
                                     // Stream ended
-                                    ping_task.abort();
                                     break;
                                 }
                             }
@@ -217,7 +195,6 @@ pub fn subscribe(
                             Some(write_request) = write_rx.recv() => {
                                 if let Err(e) = sender.send(write_request).await {
                                     warn!(error = %e, "Failed to send write request");
-                                    ping_task.abort();
                                     break;
                                 }
                             }
