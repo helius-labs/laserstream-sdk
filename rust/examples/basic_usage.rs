@@ -14,8 +14,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv::from_path("../.env").ok();
     
 
-    let api_key = String::from("");
-    let endpoint_url = String::from("");
+    let api_key = String::from("your-api-key");
+    let endpoint_url = String::from("your-endpoint");
 
     let config = LaserstreamConfig {
         api_key,
@@ -41,25 +41,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ..Default::default()
     };
 
-    // --- Subscribe and Process ---
-    println!("Connecting and subscribing...");
     let (stream, _handle) = subscribe(config, request);
 
-    // Pin the stream to the stack
     futures::pin_mut!(stream);
 
     while let Some(result) = stream.next().await {
         match result {
             Ok(update) => {
-                // Simple printing for the example
-                println!("Received update: {:?}", update);
+                println!("{:?}", update);
             }
             Err(e) => {
                 eprintln!("Stream error: {}", e);
             }
         }
     }
-
-    println!("Stream finished.");
     Ok(())
 }

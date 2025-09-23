@@ -8,11 +8,10 @@ import {
 const credentials = require('../test-config');
 
 async function main() {
-  console.log('🏗️ Laserstream Block Meta Subscription Example');
 
   const config: LaserstreamConfig = {
-    apiKey: credentials.laserstreamProduction.apiKey,
-    endpoint: credentials.laserstreamProduction.endpoint,
+    apiKey: "your-api-key",
+    endpoint: "your-endpoint",
   };
 
   const request = {
@@ -38,29 +37,14 @@ async function main() {
     config,
     request,
     async (update: SubscribeUpdate) => {
-      if (update.blockMeta) {
-        const blockMeta: SubscribeUpdateBlockMeta = update.blockMeta;
-        console.log('\n🏗️ Block Meta Update Received!');
-        console.log('  - Slot:', blockMeta.slot);
-        console.log('  - Blockhash:', blockMeta.blockhash);
-        console.log('  - Parent Slot:', blockMeta.parentSlot);
-        console.log('  - Parent Blockhash:', blockMeta.parentBlockhash);
-        console.log('  - Block Height:', blockMeta.blockHeight?.blockHeight || 'N/A');
-        console.log('  - Block Time:', blockMeta.blockTime?.timestamp || 'N/A');
-        console.log('  - Executed Transaction Count:', blockMeta.executedTransactionCount);
-        console.log('  - Rewards:', blockMeta.rewards?.rewards?.length || 0);
-      }
+      console.log(JSON.stringify(update, null, 2));
     },
-    async (error: any) => {
-      console.error('❌ Stream error:', error);
+    (error: Error) => {
+      console.error("Stream error:", error);
     }
   );
 
-  console.log(`✅ Block Meta subscription started with ID: ${stream.id}`);
-
-  // Cleanup on exit
-  process.on('SIGINT', () => {
-    console.log('\n🛑 Cancelling stream...');
+  process.on("SIGINT", () => {
     stream.cancel();
     process.exit(0);
   });

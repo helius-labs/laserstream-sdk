@@ -299,16 +299,32 @@ impl StreamInner {
             builder = builder.x_token(Some(token.clone()))?;
         }
 
+
         let mut client = builder.connect().await?;
         
         let (mut sender, mut stream) = client.subscribe_with_request(Some(request.clone())).await?;
         
+        // Ping interval timer
+        let mut ping_interval = tokio::time::interval(Duration::from_secs(30));
+        ping_interval.tick().await; // Skip first immediate tick
+        let mut ping_id = 0i32;
+
         loop {
             tokio::select! {
+                // Send periodic ping
+                _ = ping_interval.tick() => {
+                    ping_id = ping_id.wrapping_add(1);
+                    let ping_request = geyser::SubscribeRequest {
+                        ping: Some(geyser::SubscribeRequestPing { id: ping_id }),
+                        ..Default::default()
+                    };
+                    let _ = sender.send(ping_request).await;
+                },
                 // Handle incoming messages from the server
                 Some(result) = stream.next() => {
                     match result {
                 Ok(message) => {
+                    
                     // Handle ping/pong mechanism for connection health
                     if let Some(geyser::subscribe_update::UpdateOneof::Ping(_ping)) = &message.update_oneof {
                         // Respond with pong to maintain connection (use static ID since ping doesn't contain one)
@@ -374,7 +390,9 @@ impl StreamInner {
                 },
                 
                 // If both streams are closed, exit
-                else => break,
+                else => {
+                    break;
+                },
             }
         }
         

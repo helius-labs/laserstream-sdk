@@ -115,13 +115,28 @@ pub fn subscribe(
                             tonic::Status::new(code, ystatus.message())
                         }));
 
+                    // Ping interval timer
+                    let mut ping_interval = tokio::time::interval(Duration::from_secs(30));
+                    ping_interval.tick().await; // Skip first immediate tick
+                    let mut ping_id = 0i32;
+
                     loop {
                         tokio::select! {
+                            // Send periodic ping
+                            _ = ping_interval.tick() => {
+                                ping_id = ping_id.wrapping_add(1);
+                                let ping_request = SubscribeRequest {
+                                    ping: Some(SubscribeRequestPing { id: ping_id }),
+                                    ..Default::default()
+                                };
+                                let _ = sender.send(ping_request).await;
+                            },
                             // Handle incoming messages from the server
                             result = stream.next() => {
                                 if let Some(result) = result {
                                     match result {
                                         Ok(update) => {
+                                            
                                             // Handle ping/pong
                                             if matches!(&update.update_oneof, Some(UpdateOneof::Ping(_))) {
                                                 let pong_req = SubscribeRequest { ping: Some(SubscribeRequestPing { id: 1 }), ..Default::default() };
@@ -180,7 +195,7 @@ pub fn subscribe(
                             Some(write_request) = write_rx.recv() => {
                                 if let Err(e) = sender.send(write_request).await {
                                     warn!(error = %e, "Failed to send write request");
-                                    // Continue processing; don't break the stream
+                                    break;
                                 }
                             }
                         }
