@@ -299,12 +299,47 @@ impl StreamInner {
             builder = builder.x_token(Some(token.clone()))?;
         }
 
+
         let mut client = builder.connect().await?;
         
         let (mut sender, mut stream) = client.subscribe_with_request(Some(request.clone())).await?;
         
+        // Create a shared ping channel to coordinate with main sender
+        let (ping_tx, ping_rx) = tokio::sync::mpsc::unbounded_channel::<geyser::SubscribeRequest>();
+        let mut ping_rx = ping_rx;
+        
+        // Start periodic ping task
+        let ping_task = tokio::spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+            interval.tick().await; // Skip first immediate tick
+            
+            loop {
+                interval.tick().await;
+                let ping_request = geyser::SubscribeRequest {
+                    ping: Some(geyser::SubscribeRequestPing { 
+                        id: std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as i32 
+                    }),
+                    ..Default::default()
+                };
+                
+                if let Err(_) = ping_tx.send(ping_request) {
+                    break; // Connection closed, stop pinging
+                }
+            }
+        });
+
         loop {
             tokio::select! {
+                // Handle periodic ping requests
+                Some(ping_request) = ping_rx.recv() => {
+                    if let Err(_) = sender.send(ping_request).await {
+                        ping_task.abort();
+                        return Err("Failed to send periodic ping".to_string().into());
+                    }
+                },
                 // Handle incoming messages from the server
                 Some(result) = stream.next() => {
                     match result {
@@ -361,6 +396,7 @@ impl StreamInner {
                     }
                 }
                         Err(e) => {
+                            ping_task.abort(); // Stop ping task on stream error
                             return Err(Box::new(e));
                         }
                     }
@@ -369,12 +405,16 @@ impl StreamInner {
                 // Handle write requests from the JavaScript client
                 Some(write_request) = write_rx.recv() => {
                     if let Err(e) = sender.send(write_request).await {
+                        ping_task.abort(); // Stop ping task on send failure
                         return Err(Box::new(e));
                     }
                 },
                 
                 // If both streams are closed, exit
-                else => break,
+                else => {
+                    ping_task.abort(); // Stop ping task when stream ends
+                    break;
+                },
             }
         }
         

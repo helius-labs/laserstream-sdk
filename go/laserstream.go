@@ -364,6 +364,32 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 		}
 	}()
 
+	// Start periodic ping goroutine
+	pingCtx, cancelPing := context.WithCancel(ctx)
+	defer cancelPing()
+	
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		
+		for {
+			select {
+			case <-pingCtx.Done():
+				return
+			case <-ticker.C:
+				pingReq := &SubscribeRequest{
+					Ping: &SubscribeRequestPing{
+						Id: int32(time.Now().UnixMilli()),
+					},
+				}
+				if err := stream.Send(pingReq); err != nil {
+					// If ping fails, let main stream handler deal with reconnection
+					return
+				}
+			}
+		}
+	}()
+
 	for {
 		select {
 		case <-ctx.Done():

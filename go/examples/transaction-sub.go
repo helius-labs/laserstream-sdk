@@ -16,14 +16,8 @@ func main() {
 
 	godotenv.Load("../.env")
 
-	endpoint := os.Getenv("LASERSTREAM_PRODUCTION_ENDPOINT")
-	if endpoint == "" {
-		log.Fatal("LASERSTREAM_PRODUCTION_ENDPOINT required")
-	}
-	apiKey := os.Getenv("LASERSTREAM_PRODUCTION_API_KEY")
-	if apiKey == "" {
-		log.Fatal("LASERSTREAM_PRODUCTION_API_KEY required")
-	}
+	endpoint := "your-endpoint"
+	apiKey := "your-api-key"
 
 	clientConfig := laserstream.LaserstreamConfig{
 		Endpoint: endpoint,
@@ -45,7 +39,7 @@ func main() {
 	client := laserstream.NewClient(clientConfig)
 
 	dataCallback := func(data *laserstream.SubscribeUpdate) {
-		log.Printf("Transaction Update: %+v", data)
+		log.Print(data)
 	}
 
 	errorCallback := func(err error) {

@@ -10,11 +10,10 @@ import * as bs58 from 'bs58';
 const credentials = require('../test-config');
 
 async function runTransactionStatusSubscription() {
-  console.log('📊 Laserstream Transaction Status Subscription Example');
 
   const config: LaserstreamConfig  = {
-    apiKey: credentials.laserstreamProduction.apiKey,
-    endpoint: credentials.laserstreamProduction.endpoint,
+    apiKey: "your-api-key",
+    endpoint: "your-endpoint",
   };
 
   // Subscribe to transaction status updates
@@ -42,35 +41,17 @@ async function runTransactionStatusSubscription() {
     config,
     request,
     async (update: SubscribeUpdate) => {
-      if (update.transactionStatus) {
-        const txStatus: SubscribeUpdateTransactionStatus = update.transactionStatus;
-        console.log('\n📊 Transaction Status Update Received!');
-        console.log('  - Slot:', txStatus.slot);
-        console.log('  - Signature:', txStatus.signature ? bs58.encode(txStatus.signature) : 'N/A');
-        console.log('  - Is Vote:', txStatus.isVote);
-        console.log('  - Index:', txStatus.index);
-        
-        if (txStatus.err) {
-          const error: TransactionError = txStatus.err;
-          console.log('  - Error:', error.err ? Buffer.from(error.err).toString() : 'N/A');
-        } else {
-          console.log('  - Status: Success');
-        }
-      }
+      console.log(JSON.stringify(update, null, 2));
     },
-    async (error: Error) => {
-      console.error('❌ Stream error:', error);
+    (error: Error) => {
+      console.error("Stream error:", error);
     }
   );
 
-  console.log(`✅ Transaction Status subscription started with ID: ${stream.id}`);
-
-  // Cleanup on exit
-  process.on('SIGINT', () => {
-    console.log('\n🛑 Cancelling stream...');
+  process.on("SIGINT", () => {
     stream.cancel();
     process.exit(0);
   });
 }
 
-runTransactionStatusSubscription().catch(console.error); 
+runTransactionStatusSubscription().catch(console.error);

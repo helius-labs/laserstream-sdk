@@ -2,11 +2,10 @@ import { subscribe, CommitmentLevel, SubscribeUpdate, LaserstreamConfig } from '
 const credentials = require('../test-config');
 
 async function main() {
-  console.log('🔍 LaserStream Accounts Data Slice Subscription Example');
 
   const config: LaserstreamConfig = {
-    apiKey: credentials.laserstreamProduction.apiKey,
-    endpoint: credentials.laserstreamProduction.endpoint,
+    apiKey: "your-api-key",
+    endpoint: "your-endpoint",
   };
 
   const request = {
@@ -36,12 +35,17 @@ async function main() {
     config,
     request,
     async (update: SubscribeUpdate) => {
-      console.log(update);
+      console.log(JSON.stringify(update, null, 2));
     },
-    async (err) => console.error('❌ Stream error:', err)
+    (error: Error) => {
+      console.error("Stream error:", error);
+    }
   );
 
-  console.log(`✅ Accounts data slice subscription started (id: ${stream.id})`);
+  process.on("SIGINT", () => {
+    stream.cancel();
+    process.exit(0);
+  });
 }
 
 main().catch(console.error); 

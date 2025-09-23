@@ -9,11 +9,10 @@ import {
 const credentials = require('../test-config');
 
 async function main() {
-  console.log('🎰 Laserstream Slot Subscription Example');
 
   const config: LaserstreamConfig = {
-    apiKey: credentials.laserstreamProduction.apiKey,
-    endpoint: credentials.laserstreamProduction.endpoint,
+    apiKey: "your-api-key",
+    endpoint: "your-endpoint",
   };
 
   const request = {
@@ -34,19 +33,17 @@ async function main() {
     config,
     request,
     async (update: SubscribeUpdate) => {
-      if (update.slot) {
-        const slotUpdate: SubscribeUpdateSlot = update.slot;
-        console.log('\n🎰 Slot Update Received!');
-        console.log('  - Slot:', slotUpdate.slot);
-        console.log('  - Parent:', slotUpdate.parent || 'N/A');
-        console.log('  - Status:', slotUpdate.status);
-        console.log('  - Dead Error:', slotUpdate.deadError || 'None');
-      }
+      console.log(JSON.stringify(update, null, 2));
     },
-    async (err) => console.error('❌ Stream error:', err)
+    (error: Error) => {
+      console.error("Stream error:", error);
+    }
   );
 
-  console.log(`✅ Slot subscription started (id: ${stream.id})`);
+  process.on("SIGINT", () => {
+    stream.cancel();
+    process.exit(0);
+  });
 }
 
 main().catch(console.error); 

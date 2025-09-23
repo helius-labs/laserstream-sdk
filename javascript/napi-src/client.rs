@@ -421,8 +421,6 @@ impl ClientInner {
         // Handle from_slot
         request.from_slot = js_request.from_slot;
         
-
-        
         Ok(request)
     }
 
