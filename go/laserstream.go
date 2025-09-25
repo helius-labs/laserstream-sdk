@@ -276,14 +276,14 @@ func (c *Client) streamLoop(ctx context.Context) {
 			// Report the error
 			if c.errorCallback != nil {
 				errorMsg := fmt.Sprintf("Connection error (attempt %d): %v", reconnectAttempts, err)
-				c.errorCallback(fmt.Errorf(errorMsg))
+				c.errorCallback(fmt.Errorf("%s", errorMsg))
 			}
 
 			// Check if exceeded max reconnect attempts
 			if reconnectAttempts >= uint32(maxAttempts) {
 				if c.errorCallback != nil {
 					finalErr := fmt.Sprintf("Connection failed after %d attempts", maxAttempts)
-					c.errorCallback(fmt.Errorf(finalErr))
+					c.errorCallback(fmt.Errorf("%s", finalErr))
 				}
 				return
 			}
