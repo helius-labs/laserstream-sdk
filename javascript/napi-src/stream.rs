@@ -292,9 +292,13 @@ impl StreamInner {
                 .max_decoding_message_size(1_000_000_000)
                 .timeout(Duration::from_secs(10));
         }
-        
-        builder = builder.tls_config(ClientTlsConfig::new().with_enabled_roots())?;
-        
+
+        let use_tls = !endpoint.to_lowercase().starts_with("http://");
+
+        if use_tls {
+            builder = builder.tls_config(ClientTlsConfig::new().with_enabled_roots())?;
+        }
+
         if let Some(ref token) = token {
             builder = builder.x_token(Some(token.clone()))?;
         }
