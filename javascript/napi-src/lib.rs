@@ -147,7 +147,7 @@ impl LaserstreamClient {
         // Threadsafe function that forwards protobuf bytes to JS
         // Use bounded queue to prevent unbounded memory growth when callbacks are slow
         let ts_callback: ThreadsafeFunction<SubscribeUpdateBytes, ErrorStrategy::CalleeHandled> =
-            callback.create_threadsafe_function(1000, |ctx| {
+            callback.create_threadsafe_function(100000, |ctx| {
                 let bytes_wrapper: SubscribeUpdateBytes = ctx.value;
                 let js_uint8array = unsafe { SubscribeUpdateBytes::to_napi_value(ctx.env.raw(), bytes_wrapper)? };
                 Ok(vec![unsafe { napi::JsUnknown::from_raw(ctx.env.raw(), js_uint8array)? }])
