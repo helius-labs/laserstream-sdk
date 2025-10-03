@@ -8,3 +8,4 @@ pub use error::LaserstreamError;
 
 // Re-export commonly used types from yellowstone-grpc-proto
 pub use yellowstone_grpc_proto::geyser as grpc;
+pub use yellowstone_grpc_proto::solana;
