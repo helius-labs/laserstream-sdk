@@ -240,7 +240,9 @@ async fn connect_and_subscribe_once(
     tonic::Status,
 > {
     let options = &config.channel_options;
-    
+
+    let use_tls = !config.endpoint.to_lowercase().starts_with("http://");
+
     let mut builder = GeyserGrpcClient::build_from_shared(config.endpoint.clone())
         .map_err(|e| tonic::Status::internal(format!("Failed to build client: {}", e)))?
         .x_token(Some(api_key))
@@ -252,15 +254,23 @@ async fn connect_and_subscribe_once(
         .http2_keep_alive_interval(Duration::from_secs(options.http2_keep_alive_interval_secs.unwrap_or(30)))
         .keep_alive_timeout(Duration::from_secs(options.keep_alive_timeout_secs.unwrap_or(5)))  
         .keep_alive_while_idle(options.keep_alive_while_idle.unwrap_or(true))
-        .initial_stream_window_size(options.initial_stream_window_size.or(Some(1024 * 1024 * 4)))      // 4MB default
-        .initial_connection_window_size(options.initial_connection_window_size.or(Some(1024 * 1024 * 8)))  // 8MB default
-        .http2_adaptive_window(options.http2_adaptive_window.unwrap_or(true))                             // Dynamic window sizing
-        .tcp_nodelay(options.tcp_nodelay.unwrap_or(true))                                       // Disable Nagle's algorithm
-        .tcp_keepalive(options.tcp_keepalive_secs.map(Duration::from_secs))           // TCP keepalive
-        .buffer_size(options.buffer_size.or(Some(1024 * 64)))                           // 64KB default
-        .tls_config(ClientTlsConfig::new().with_enabled_roots())
-        .map_err(|e| tonic::Status::internal(format!("TLS config error: {}", e)))?;
-    
+        .initial_stream_window_size(options.initial_stream_window_size.or(Some(1024 * 1024 * 4))) // 4MB default
+        .initial_connection_window_size(
+            options
+                .initial_connection_window_size
+                .or(Some(1024 * 1024 * 8)),
+        ) // 8MB default
+        .http2_adaptive_window(options.http2_adaptive_window.unwrap_or(true)) // Dynamic window sizing
+        .tcp_nodelay(options.tcp_nodelay.unwrap_or(true)) // Disable Nagle's algorithm
+        .tcp_keepalive(options.tcp_keepalive_secs.map(Duration::from_secs)) // TCP keepalive
+        .buffer_size(options.buffer_size.or(Some(1024 * 64))); // 64KB default
+
+    if use_tls {
+        builder = builder
+            .tls_config(ClientTlsConfig::new().with_enabled_roots())
+            .map_err(|e| tonic::Status::internal(format!("TLS config error: {}", e)))?;
+    }
+
     // Configure compression if specified
     if let Some(send_comp) = options.send_compression {
         let encoding = match send_comp {

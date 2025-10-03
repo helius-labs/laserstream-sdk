@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/encoding/gzip"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
@@ -367,11 +368,11 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 	// Start periodic ping goroutine
 	pingCtx, cancelPing := context.WithCancel(ctx)
 	defer cancelPing()
-	
+
 	go func() {
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
-		
+
 		for {
 			select {
 			case <-pingCtx.Done():
@@ -517,7 +518,10 @@ func (c *Client) connect(ctx context.Context) error {
 	endpoint := c.config.Endpoint
 
 	// Handle production endpoint formats
-	var target string
+	var (
+		target string
+		useTLS = true
+	)
 	if strings.HasPrefix(endpoint, "https://") || strings.HasPrefix(endpoint, "http://") {
 		// URL format (e.g., https://example.com or https://example.com:443)
 		u, err := url.Parse(endpoint)
@@ -525,11 +529,18 @@ func (c *Client) connect(ctx context.Context) error {
 			return fmt.Errorf("error parsing endpoint URL: %w", err)
 		}
 
-		// Always use TLS and default HTTPS port
+		if u.Scheme == "http" {
+			useTLS = false
+		}
+
 		if u.Port() != "" {
 			target = u.Host
 		} else {
-			target = u.Hostname() + ":443"
+			defaultPort := "443"
+			if !useTLS {
+				defaultPort = "80"
+			}
+			target = u.Hostname() + ":" + defaultPort
 		}
 	} else {
 		// Simple host:port format (e.g., localhost:4003, example.com:80, example.com)
@@ -543,8 +554,12 @@ func (c *Client) connect(ctx context.Context) error {
 	}
 
 	var opts []grpc.DialOption
-	creds := credentials.NewClientTLSFromCert(nil, "")
-	opts = append(opts, grpc.WithTransportCredentials(creds))
+	if useTLS {
+		creds := credentials.NewClientTLSFromCert(nil, "")
+		opts = append(opts, grpc.WithTransportCredentials(creds))
+	} else {
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	}
 
 	// Apply channel options with defaults
 	channelOpts := c.config.ChannelOptions
