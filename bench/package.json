@@ -1,0 +1,8 @@
+{
+  "name": "laserstream-performance-demo",
+  "version": "1.0.0",
+  "scripts": {
+    "setup": "npm install && npm install -g 0x",
+    "bench": "0x laserstream.js"
+  }
+}
