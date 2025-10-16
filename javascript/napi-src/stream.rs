@@ -58,15 +58,18 @@ impl StreamInner {
         }
 
         let id_for_cleanup = id.clone();
+
+        // Wrap current_request in Arc<Mutex> so it can be updated from write() calls
+        let current_request = Arc::new(parking_lot::Mutex::new(initial_request));
+
         tokio::spawn(async move {
-            let mut current_request = initial_request;
             let mut reconnect_attempts = 0u32;
-            
+
             // Determine effective max attempts
             let effective_max_attempts = max_reconnect_attempts.min(HARD_CAP_RECONNECT_ATTEMPTS);
-            
+
             // Extract commitment level for reconnection logic
-            let commitment_level = current_request.commitment.unwrap_or(0); // 0 = Processed, 1 = Confirmed, 2 = Finalized
+            let commitment_level = current_request.lock().commitment.unwrap_or(0); // 0 = Processed, 1 = Confirmed, 2 = Finalized
 
             loop {
                 let tracked_slot_clone = tracked_slot.clone();
@@ -77,6 +80,9 @@ impl StreamInner {
                 // Reset progress flag for this connection attempt
                 made_progress.store(false, Ordering::SeqCst);
 
+                // Clone the current request for this connection attempt
+                let request_snapshot = current_request.lock().clone();
+
                 tokio::select! {
                     _ = &mut cancel_rx => {
                         break;
@@ -85,13 +91,14 @@ impl StreamInner {
                     result = Self::connect_and_stream_bytes(
                         &endpoint,
                         &token,
-                        &current_request,
+                        &request_snapshot,
                         ts_callback_clone,
                         tracked_slot_clone,
                         internal_slot_id_clone,
                         progress_flag_clone,
                         &channel_options,
                         &mut write_rx,
+                        current_request.clone(),
                     ) => {
                         match result {
                             Ok(()) => {
@@ -121,7 +128,7 @@ impl StreamInner {
                             break;
                         }
 
-                                                // Determine where to resume based on commitment level.
+                        // Determine where to resume based on commitment level.
                         let last_tracked_slot = tracked_slot.load(Ordering::SeqCst);
 
                         // Only use from_slot when replay is enabled
@@ -141,9 +148,9 @@ impl StreamInner {
                                 }
                             };
 
-                            current_request.from_slot = Some(from_slot);
+                            current_request.lock().from_slot = Some(from_slot);
                         } else {
-                            current_request.from_slot = None;
+                            current_request.lock().from_slot = None;
                         }
 
                         // Fixed interval delay between reconnections
@@ -172,6 +179,7 @@ impl StreamInner {
         progress_flag: Arc<std::sync::atomic::AtomicBool>,
         channel_options: &Option<ChannelOptions>,
         write_rx: &mut mpsc::UnboundedReceiver<geyser::SubscribeRequest>,
+        current_request: Arc<parking_lot::Mutex<geyser::SubscribeRequest>>,
     ) -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
         
         let mut builder = GeyserGrpcClient::build_from_shared(endpoint.to_string())?;
@@ -384,6 +392,13 @@ impl StreamInner {
                 
                 // Handle write requests from the JavaScript client
                 Some(write_request) = write_rx.recv() => {
+                    // IMPORTANT: Merge the write_request into current_request so it persists across reconnections
+                    {
+                        let mut req = current_request.lock();
+                        Self::merge_subscribe_requests(&mut req, &write_request);
+                    }
+
+                    // Send the modification to the active stream
                     if let Err(e) = sender.send(write_request).await {
                         return Err(Box::new(e));
                     }
@@ -399,13 +414,37 @@ impl StreamInner {
         Ok(())
     }
 
+    /// Merges a subscription modification request into the current request.
+    /// This ensures that modifications made via write() are preserved across reconnections.
+    fn merge_subscribe_requests(
+        current: &mut geyser::SubscribeRequest,
+        modification: &geyser::SubscribeRequest,
+    ) {
+        // Merge all subscription types
+        current.accounts.extend(modification.accounts.clone());
+        current.slots.extend(modification.slots.clone());
+        current.transactions.extend(modification.transactions.clone());
+        current.transactions_status.extend(modification.transactions_status.clone());
+        current.blocks.extend(modification.blocks.clone());
+        current.blocks_meta.extend(modification.blocks_meta.clone());
+        current.entry.extend(modification.entry.clone());
+        current.accounts_data_slice.extend(modification.accounts_data_slice.clone());
+
+        // Update commitment if specified
+        if modification.commitment.is_some() {
+            current.commitment = modification.commitment;
+        }
+
+        // Note: from_slot and ping are not merged as they are connection-specific
+    }
+
     pub fn cancel(&self) -> Result<()> {
         if let Some(tx) = self.cancel_tx.lock().take() {
             let _ = tx.send(());
         }
         Ok(())
     }
-    
+
     pub fn write(&self, request: geyser::SubscribeRequest) -> Result<()> {
         let tx_guard = self.write_tx.lock();
         if let Some(ref tx) = *tx_guard {
