@@ -1,4 +1,4 @@
-use tonic::Status;
+use yellowstone_grpc_proto::tonic::Status;
 use url::ParseError;
 use futures_channel::mpsc::SendError;
 use yellowstone_grpc_client::{GeyserGrpcClientError, GeyserGrpcBuilderError};
@@ -7,7 +7,7 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum LaserstreamError {
     #[error("gRPC transport error: {0}")]
-    Transport(#[from] tonic::transport::Error),
+    Transport(#[from] yellowstone_grpc_proto::tonic::transport::Error),
 
     #[error("gRPC status error: {0}")]
     Status(#[from] Status),

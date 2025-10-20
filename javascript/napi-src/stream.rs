@@ -7,9 +7,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::oneshot;
-use yellowstone_grpc_client::{GeyserGrpcClient, ClientTlsConfig};
+use yellowstone_grpc_client::{ClientTlsConfig, Interceptor};
+use yellowstone_grpc_proto::prelude::{geyser_client::GeyserClient};
 use yellowstone_grpc_proto::geyser;
-use yellowstone_grpc_proto::tonic::codec::CompressionEncoding;
+use yellowstone_grpc_proto::tonic::{codec::CompressionEncoding, transport::Endpoint, Request, Status, metadata::MetadataValue};
 use uuid;
 use prost::Message;
 use crate::client::ChannelOptions;
@@ -18,6 +19,48 @@ use crate::client::ChannelOptions;
 const HARD_CAP_RECONNECT_ATTEMPTS: u32 = (20 * 60) / 5; // 20 mins / 5 sec interval = 240 attempts
 const FIXED_RECONNECT_INTERVAL_MS: u64 = 5000; // 5 seconds fixed interval
 const FORK_DEPTH_SAFETY_MARGIN: u64 = 31; // Max fork depth for processed commitment
+
+// SDK metadata constants
+const SDK_NAME: &str = "laserstream-javascript";
+const SDK_VERSION: &str = "0.2.3";
+
+/// Custom interceptor that adds SDK metadata headers to all gRPC requests
+#[derive(Clone)]
+struct SdkMetadataInterceptor {
+    x_token: Option<yellowstone_grpc_proto::tonic::metadata::AsciiMetadataValue>,
+}
+
+impl SdkMetadataInterceptor {
+    fn new(token: &Option<String>) -> std::result::Result<Self, Status> {
+        let x_token = if let Some(token_str) = token {
+            if !token_str.is_empty() {
+                Some(token_str.parse().map_err(|e| {
+                    Status::invalid_argument(format!("Invalid API key: {}", e))
+                })?)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        Ok(Self { x_token })
+    }
+}
+
+impl Interceptor for SdkMetadataInterceptor {
+    fn call(&mut self, mut request: Request<()>) -> std::result::Result<Request<()>, Status> {
+        // Add x-token if present
+        if let Some(ref x_token) = self.x_token {
+            request.metadata_mut().insert("x-token", x_token.clone());
+        }
+
+        // Add SDK metadata headers
+        request.metadata_mut().insert("x-sdk-name", MetadataValue::from_static(SDK_NAME));
+        request.metadata_mut().insert("x-sdk-version", MetadataValue::from_static(SDK_VERSION));
+
+        Ok(request)
+    }
+}
 
 pub struct StreamInner {
     cancel_tx: Mutex<Option<oneshot::Sender<()>>>,
@@ -181,136 +224,127 @@ impl StreamInner {
         write_rx: &mut mpsc::UnboundedReceiver<geyser::SubscribeRequest>,
         current_request: Arc<parking_lot::Mutex<geyser::SubscribeRequest>>,
     ) -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        
-        let mut builder = GeyserGrpcClient::build_from_shared(endpoint.to_string())?;
-        
+
+        // Create our custom interceptor with SDK metadata
+        let interceptor = SdkMetadataInterceptor::new(token)?;
+
+        // Build endpoint with all options
+        let mut endpoint = Endpoint::from_shared(endpoint.to_string())?;
+
         // Apply channel options or use defaults
+        let (max_send_msg_size, max_recv_msg_size, send_compression, accept_compression);
+
         if let Some(ref opts) = channel_options {
-            // Message size limits
-            if let Some(max_send) = opts.grpc_max_send_message_length {
-                builder = builder.max_encoding_message_size(max_send as usize);
-            } else {
-                builder = builder.max_encoding_message_size(32_000_000); // 32MB default
-            }
-            
-            if let Some(max_recv) = opts.grpc_max_receive_message_length {
-                builder = builder.max_decoding_message_size(max_recv as usize);
-            } else {
-                builder = builder.max_decoding_message_size(1_000_000_000); // 1GB default
-            }
-            
+            // Store message size limits for later use
+            max_send_msg_size = opts.grpc_max_send_message_length.map(|v| v as usize).unwrap_or(32_000_000);
+            max_recv_msg_size = opts.grpc_max_receive_message_length.map(|v| v as usize).unwrap_or(1_000_000_000);
+
             // Keep-alive options
             if let Some(keepalive_time) = opts.grpc_keepalive_time_ms {
-                builder = builder.http2_keep_alive_interval(Duration::from_millis(keepalive_time as u64));
+                endpoint = endpoint.http2_keep_alive_interval(Duration::from_millis(keepalive_time as u64));
             }
             if let Some(keepalive_timeout) = opts.grpc_keepalive_timeout_ms {
-                builder = builder.keep_alive_timeout(Duration::from_millis(keepalive_timeout as u64));
+                endpoint = endpoint.keep_alive_timeout(Duration::from_millis(keepalive_timeout as u64));
             }
             if let Some(permit_without_calls) = opts.grpc_keepalive_permit_without_calls {
-                builder = builder.keep_alive_while_idle(permit_without_calls != 0);
+                endpoint = endpoint.keep_alive_while_idle(permit_without_calls != 0);
             }
             
             // Process other gRPC options from the catch-all HashMap
             for (key, value) in &opts.other {
                 match key.as_str() {
-                    // Additional keepalive/timeout options
-                    "grpc.http2.max_pings_without_data" => {
-                        // Not directly supported by yellowstone-grpc-client
-                    }
                     "grpc.http2.min_time_between_pings_ms" => {
-                        // Could map to http2_keep_alive_interval if not already set
                         if opts.grpc_keepalive_time_ms.is_none() {
                             if let Some(ms) = value.as_i64() {
-                                builder = builder.http2_keep_alive_interval(Duration::from_millis(ms as u64));
+                                endpoint = endpoint.http2_keep_alive_interval(Duration::from_millis(ms as u64));
                             }
                         }
-                    }
-                    "grpc.http2.max_ping_strikes" => {
-                        // Not directly supported
                     }
                     "grpc.client_idle_timeout_ms" => {
                         if let Some(ms) = value.as_i64() {
-                            builder = builder.timeout(Duration::from_millis(ms as u64));
+                            endpoint = endpoint.timeout(Duration::from_millis(ms as u64));
                         }
                     }
-                    // HTTP/2 flow control
                     "grpc.http2.write_buffer_size" => {
                         if let Some(size) = value.as_i64() {
-                            builder = builder.buffer_size(Some(size as usize));
+                            endpoint = endpoint.buffer_size(Some(size as usize));
                         }
                     }
                     "grpc-node.max_session_memory" => {
-                        // Could influence buffer sizes
                         if let Some(size) = value.as_i64() {
-                            // Use a portion of session memory for initial windows
                             let window_size = (size / 4).min(16 * 1024 * 1024) as u32;
-                            builder = builder.initial_stream_window_size(Some(window_size));
+                            endpoint = endpoint.initial_stream_window_size(Some(window_size));
                         }
                     }
-                    // Connection options
-                    "grpc.http2.max_frame_size" => {
-                        // Not directly supported, but influences message sizes
-                    }
                     "grpc.max_connection_idle_ms" => {
-                        // Similar to client_idle_timeout
                         if opts.other.get("grpc.client_idle_timeout_ms").is_none() {
                             if let Some(ms) = value.as_i64() {
-                                builder = builder.timeout(Duration::from_millis(ms as u64));
+                                endpoint = endpoint.timeout(Duration::from_millis(ms as u64));
                             }
                         }
                     }
-                    _ => {
-                        // Ignore unknown options
-                    }
+                    _ => {}
                 }
             }
-            
+
             // Apply sensible defaults for options not specified
-            builder = builder
+            endpoint = endpoint
                 .connect_timeout(Duration::from_secs(10))
                 .timeout(Duration::from_secs(30))
                 .http2_adaptive_window(true)
                 .tcp_nodelay(true)
-                .initial_stream_window_size(Some(4 * 1024 * 1024))      // 4MB
-                .initial_connection_window_size(Some(8 * 1024 * 1024)); // 8MB
-            
-            // Configure compression if specified
-            if let Some(compression_algo) = opts.grpc_default_compression_algorithm {
-                match compression_algo {
-                    0 => {}, // identity (no compression)
-                    2 => {
-                        // gzip compression
-                        builder = builder
-                            .send_compressed(CompressionEncoding::Gzip)
-                            .accept_compressed(CompressionEncoding::Gzip);
-                    },
-                    3 => {
-                        // zstd compression  
-                        builder = builder
-                            .send_compressed(CompressionEncoding::Zstd)
-                            .accept_compressed(CompressionEncoding::Zstd);
-                    },
-                    _ => return Err(format!("Unsupported compression algorithm: {}. Supported: identity (0), gzip (2), zstd (3).", compression_algo).into()),
-                }
-            }
+                .initial_stream_window_size(Some(4 * 1024 * 1024))
+                .initial_connection_window_size(Some(8 * 1024 * 1024));
+
+            // Store compression settings
+            send_compression = opts.grpc_default_compression_algorithm.and_then(|algo| match algo {
+                2 => Some(CompressionEncoding::Gzip),
+                3 => Some(CompressionEncoding::Zstd),
+                _ => None,
+            });
+            accept_compression = send_compression;
         } else {
             // Use defaults
-            builder = builder
+            max_send_msg_size = 32_000_000;
+            max_recv_msg_size = 1_000_000_000;
+            send_compression = None;
+            accept_compression = None;
+
+            endpoint = endpoint
                 .connect_timeout(Duration::from_secs(10))
-                .max_decoding_message_size(1_000_000_000)
                 .timeout(Duration::from_secs(10));
         }
-        
-        builder = builder.tls_config(ClientTlsConfig::new().with_enabled_roots())?;
-        
-        if let Some(ref token) = token {
-            builder = builder.x_token(Some(token.clone()))?;
+
+        // Configure TLS
+        endpoint = endpoint.tls_config(ClientTlsConfig::new().with_enabled_roots())?;
+
+        // Connect to create channel
+        let channel = endpoint.connect().await?;
+
+        // Create geyser client with our custom interceptor
+        let mut geyser_client = GeyserClient::with_interceptor(channel, interceptor);
+
+        // Configure message size limits
+        geyser_client = geyser_client
+            .max_decoding_message_size(max_recv_msg_size)
+            .max_encoding_message_size(max_send_msg_size);
+
+        // Configure compression if specified
+        if let Some(encoding) = send_compression {
+            geyser_client = geyser_client.send_compressed(encoding);
+        }
+        if let Some(encoding) = accept_compression {
+            geyser_client = geyser_client.accept_compressed(encoding);
         }
 
-
-        let mut client = builder.connect().await?;
-        
-        let (mut sender, mut stream) = client.subscribe_with_request(Some(request.clone())).await?;
+        // Create bidirectional stream
+        let (mut sender, mut stream) = {
+            use futures_channel::mpsc as futures_mpsc;
+            let (mut subscribe_tx, subscribe_rx) = futures_mpsc::unbounded();
+            subscribe_tx.send(request.clone()).await?;
+            let response = geyser_client.subscribe(subscribe_rx).await?;
+            (subscribe_tx, response.into_inner())
+        };
         
         // Ping interval timer
         let mut ping_interval = tokio::time::interval(Duration::from_secs(30));
