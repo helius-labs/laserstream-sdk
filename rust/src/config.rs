@@ -27,7 +27,7 @@ pub struct LaserstreamConfig {
     pub replay: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ChannelOptions {
     /// Connect timeout in seconds. Default: 10
     pub connect_timeout_secs: Option<u64>,
@@ -61,27 +61,6 @@ pub struct ChannelOptions {
     pub send_compression: Option<CompressionEncoding>,
 }
 
-impl Default for ChannelOptions {
-    fn default() -> Self {
-        Self {
-            connect_timeout_secs: None,
-            timeout_secs: None,
-            max_decoding_message_size: None,
-            max_encoding_message_size: None,
-            http2_keep_alive_interval_secs: None,
-            keep_alive_timeout_secs: None,
-            keep_alive_while_idle: None,
-            initial_stream_window_size: None,
-            initial_connection_window_size: None,
-            http2_adaptive_window: None,
-            tcp_nodelay: None,
-            tcp_keepalive_secs: None,
-            buffer_size: None,
-            accept_compression: None,
-            send_compression: None,
-        }
-    }
-}
 
 impl ChannelOptions {
     /// Enable zstd compression for both sending and receiving

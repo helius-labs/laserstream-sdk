@@ -1,16 +1,18 @@
 use crate::{LaserstreamConfig, LaserstreamError, config::CompressionEncoding as ConfigCompressionEncoding};
 use async_stream::stream;
-use futures::{StreamExt, TryStreamExt};
+use futures::StreamExt;
 use futures_channel::mpsc as futures_mpsc;
 use futures_util::{sink::SinkExt, Stream};
 use std::{pin::Pin, time::Duration};
 use tokio::sync::mpsc;
 use tokio::time::sleep;
-use tonic::Status;
-use yellowstone_grpc_proto::tonic::codec::CompressionEncoding;
+use yellowstone_grpc_proto::tonic::{
+    Status, Request, metadata::MetadataValue, transport::Endpoint, codec::CompressionEncoding,
+};
 use tracing::{error, instrument, warn};
 use uuid;
-use yellowstone_grpc_client::{ClientTlsConfig, GeyserGrpcClient};
+use yellowstone_grpc_client::{ClientTlsConfig, Interceptor};
+use yellowstone_grpc_proto::prelude::{geyser_client::GeyserClient};
 use yellowstone_grpc_proto::geyser::{
     subscribe_update::UpdateOneof, SubscribeRequest, SubscribeRequestFilterSlots,
     SubscribeRequestPing, SubscribeUpdate,
@@ -18,6 +20,42 @@ use yellowstone_grpc_proto::geyser::{
 
 const HARD_CAP_RECONNECT_ATTEMPTS: u32 = (20 * 60) / 5; // 20 mins / 5 sec interval
 const FIXED_RECONNECT_INTERVAL_MS: u64 = 5000; // 5 seconds fixed interval
+const SDK_NAME: &str = "laserstream-rust";
+const SDK_VERSION: &str = "0.1.3";
+
+/// Custom interceptor that adds SDK metadata headers to all gRPC requests
+#[derive(Clone)]
+struct SdkMetadataInterceptor {
+    x_token: Option<yellowstone_grpc_proto::tonic::metadata::AsciiMetadataValue>,
+}
+
+impl SdkMetadataInterceptor {
+    fn new(api_key: String) -> Result<Self, Status> {
+        let x_token = if !api_key.is_empty() {
+            Some(api_key.parse().map_err(|e| {
+                Status::invalid_argument(format!("Invalid API key: {}", e))
+            })?)
+        } else {
+            None
+        };
+        Ok(Self { x_token })
+    }
+}
+
+impl Interceptor for SdkMetadataInterceptor {
+    fn call(&mut self, mut request: Request<()>) -> Result<Request<()>, Status> {
+        // Add x-token if present
+        if let Some(ref x_token) = self.x_token {
+            request.metadata_mut().insert("x-token", x_token.clone());
+        }
+
+        // Add SDK metadata headers
+        request.metadata_mut().insert("x-sdk-name", MetadataValue::from_static(SDK_NAME));
+        request.metadata_mut().insert("x-sdk-version", MetadataValue::from_static(SDK_VERSION));
+
+        Ok(request)
+    }
+}
 
 /// Handle for managing a bidirectional streaming subscription.
 #[derive(Clone)]
@@ -108,13 +146,8 @@ pub fn subscribe(
 
                     // Box sender and stream here before processing
                     let mut sender: Pin<Box<dyn futures_util::Sink<SubscribeRequest, Error = futures_mpsc::SendError> + Send>> = Box::pin(sender);
-                    // Ensure the boxed stream yields Result<_, tonic::Status>
-                    let mut stream: Pin<Box<dyn Stream<Item = Result<SubscribeUpdate, tonic::Status>> + Send>> =
-                        Box::pin(stream.map_err(|ystatus| {
-                            // Convert yellowstone_grpc_proto::tonic::Status to tonic::Status
-                            let code = tonic::Code::from_i32(ystatus.code() as i32);
-                            tonic::Status::new(code, ystatus.message())
-                        }));
+                    // Ensure the boxed stream yields Result<_, Status>
+                    let mut stream: Pin<Box<dyn Stream<Item = Result<SubscribeUpdate, Status>> + Send>> = Box::pin(stream);
 
                     // Ping interval timer
                     let mut ping_interval = tokio::time::interval(Duration::from_secs(30));
@@ -237,39 +270,59 @@ async fn connect_and_subscribe_once(
         impl futures_util::Sink<SubscribeRequest, Error = futures_mpsc::SendError> + Send,
         impl Stream<Item = Result<SubscribeUpdate, yellowstone_grpc_proto::tonic::Status>> + Send,
     ),
-    tonic::Status,
+    Status,
 > {
     let options = &config.channel_options;
-    
-    let mut builder = GeyserGrpcClient::build_from_shared(config.endpoint.clone())
-        .map_err(|e| tonic::Status::internal(format!("Failed to build client: {}", e)))?
-        .x_token(Some(api_key))
-        .map_err(|e| tonic::Status::unauthenticated(format!("Failed to set API key: {}", e)))?
+
+    // Create our custom interceptor with SDK metadata
+    let interceptor = SdkMetadataInterceptor::new(api_key)?;
+
+    // Build endpoint with all options
+    let mut endpoint = Endpoint::from_shared(config.endpoint.clone())
+        .map_err(|e| Status::internal(format!("Failed to parse endpoint: {}", e)))?
         .connect_timeout(Duration::from_secs(options.connect_timeout_secs.unwrap_or(10)))
         .timeout(Duration::from_secs(options.timeout_secs.unwrap_or(30)))
-        .max_decoding_message_size(options.max_decoding_message_size.unwrap_or(1_000_000_000)) // 1GB default
-        .max_encoding_message_size(options.max_encoding_message_size.unwrap_or(32_000_000))    // 32MB default
         .http2_keep_alive_interval(Duration::from_secs(options.http2_keep_alive_interval_secs.unwrap_or(30)))
-        .keep_alive_timeout(Duration::from_secs(options.keep_alive_timeout_secs.unwrap_or(5)))  
+        .keep_alive_timeout(Duration::from_secs(options.keep_alive_timeout_secs.unwrap_or(5)))
         .keep_alive_while_idle(options.keep_alive_while_idle.unwrap_or(true))
-        .initial_stream_window_size(options.initial_stream_window_size.or(Some(1024 * 1024 * 4)))      // 4MB default
-        .initial_connection_window_size(options.initial_connection_window_size.or(Some(1024 * 1024 * 8)))  // 8MB default
-        .http2_adaptive_window(options.http2_adaptive_window.unwrap_or(true))                             // Dynamic window sizing
-        .tcp_nodelay(options.tcp_nodelay.unwrap_or(true))                                       // Disable Nagle's algorithm
-        .tcp_keepalive(options.tcp_keepalive_secs.map(Duration::from_secs))           // TCP keepalive
-        .buffer_size(options.buffer_size.or(Some(1024 * 64)))                           // 64KB default
+        .initial_stream_window_size(options.initial_stream_window_size.or(Some(1024 * 1024 * 4)))
+        .initial_connection_window_size(options.initial_connection_window_size.or(Some(1024 * 1024 * 8)))
+        .http2_adaptive_window(options.http2_adaptive_window.unwrap_or(true))
+        .tcp_nodelay(options.tcp_nodelay.unwrap_or(true))
+        .buffer_size(options.buffer_size.or(Some(1024 * 64)));
+
+    if let Some(tcp_keepalive_secs) = options.tcp_keepalive_secs {
+        endpoint = endpoint.tcp_keepalive(Some(Duration::from_secs(tcp_keepalive_secs)));
+    }
+
+    // Configure TLS
+    endpoint = endpoint
         .tls_config(ClientTlsConfig::new().with_enabled_roots())
-        .map_err(|e| tonic::Status::internal(format!("TLS config error: {}", e)))?;
-    
+        .map_err(|e| Status::internal(format!("TLS config error: {}", e)))?;
+
+    // Connect to create channel
+    let channel = endpoint
+        .connect()
+        .await
+        .map_err(|e| Status::unavailable(format!("Connection failed: {}", e)))?;
+
+    // Create geyser client with our custom interceptor
+    let mut geyser_client = GeyserClient::with_interceptor(channel, interceptor);
+
+    // Configure message size limits
+    geyser_client = geyser_client
+        .max_decoding_message_size(options.max_decoding_message_size.unwrap_or(1_000_000_000))
+        .max_encoding_message_size(options.max_encoding_message_size.unwrap_or(32_000_000));
+
     // Configure compression if specified
     if let Some(send_comp) = options.send_compression {
         let encoding = match send_comp {
             ConfigCompressionEncoding::Gzip => CompressionEncoding::Gzip,
             ConfigCompressionEncoding::Zstd => CompressionEncoding::Zstd,
         };
-        builder = builder.send_compressed(encoding);
+        geyser_client = geyser_client.send_compressed(encoding);
     }
-    
+
     // Configure accepted compression encodings
     if let Some(ref accept_comps) = options.accept_compression {
         for comp in accept_comps {
@@ -277,24 +330,26 @@ async fn connect_and_subscribe_once(
                 ConfigCompressionEncoding::Gzip => CompressionEncoding::Gzip,
                 ConfigCompressionEncoding::Zstd => CompressionEncoding::Zstd,
             };
-            builder = builder.accept_compressed(encoding);
+            geyser_client = geyser_client.accept_compressed(encoding);
         }
     } else {
         // Default: accept both gzip and zstd like yellowstone-grpc
-        builder = builder
+        geyser_client = geyser_client
             .accept_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Zstd);
     }
-    
-    let mut builder = builder
-        .connect()
-        .await
-        .map_err(|e| tonic::Status::unavailable(format!("Connection failed: {}", e)))?;
 
-    let (sender, stream) = builder
-        .subscribe_with_request(Some(request))
+    // Create bidirectional stream
+    let (mut subscribe_tx, subscribe_rx) = futures_mpsc::unbounded();
+    subscribe_tx
+        .send(request)
         .await
-        .map_err(|e| tonic::Status::internal(format!("Subscription failed: {}", e)))?;
+        .map_err(|e| Status::internal(format!("Failed to send initial request: {}", e)))?;
 
-    Ok((sender, stream))
+    let response = geyser_client
+        .subscribe(subscribe_rx)
+        .await
+        .map_err(|e| Status::internal(format!("Subscription failed: {}", e)))?;
+
+    Ok((subscribe_tx, response.into_inner()))
 }

@@ -30,6 +30,12 @@ const (
 	ForkDepthSafetyMargin    = 31   // Max fork depth for processed commitment
 )
 
+// SDK metadata constants
+const (
+	SDKName    = "laserstream-go"
+	SDKVersion = "0.0.8"
+)
+
 // Commitment levels
 const (
 	CommitmentProcessed = 0
@@ -316,10 +322,15 @@ func (c *Client) connectAndStream(ctx context.Context) error {
 	geyserClient := pb.NewGeyserClient(c.conn)
 
 	streamCtx := ctx
+	// Create metadata with SDK information and API key
+	md := metadata.New(map[string]string{
+		"x-sdk-name":    SDKName,
+		"x-sdk-version": SDKVersion,
+	})
 	if c.config.APIKey != "" {
-		md := metadata.New(map[string]string{"x-token": c.config.APIKey})
-		streamCtx = metadata.NewOutgoingContext(streamCtx, md)
+		md.Set("x-token", c.config.APIKey)
 	}
+	streamCtx = metadata.NewOutgoingContext(streamCtx, md)
 
 	stream, err := geyserClient.Subscribe(streamCtx)
 	if err != nil {
