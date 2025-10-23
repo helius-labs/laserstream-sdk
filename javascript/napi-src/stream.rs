@@ -22,7 +22,7 @@ const FORK_DEPTH_SAFETY_MARGIN: u64 = 31; // Max fork depth for processed commit
 
 // SDK metadata constants
 const SDK_NAME: &str = "laserstream-javascript";
-const SDK_VERSION: &str = "0.2.3";
+const SDK_VERSION: &str = "0.2.4";
 
 /// Custom interceptor that adds SDK metadata headers to all gRPC requests
 #[derive(Clone)]
@@ -383,34 +383,59 @@ impl StreamInner {
                         if let Some(geyser::subscribe_update::UpdateOneof::Pong(_pong)) = &message.update_oneof {
                             continue;
                         }
-                    
+
                     // Track slot updates for reconnection (only decode when necessary)
                     if let Some(geyser::subscribe_update::UpdateOneof::Slot(slot)) = &message.update_oneof {
                         tracked_slot.store(slot.slot, Ordering::SeqCst);
-                        
+
                         // Check if this slot update is EXCLUSIVELY from our internal subscription
                         // Only skip if the message contains ONLY the internal filter ID (not mixed with user subscriptions)
                         if message.filters.len() == 1 && message.filters.contains(&internal_slot_sub_id) {
                             continue; // Skip forwarding this message
                         }
+
+                        // If we reach here, user ALSO has a slot subscription
+                        // Remove internal filter ID so it doesn't leak to user
+                        // OPTIMIZATION: Only clean filters for slot messages (not all messages)
+                        let mut clean_message = message;
+                        if let Some(pos) = clean_message.filters.iter().position(|id| id == &internal_slot_sub_id) {
+                            clean_message.filters.swap_remove(pos);
+                        }
+
+                        // Serialize the protobuf message to bytes
+                        let mut buf = Vec::new();
+                        if let Err(_e) = clean_message.encode(&mut buf) {
+                            // Failed to encode protobuf message, skip this message
+                            continue;
+                        }
+
+                        let bytes_wrapper = crate::SubscribeUpdateBytes(buf);
+
+                        // mark that at least one message was forwarded in this session
+                        progress_flag.store(true, Ordering::SeqCst);
+
+                        // Use Blocking mode to prevent message drops and handle errors
+                        let status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
+                        if status != napi::Status::Ok {
+                            // Failed to deliver bytes to JavaScript, continue processing
+                            // Continue processing other messages instead of breaking the stream
+                        }
+                        continue; // Skip to next message
                     }
-                    
-                    // Clean up internal filter ID from ALL message types
-                    let mut clean_message = message;
-                    clean_message.filters.retain(|filter_id| filter_id != &internal_slot_sub_id);
-                    
-                    // Serialize the protobuf message to bytes
+
+                    // For all non-slot messages, forward as-is (no filter cleanup needed)
+                    // Internal slot ID will never appear in account/transaction/block messages
                     let mut buf = Vec::new();
-                    if let Err(_e) = clean_message.encode(&mut buf) {
+                    if let Err(_e) = message.encode(&mut buf) {
                         // Failed to encode protobuf message, skip this message
                         continue;
                     }
-                    
+
                     let bytes_wrapper = crate::SubscribeUpdateBytes(buf);
-                    
+
                     // mark that at least one message was forwarded in this session
                     progress_flag.store(true, Ordering::SeqCst);
-                    
+
                     // Use Blocking mode to prevent message drops and handle errors
                     let status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
                     if status != napi::Status::Ok {
