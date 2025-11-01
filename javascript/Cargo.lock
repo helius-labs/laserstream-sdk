@@ -1664,7 +1664,7 @@ dependencies = [
 
 [[package]]
 name = "laserstream-napi"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "base64 0.21.7",
  "bs58",

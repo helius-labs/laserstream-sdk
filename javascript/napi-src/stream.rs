@@ -473,28 +473,28 @@ impl StreamInner {
         Ok(())
     }
 
-    /// Merges a subscription modification request into the current request.
-    /// This ensures that modifications made via write() are preserved across reconnections.
+    /// Replaces the current subscription request with a new one.
+    /// This ensures modifications made via write() are preserved across reconnections.
     fn merge_subscribe_requests(
         current: &mut geyser::SubscribeRequest,
         modification: &geyser::SubscribeRequest,
     ) {
-        // Merge all subscription types
-        current.accounts.extend(modification.accounts.clone());
-        current.slots.extend(modification.slots.clone());
-        current.transactions.extend(modification.transactions.clone());
-        current.transactions_status.extend(modification.transactions_status.clone());
-        current.blocks.extend(modification.blocks.clone());
-        current.blocks_meta.extend(modification.blocks_meta.clone());
-        current.entry.extend(modification.entry.clone());
-        current.accounts_data_slice.extend(modification.accounts_data_slice.clone());
+        // Replace all subscription types (Yellowstone gRPC replaces, not merges)
+        current.accounts = modification.accounts.clone();
+        current.slots = modification.slots.clone();
+        current.transactions = modification.transactions.clone();
+        current.transactions_status = modification.transactions_status.clone();
+        current.blocks = modification.blocks.clone();
+        current.blocks_meta = modification.blocks_meta.clone();
+        current.entry = modification.entry.clone();
+        current.accounts_data_slice = modification.accounts_data_slice.clone();
 
         // Update commitment if specified
         if modification.commitment.is_some() {
             current.commitment = modification.commitment;
         }
 
-        // Note: from_slot and ping are not merged as they are connection-specific
+        // Note: from_slot and ping are not replaced as they are connection-specific
     }
 
     pub fn cancel(&self) -> Result<()> {
