@@ -22,7 +22,7 @@ const FORK_DEPTH_SAFETY_MARGIN: u64 = 31; // Max fork depth for processed commit
 
 // SDK metadata constants
 const SDK_NAME: &str = "laserstream-javascript";
-const SDK_VERSION: &str = "0.2.4";
+const SDK_VERSION: &str = "0.2.6";
 
 /// Custom interceptor that adds SDK metadata headers to all gRPC requests
 #[derive(Clone)]
@@ -156,23 +156,22 @@ impl StreamInner {
                                     reconnect_attempts = 1; // Reset to 1 since this is the first attempt after progress
                                 }
 
-                                // Report every error as it happens
-                                let error_msg = format!("Connection error (attempt {}): {}", reconnect_attempts, e);
-                                let _ = ts_callback.call(Err(napi::Error::from_reason(error_msg)), ThreadsafeFunctionCallMode::Blocking);
+                                // Log error internally but don't yield to consumer until max attempts exhausted
+                                eprintln!("RECONNECT: Connection failed (attempt {}/{}): {}", reconnect_attempts, effective_max_attempts, e);
 
                                 // Check if exceeded max reconnect attempts
+                                if reconnect_attempts >= effective_max_attempts {
+                                    // Only report error to consumer after exhausting all retries
+                                    let error_msg = format!("Connection failed after {} attempts: {}", effective_max_attempts, e);
+                                    let _ = ts_callback.call(Err(napi::Error::from_reason(error_msg)), ThreadsafeFunctionCallMode::Blocking);
+                                    break;
+                                }
                             }
-                        }
-
-                        if reconnect_attempts >= effective_max_attempts {
-                            // Exceeded max reconnect attempts - call error callback one final time
-                            let error_msg = format!("Connection failed after {} attempts", effective_max_attempts);
-                            let _ = ts_callback.call(Err(napi::Error::from_reason(error_msg)), ThreadsafeFunctionCallMode::Blocking);
-                            break;
                         }
 
                         // Determine where to resume based on commitment level.
                         let last_tracked_slot = tracked_slot.load(Ordering::SeqCst);
+                        eprintln!("RECONNECT: tracked_slot={}", last_tracked_slot);
 
                         // Only use from_slot when replay is enabled
                         if last_tracked_slot > 0 && replay {
