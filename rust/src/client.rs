@@ -236,19 +236,22 @@ pub fn subscribe(
                     }
                 }
                 Err(err) => {
-                    // Log connection error and yield to consumer, then continue reconnection loop
-                    error!(error = %err, "Connection failed, will retry after 5s delay");
-                    yield Err(LaserstreamError::Status(err));
-                }
-            }
+                    // Increment reconnect attempts
+                    reconnect_attempts += 1;
 
-            reconnect_attempts += 1;
-            if reconnect_attempts >= effective_max_attempts {
-                error!(attempts = effective_max_attempts, "Max reconnection attempts reached");
-                yield Err(LaserstreamError::MaxReconnectAttempts(Status::cancelled(
-                    format!("Max reconnection attempts ({}) reached", effective_max_attempts)
-                )));
-                return;
+                    // Log error internally but don't yield to consumer until max attempts exhausted
+                    error!(error = %err, attempt = reconnect_attempts, max_attempts = effective_max_attempts, "Connection failed, will retry after 5s delay");
+
+                    // Check if exceeded max reconnect attempts
+                    if reconnect_attempts >= effective_max_attempts {
+                        error!(attempts = effective_max_attempts, "Max reconnection attempts reached");
+                        // Only report error to consumer after exhausting all retries
+                        yield Err(LaserstreamError::MaxReconnectAttempts(Status::cancelled(
+                            format!("Connection failed after {} attempts", effective_max_attempts)
+                        )));
+                        return;
+                    }
+                }
             }
 
             // Wait 5s before retry

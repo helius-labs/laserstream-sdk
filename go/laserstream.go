@@ -33,7 +33,7 @@ const (
 // SDK metadata constants
 const (
 	SDKName    = "laserstream-go"
-	SDKVersion = "0.0.8"
+	SDKVersion = "0.0.9"
 )
 
 // Commitment levels
@@ -279,16 +279,14 @@ func (c *Client) streamLoop(ctx context.Context) {
 				reconnectAttempts = 1
 			}
 
-			// Report the error
-			if c.errorCallback != nil {
-				errorMsg := fmt.Sprintf("Connection error (attempt %d): %v", reconnectAttempts, err)
-				c.errorCallback(fmt.Errorf("%s", errorMsg))
-			}
+			// Log error internally but don't report to consumer until max attempts exhausted
+			fmt.Printf("RECONNECT: Connection failed (attempt %d/%d): %v\n", reconnectAttempts, maxAttempts, err)
 
 			// Check if exceeded max reconnect attempts
 			if reconnectAttempts >= uint32(maxAttempts) {
+				// Only report error to consumer after exhausting all retries
 				if c.errorCallback != nil {
-					finalErr := fmt.Sprintf("Connection failed after %d attempts", maxAttempts)
+					finalErr := fmt.Sprintf("Connection failed after %d attempts: %v", maxAttempts, err)
 					c.errorCallback(fmt.Errorf("%s", finalErr))
 				}
 				return
