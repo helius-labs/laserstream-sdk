@@ -216,11 +216,114 @@ func (c *Client) Write(req *SubscribeRequest) error {
 	}
 	c.mu.RUnlock()
 
+	// Persist the update so reconnects reuse the latest effective subscription.
+	c.mu.Lock()
+	if c.originalRequest != nil {
+		mergeSubscribeRequests(c.originalRequest, req, c.internalSlotSubID)
+	}
+	c.mu.Unlock()
+
 	select {
 	case c.writeChan <- req:
 		return nil
 	case <-time.After(5 * time.Second):
 		return fmt.Errorf("write timeout: channel full")
+	}
+}
+
+// mergeSubscribeRequests merges an in-flight stream-write update into the cached
+// request used for subsequent reconnects. It keeps the internal slot tracker intact.
+func mergeSubscribeRequests(base, update *SubscribeRequest, internalSlotID string) {
+	if base == nil || update == nil {
+		return
+	}
+
+	var internalSlot *SubscribeRequestFilterSlots
+	if internalSlotID != "" && base.Slots != nil {
+		internalSlot = base.Slots[internalSlotID]
+	}
+
+	if len(update.Accounts) > 0 {
+		if base.Accounts == nil {
+			base.Accounts = make(map[string]*SubscribeRequestFilterAccounts)
+		}
+		for k, v := range update.Accounts {
+			base.Accounts[k] = v
+		}
+	}
+
+	if len(update.Slots) > 0 {
+		if base.Slots == nil {
+			base.Slots = make(map[string]*SubscribeRequestFilterSlots)
+		}
+		for k, v := range update.Slots {
+			base.Slots[k] = v
+		}
+	}
+
+	if len(update.Transactions) > 0 {
+		if base.Transactions == nil {
+			base.Transactions = make(map[string]*SubscribeRequestFilterTransactions)
+		}
+		for k, v := range update.Transactions {
+			base.Transactions[k] = v
+		}
+	}
+
+	if len(update.TransactionsStatus) > 0 {
+		if base.TransactionsStatus == nil {
+			base.TransactionsStatus = make(map[string]*SubscribeRequestFilterTransactions)
+		}
+		for k, v := range update.TransactionsStatus {
+			base.TransactionsStatus[k] = v
+		}
+	}
+
+	if len(update.Blocks) > 0 {
+		if base.Blocks == nil {
+			base.Blocks = make(map[string]*SubscribeRequestFilterBlocks)
+		}
+		for k, v := range update.Blocks {
+			base.Blocks[k] = v
+		}
+	}
+
+	if len(update.BlocksMeta) > 0 {
+		if base.BlocksMeta == nil {
+			base.BlocksMeta = make(map[string]*SubscribeRequestFilterBlocksMeta)
+		}
+		for k, v := range update.BlocksMeta {
+			base.BlocksMeta[k] = v
+		}
+	}
+
+	if len(update.Entry) > 0 {
+		if base.Entry == nil {
+			base.Entry = make(map[string]*SubscribeRequestFilterEntry)
+		}
+		for k, v := range update.Entry {
+			base.Entry[k] = v
+		}
+	}
+
+	if len(update.AccountsDataSlice) > 0 {
+		base.AccountsDataSlice = append(base.AccountsDataSlice, update.AccountsDataSlice...)
+	}
+
+	if update.Commitment != nil {
+		base.Commitment = update.Commitment
+	}
+
+	if update.FromSlot != nil {
+		base.FromSlot = update.FromSlot
+	}
+
+	// Re-apply the internal slot tracker after the merge so it never gets dropped.
+	if internalSlotID != "" && internalSlot != nil {
+		if base.Slots == nil {
+			base.Slots = make(map[string]*SubscribeRequestFilterSlots)
+		}
+		base.Slots[internalSlotID] = internalSlot
 	}
 }
 
@@ -376,11 +479,11 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 	// Start periodic ping goroutine
 	pingCtx, cancelPing := context.WithCancel(ctx)
 	defer cancelPing()
-	
+
 	go func() {
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
-		
+
 		for {
 			select {
 			case <-pingCtx.Done():
