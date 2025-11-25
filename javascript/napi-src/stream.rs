@@ -22,7 +22,7 @@ const FORK_DEPTH_SAFETY_MARGIN: u64 = 31; // Max fork depth for processed commit
 
 // SDK metadata constants
 const SDK_NAME: &str = "laserstream-javascript";
-const SDK_VERSION: &str = "0.2.6";
+const SDK_VERSION: &str = "0.2.7";
 
 /// Custom interceptor that adds SDK metadata headers to all gRPC requests
 #[derive(Clone)]
