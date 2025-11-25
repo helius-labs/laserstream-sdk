@@ -22,7 +22,7 @@ const FORK_DEPTH_SAFETY_MARGIN: u64 = 31; // Max fork depth for processed commit
 
 // SDK metadata constants
 const SDK_NAME: &str = "laserstream-javascript";
-const SDK_VERSION: &str = "0.2.6";
+const SDK_VERSION: &str = "0.2.7";
 
 /// Custom interceptor that adds SDK metadata headers to all gRPC requests
 #[derive(Clone)]
@@ -478,6 +478,11 @@ impl StreamInner {
         current: &mut geyser::SubscribeRequest,
         modification: &geyser::SubscribeRequest,
     ) {
+        // Save the internal slot tracker before replacing slots
+        let internal_tracker = current.slots.iter()
+            .find(|(k, _)| k.starts_with("__internal_slot_tracker_"))
+            .map(|(k, v)| (k.clone(), v.clone()));
+
         // Replace all subscription types (Yellowstone gRPC replaces, not merges)
         current.accounts = modification.accounts.clone();
         current.slots = modification.slots.clone();
@@ -487,6 +492,11 @@ impl StreamInner {
         current.blocks_meta = modification.blocks_meta.clone();
         current.entry = modification.entry.clone();
         current.accounts_data_slice = modification.accounts_data_slice.clone();
+
+        // Restore the internal slot tracker if it existed
+        if let Some((key, value)) = internal_tracker {
+            current.slots.insert(key, value);
+        }
 
         // Update commitment if specified
         if modification.commitment.is_some() {
