@@ -10,7 +10,7 @@ use helius_laserstream::{
     },
     subscribe, LaserstreamConfig,
 };
-use yellowstone_grpc_client::{ClientTlsConfig, GeyserGrpcClient};
+use laserstream_core_client::{ClientTlsConfig, GeyserGrpcClient};
 use bs58;
 use tracing::{error, warn};
 use std::io::{self, Write};

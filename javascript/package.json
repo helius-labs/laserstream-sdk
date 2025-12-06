@@ -1,6 +1,6 @@
 {
   "name": "helius-laserstream",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "High-performance Laserstream gRPC client with automatic reconnection",
   "main": "client.js",
   "types": "client.d.ts",
@@ -31,6 +31,8 @@
     "example:compression": "ts-node examples/compression-example.ts",
     "example:compression-zstd": "ts-node examples/compression-zstd-example.ts",
     "example:grpc-options": "ts-node examples/grpc-options-comprehensive.ts",
+    "example:preprocessed-transaction-sub": "ts-node examples/preprocessed-transaction-sub.ts",
+    "example:preprocessed-filters-test": "ts-node examples/preprocessed-filters-test.ts",
     "perf:test": "ts-node performance/pump-raydium-performance-test.ts",
     "perf:slot": "ts-node performance/slot-performance-test.ts",
     "perf:token": "ts-node performance/token-performance-test.ts",
@@ -83,15 +85,16 @@
     }
   },
   "optionalDependencies": {
-    "helius-laserstream-darwin-arm64": "0.2.7",
-    "helius-laserstream-darwin-x64": "0.2.7",
-    "helius-laserstream-linux-arm64-gnu": "0.2.7",
-    "helius-laserstream-linux-arm64-musl": "0.2.7",
-    "helius-laserstream-linux-x64-gnu": "0.2.7",
-    "helius-laserstream-linux-x64-musl": "0.2.7"
+    "helius-laserstream-darwin-arm64": "0.2.8",
+    "helius-laserstream-darwin-x64": "0.2.8",
+    "helius-laserstream-linux-arm64-gnu": "0.2.8",
+    "helius-laserstream-linux-arm64-musl": "0.2.8",
+    "helius-laserstream-linux-x64-gnu": "0.2.8",
+    "helius-laserstream-linux-x64-musl": "0.2.8"
   },
   "dependencies": {
     "@types/protobufjs": "^6.0.0",
+    "laserstream-core-proto-js": "^9.0.2",
     "protobufjs": "^7.5.3"
   },
   "devDependencies": {

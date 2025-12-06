@@ -1,13 +1,13 @@
-use yellowstone_grpc_proto::tonic::Status;
+use laserstream_core_proto::tonic::Status;
 use url::ParseError;
 use futures_channel::mpsc::SendError;
-use yellowstone_grpc_client::{GeyserGrpcClientError, GeyserGrpcBuilderError};
+use laserstream_core_client::{GeyserGrpcClientError, GeyserGrpcBuilderError};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum LaserstreamError {
     #[error("gRPC transport error: {0}")]
-    Transport(#[from] yellowstone_grpc_proto::tonic::transport::Error),
+    Transport(#[from] laserstream_core_proto::tonic::transport::Error),
 
     #[error("gRPC status error: {0}")]
     Status(#[from] Status),
@@ -27,15 +27,15 @@ pub enum LaserstreamError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
-    #[error("Yellowstone client error: {0}")]
+    #[error("Laserstream client error: {0}")]
     ClientError(#[from] GeyserGrpcClientError),
 
-    #[error("Yellowstone builder error: {0}")]
+    #[error("Laserstream builder error: {0}")]
     BuilderError(#[from] GeyserGrpcBuilderError),
 
     #[error("Invalid API Key format")]
     InvalidApiKeyFormat,
-    
+
     #[error("Connection error: {0}")]
     ConnectionError(String),
 }

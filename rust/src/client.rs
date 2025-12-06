@@ -6,27 +6,28 @@ use futures_util::{sink::SinkExt, Stream};
 use std::{pin::Pin, time::Duration};
 use tokio::sync::mpsc;
 use tokio::time::sleep;
-use yellowstone_grpc_proto::tonic::{
+use laserstream_core_proto::tonic::{
     Status, Request, metadata::MetadataValue, transport::Endpoint, codec::CompressionEncoding,
 };
 use tracing::{error, instrument, warn};
 use uuid;
-use yellowstone_grpc_client::{ClientTlsConfig, Interceptor};
-use yellowstone_grpc_proto::prelude::{geyser_client::GeyserClient};
-use yellowstone_grpc_proto::geyser::{
+use laserstream_core_client::{ClientTlsConfig, Interceptor};
+use laserstream_core_proto::prelude::{geyser_client::GeyserClient};
+use laserstream_core_proto::geyser::{
     subscribe_update::UpdateOneof, SubscribeRequest, SubscribeRequestFilterSlots,
     SubscribeRequestPing, SubscribeUpdate,
+    SubscribePreprocessedRequest, SubscribePreprocessedUpdate,
 };
 
 const HARD_CAP_RECONNECT_ATTEMPTS: u32 = (20 * 60) / 5; // 20 mins / 5 sec interval
 const FIXED_RECONNECT_INTERVAL_MS: u64 = 5000; // 5 seconds fixed interval
 const SDK_NAME: &str = "laserstream-rust";
-const SDK_VERSION: &str = "0.1.3";
+const SDK_VERSION: &str = "0.1.5";
 
 /// Custom interceptor that adds SDK metadata headers to all gRPC requests
 #[derive(Clone)]
 struct SdkMetadataInterceptor {
-    x_token: Option<yellowstone_grpc_proto::tonic::metadata::AsciiMetadataValue>,
+    x_token: Option<laserstream_core_proto::tonic::metadata::AsciiMetadataValue>,
 }
 
 impl SdkMetadataInterceptor {
@@ -271,7 +272,7 @@ async fn connect_and_subscribe_once(
 ) -> Result<
     (
         impl futures_util::Sink<SubscribeRequest, Error = futures_mpsc::SendError> + Send,
-        impl Stream<Item = Result<SubscribeUpdate, yellowstone_grpc_proto::tonic::Status>> + Send,
+        impl Stream<Item = Result<SubscribeUpdate, laserstream_core_proto::tonic::Status>> + Send,
     ),
     Status,
 > {
@@ -355,4 +356,130 @@ async fn connect_and_subscribe_once(
         .map_err(|e| Status::internal(format!("Subscription failed: {}", e)))?;
 
     Ok((subscribe_tx, response.into_inner()))
+}
+
+/// Handle for managing a preprocessed subscription (no write support).
+#[derive(Clone)]
+pub struct PreprocessedStreamHandle;
+
+/// Establishes a gRPC connection for preprocessed transactions and provides a stream of updates.
+/// Automatically reconnects on failure. No slot tracking or replay - just simple reconnection.
+#[instrument(skip(config, request))]
+pub fn subscribe_preprocessed(
+    config: LaserstreamConfig,
+    request: SubscribePreprocessedRequest,
+) -> (
+    impl Stream<Item = Result<SubscribePreprocessedUpdate, LaserstreamError>>,
+    PreprocessedStreamHandle,
+) {
+    let handle = PreprocessedStreamHandle;
+    let update_stream = stream! {
+        let mut reconnect_attempts = 0;
+
+        // Determine the effective max reconnect attempts
+        let effective_max_attempts = config
+            .max_reconnect_attempts
+            .unwrap_or(HARD_CAP_RECONNECT_ATTEMPTS)
+            .min(HARD_CAP_RECONNECT_ATTEMPTS);
+
+        loop {
+            let api_key = config.api_key.clone();
+            let request_clone = request.clone();
+
+            match connect_and_subscribe_preprocessed_once(&config, request_clone, api_key).await {
+                Ok(mut stream) => {
+                    reconnect_attempts = 0;
+
+                    while let Some(result) = stream.next().await {
+                        match result {
+                            Ok(update) => yield Ok(update),
+                            Err(e) => {
+                                warn!(error = %e, "Stream error received");
+                                break;
+                            }
+                        }
+                    }
+                }
+                Err(err) => {
+                    reconnect_attempts += 1;
+                    error!(error = %err, attempt = reconnect_attempts, max_attempts = effective_max_attempts, "Connection failed, will retry after 5s delay");
+
+                    if reconnect_attempts >= effective_max_attempts {
+                        error!(attempts = effective_max_attempts, "Max reconnection attempts reached");
+                        yield Err(LaserstreamError::MaxReconnectAttempts(Status::cancelled(
+                            format!("Connection failed after {} attempts", effective_max_attempts)
+                        )));
+                        return;
+                    }
+                }
+            }
+
+            let delay = Duration::from_millis(FIXED_RECONNECT_INTERVAL_MS);
+            sleep(delay).await;
+        }
+    };
+
+    (update_stream, handle)
+}
+
+#[instrument(skip(config, request, api_key))]
+async fn connect_and_subscribe_preprocessed_once(
+    config: &LaserstreamConfig,
+    request: SubscribePreprocessedRequest,
+    api_key: String,
+) -> Result<
+    impl Stream<Item = Result<SubscribePreprocessedUpdate, laserstream_core_proto::tonic::Status>> + Send,
+    Status,
+> {
+    let options = &config.channel_options;
+
+    // Create our custom interceptor with SDK metadata
+    let interceptor = SdkMetadataInterceptor::new(api_key)?;
+
+    // Build endpoint with all options
+    let mut endpoint = Endpoint::from_shared(config.endpoint.clone())
+        .map_err(|e| Status::internal(format!("Failed to parse endpoint: {}", e)))?
+        .connect_timeout(Duration::from_secs(options.connect_timeout_secs.unwrap_or(10)))
+        .timeout(Duration::from_secs(options.timeout_secs.unwrap_or(30)))
+        .tcp_nodelay(options.tcp_nodelay.unwrap_or(true))
+        .tcp_keepalive(Some(Duration::from_secs(options.tcp_keepalive_secs.unwrap_or(30))))
+        .http2_keep_alive_interval(Duration::from_secs(options.http2_keep_alive_interval_secs.unwrap_or(30)))
+        .keep_alive_timeout(Duration::from_secs(options.keep_alive_timeout_secs.unwrap_or(10)))
+        .keep_alive_while_idle(options.keep_alive_while_idle.unwrap_or(true));
+
+    endpoint = endpoint
+        .tls_config(ClientTlsConfig::new().with_enabled_roots())
+        .map_err(|e| Status::internal(format!("Failed to configure TLS: {}", e)))?;
+
+    let channel = endpoint
+        .connect()
+        .await
+        .map_err(|e| Status::internal(format!("Failed to connect: {}", e)))?;
+
+    let mut geyser_client = GeyserClient::with_interceptor(channel, interceptor)
+        .max_decoding_message_size(options.max_decoding_message_size.unwrap_or(1_000_000_000))
+        .max_encoding_message_size(options.max_encoding_message_size.unwrap_or(32_000_000));
+
+    // Apply compression if specified
+    if let Some(compression) = &options.send_compression {
+        let encoding = match compression {
+            ConfigCompressionEncoding::Gzip => CompressionEncoding::Gzip,
+            ConfigCompressionEncoding::Zstd => CompressionEncoding::Zstd,
+        };
+        geyser_client = geyser_client.send_compressed(encoding).accept_compressed(encoding);
+    }
+
+    let (mut subscribe_tx, subscribe_rx) = futures_mpsc::unbounded();
+
+    subscribe_tx
+        .send(request)
+        .await
+        .map_err(|e| Status::internal(format!("Failed to send initial request: {}", e)))?;
+
+    let response = geyser_client
+        .subscribe_preprocessed(subscribe_rx)
+        .await
+        .map_err(|e| Status::internal(format!("Preprocessed subscription failed: {}", e)))?;
+
+    Ok(response.into_inner())
 }

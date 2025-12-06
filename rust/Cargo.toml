@@ -1,6 +1,6 @@
 [package]
 name = "helius-laserstream"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 authors = ["Helius <support@helius.xyz>"]
 description = "Rust client for Helius LaserStream gRPC with robust reconnection and slot tracking"
@@ -12,8 +12,8 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-yellowstone-grpc-proto = "9.0.0"
-yellowstone-grpc-client = "9.0.0"
+laserstream-core-proto = { version = "9.0.2", default-features = false, features = ["tonic", "tonic-compression"] }
+laserstream-core-client = "9.0.2"
 tonic = { version = "0.12.1", features = ["transport", "tls", "zstd", "gzip"] }
 prost = "0.12"
 prost-types = "0.12"
