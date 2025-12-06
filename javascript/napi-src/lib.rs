@@ -2,6 +2,16 @@ mod client;
 mod proto;
 mod stream;
 
+use std::sync::Once;
+
+static INIT_RUSTLS: Once = Once::new();
+
+fn init_rustls() {
+    INIT_RUSTLS.call_once(|| {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    });
+}
+
 use napi::bindgen_prelude::*;
 use napi::threadsafe_function::{ErrorStrategy, ThreadsafeFunction};
 use napi::{Env, JsFunction, JsObject, NapiRaw, NapiValue};
@@ -11,8 +21,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::collections::HashMap;
 use parking_lot::Mutex;
 use std::sync::LazyLock;
-use yellowstone_grpc_proto;
-use yellowstone_grpc_proto::geyser::SubscribeUpdate as YellowstoneSubscribeUpdate;
+use laserstream_core_proto;
+use laserstream_core_proto::geyser::{
+    SubscribeUpdate as YellowstoneSubscribeUpdate,
+    SubscribePreprocessedUpdate as YellowstoneSubscribePreprocessedUpdate,
+};
 use prost::Message;
 
 // Re-export the generated protobuf types
@@ -27,6 +40,18 @@ static ACTIVE_STREAM_COUNT: std::sync::atomic::AtomicU32 = std::sync::atomic::At
 pub struct SubscribeUpdateBytes(pub Vec<u8>);
 
 impl ToNapiValue for SubscribeUpdateBytes {
+    unsafe fn to_napi_value(env: napi::sys::napi_env, val: Self) -> napi::Result<napi::sys::napi_value> {
+        // Create a Uint8Array from the protobuf bytes (zero-copy)
+        let env = unsafe { napi::Env::from_raw(env) };
+        let buffer = env.create_buffer_with_data(val.0)?;
+        unsafe { Ok(buffer.into_unknown().raw()) }
+    }
+}
+
+// Wrapper for preprocessed update bytes
+pub struct SubscribePreprocessedUpdateBytes(pub Vec<u8>);
+
+impl ToNapiValue for SubscribePreprocessedUpdateBytes {
     unsafe fn to_napi_value(env: napi::sys::napi_env, val: Self) -> napi::Result<napi::sys::napi_value> {
         // Create a Uint8Array from the protobuf bytes (zero-copy)
         let env = unsafe { napi::Env::from_raw(env) };
@@ -84,6 +109,16 @@ pub fn get_active_stream_count() -> u32 {
 
 // Convert SubscribeUpdate to bytes for zero-copy transfer to JS
 pub fn subscribe_update_to_bytes(update: YellowstoneSubscribeUpdate) -> Result<Vec<u8>> {
+    // Serialize the protobuf message back to bytes
+    let mut buf = Vec::new();
+    update.encode(&mut buf).map_err(|e| {
+        Error::new(Status::GenericFailure, format!("Failed to encode protobuf: {}", e))
+    })?;
+    Ok(buf)
+}
+
+// Convert SubscribePreprocessedUpdate to bytes for zero-copy transfer to JS
+pub fn subscribe_preprocessed_update_to_bytes(update: YellowstoneSubscribePreprocessedUpdate) -> Result<Vec<u8>> {
     // Serialize the protobuf message back to bytes
     let mut buf = Vec::new();
     update.encode(&mut buf).map_err(|e| {
@@ -158,6 +193,33 @@ impl LaserstreamClient {
         env.spawn_future(async move {
             client_inner
                 .subscribe_internal_bytes(subscribe_request, ts_callback)
+                .await
+        })
+    }
+
+    #[napi(
+        ts_args_type = "request: any, callback: (error: Error | null, updateBytes: Uint8Array) => void",
+        ts_return_type = "Promise<StreamHandle>"
+    )]
+    pub fn subscribe_preprocessed(&self, env: Env, request: Object, callback: JsFunction) -> Result<JsObject> {
+        // Setup global lifecycle management on first use
+        setup_global_lifecycle_management(&env)?;
+
+        let subscribe_request = self.inner.js_to_subscribe_preprocessed_request(&env, request)?;
+
+        // Threadsafe function that forwards protobuf bytes to JS
+        let ts_callback: ThreadsafeFunction<SubscribePreprocessedUpdateBytes, ErrorStrategy::CalleeHandled> =
+            callback.create_threadsafe_function(100000, |ctx| {
+                let bytes_wrapper: SubscribePreprocessedUpdateBytes = ctx.value;
+                let js_uint8array = unsafe { SubscribePreprocessedUpdateBytes::to_napi_value(ctx.env.raw(), bytes_wrapper)? };
+                Ok(vec![unsafe { napi::JsUnknown::from_raw(ctx.env.raw(), js_uint8array)? }])
+            })?;
+
+        let client_inner = self.inner.clone();
+
+        env.spawn_future(async move {
+            client_inner
+                .subscribe_preprocessed_internal_bytes(subscribe_request, ts_callback)
                 .await
         })
     }

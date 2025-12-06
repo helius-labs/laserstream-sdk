@@ -54,3 +54,7 @@ out/
 go/test/remote-integrity-test.sh
 
 ClAUDE.md
+
+laserstream-core-proto-publish/
+laserstream-core-client-publish
+laserstream-core-proto-js

@@ -1,24 +1,33 @@
-// TypeScript declarations for Laserstream client with protobuf decoding
+// TypeScript declarations for Laserstream client
 
-// Re-export gRPC types directly
+// Re-export gRPC types
 export { ChannelOptions } from '@grpc/grpc-js';
 
-// Re-export Yellowstone proto types directly
+// Re-export all proto types from laserstream-core-proto-js
 export {
+  // Preprocessed subscription types
+  SubscribePreprocessedRequest,
+  SubscribePreprocessedRequestFilterTransactions,
+  SubscribePreprocessedUpdate,
+  SubscribePreprocessedTransaction,
+  SubscribePreprocessedTransactionInfo,
+  // Regular subscription types
   SubscribeUpdate,
   SubscribeUpdateAccount,
   SubscribeUpdateAccountInfo,
-  SubscribeUpdateBlock,
-  SubscribeUpdateBlockMeta,
   SubscribeUpdateSlot,
   SubscribeUpdateTransaction,
   SubscribeUpdateTransactionInfo,
   SubscribeUpdateTransactionStatus,
+  SubscribeUpdateBlock,
+  SubscribeUpdateBlockMeta,
   SubscribeUpdateEntry,
   SubscribeUpdatePing,
   SubscribeUpdatePong,
+  // Request types
   SubscribeRequest,
   SubscribeRequestFilterAccounts,
+  SubscribeRequestFilterAccountsFilter,
   SubscribeRequestFilterSlots,
   SubscribeRequestFilterTransactions,
   SubscribeRequestFilterBlocks,
@@ -26,15 +35,14 @@ export {
   SubscribeRequestFilterEntry,
   SubscribeRequestAccountsDataSlice,
   SubscribeRequestPing,
-} from '@triton-one/yellowstone-grpc/dist/types/grpc/geyser';
+  // Enums
+  CommitmentLevel,
+  SlotStatus,
+} from 'laserstream-core-proto-js/generated';
 
-export {
-  MessageAddressTableLookup,
-  Message,
-  Transaction,
-  TransactionStatusMeta,
-  TransactionError,
-} from '@triton-one/yellowstone-grpc/dist/types/grpc/solana-storage';
+// ============================================================================
+// Compression and Configuration
+// ============================================================================
 
 // Compression algorithms enum
 export declare enum CompressionAlgorithms {
@@ -54,37 +62,21 @@ export interface LaserstreamConfig {
   replay?: boolean;
 }
 
-// Subscription request interface
-export interface SubscribeRequest {
-  accounts?: { [key: string]: any };
-  slots?: { [key: string]: any };
-  transactions?: { [key: string]: any };
-  transactionsStatus?: { [key: string]: any };
-  blocks?: { [key: string]: any };
-  blocksMeta?: { [key: string]: any };
-  entry?: { [key: string]: any };
-  accountsDataSlice?: any[];
-  commitment?: number;
-  ping?: any;
-  fromSlot?: number;
-}
+// ============================================================================
+// Stream Handle Interface
+// ============================================================================
 
-
-// Stream handle interface
 export interface StreamHandle {
   id: string;
   cancel(): void;
   write(request: SubscribeRequest): Promise<void>;
 }
 
-// Commitment level enum
-export declare const CommitmentLevel: {
-  readonly PROCESSED: 0;
-  readonly CONFIRMED: 1;
-  readonly FINALIZED: 2;
-};
+// ============================================================================
+// Main API Functions
+// ============================================================================
 
-// Single subscribe function using NAPI directly
+// Regular subscribe function using NAPI directly
 export declare function subscribe(
   config: LaserstreamConfig,
   request: SubscribeRequest,
@@ -92,8 +84,20 @@ export declare function subscribe(
   onError?: (error: Error) => void | Promise<void>
 ): Promise<StreamHandle>;
 
-// Utility functions
+// Preprocessed subscribe function
+export declare function subscribePreprocessed(
+  config: LaserstreamConfig,
+  request: SubscribePreprocessedRequest,
+  onData: (update: SubscribePreprocessedUpdate) => void | Promise<void>,
+  onError?: (error: Error) => void | Promise<void>
+): Promise<StreamHandle>;
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
 export declare function initProtobuf(): Promise<void>;
 export declare function decodeSubscribeUpdate(bytes: Uint8Array): SubscribeUpdate;
+export declare function decodeSubscribePreprocessedUpdate(bytes: Uint8Array): SubscribePreprocessedUpdate;
 export declare function shutdownAllStreams(): void;
-export declare function getActiveStreamCount(): number; 
+export declare function getActiveStreamCount(): number;

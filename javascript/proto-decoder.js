@@ -3,6 +3,7 @@ const path = require('path');
 
 let root = null;
 let SubscribeUpdate = null;
+let SubscribePreprocessedUpdate = null;
 
 // Initialize protobuf types
 async function initProtobuf() {
@@ -17,7 +18,8 @@ async function initProtobuf() {
     
     // Get the SubscribeUpdate message type
     SubscribeUpdate = root.lookupType('geyser.SubscribeUpdate');
-    
+    SubscribePreprocessedUpdate = root.lookupType('geyser.SubscribePreprocessedUpdate');
+
   } catch (error) {
     throw error;
   }
@@ -184,8 +186,40 @@ function processEntryUpdate(entry) {
   return entry;
 }
 
+// Decode preprocessed update protobuf bytes to JavaScript object
+function decodeSubscribePreprocessedUpdate(bytes) {
+  if (!SubscribePreprocessedUpdate) {
+    throw new Error('Protobuf not initialized. Call initProtobuf() first.');
+  }
+
+  try {
+    // Decode the protobuf bytes
+    const message = SubscribePreprocessedUpdate.decode(bytes);
+
+    // Convert to plain JavaScript object
+    const obj = SubscribePreprocessedUpdate.toObject(message, {
+      longs: String,
+      enums: Number,
+      bytes: Buffer,
+      defaults: true,
+      arrays: true,
+      objects: true,
+      oneofs: false
+    });
+
+    // Remove protobuf-oneof helper fields if present
+    delete obj.updateOneof;
+    delete obj.update;
+
+    return obj;
+  } catch (error) {
+    throw new Error(`Failed to decode preprocessed update: ${error.message}`);
+  }
+}
+
 // Export functions
 module.exports = {
   initProtobuf,
-  decodeSubscribeUpdate
+  decodeSubscribeUpdate,
+  decodeSubscribePreprocessedUpdate
 }; 

@@ -7,7 +7,7 @@ use helius_laserstream::{
     },
     subscribe, LaserstreamConfig,
 };
-use yellowstone_grpc_client::{ClientTlsConfig, GeyserGrpcClient};
+use laserstream_core_client::{ClientTlsConfig, GeyserGrpcClient};
 use tokio_stream::StreamExt;
 use tracing::{error, info, warn};
 use bs58;

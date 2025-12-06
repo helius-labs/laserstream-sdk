@@ -1,5 +1,5 @@
 use helius_laserstream::{subscribe, LaserstreamConfig};
-use yellowstone_grpc_proto::geyser::{SubscribeRequest, SubscribeRequestFilterSlots};
+use laserstream_core_proto::prelude::{SubscribeRequest, SubscribeRequestFilterSlots, subscribe_update::UpdateOneof};
 use futures::StreamExt;
 use std::env;
 
@@ -78,7 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 
                 // Verify user filter is present in slot updates
-                if matches!(update.update_oneof, Some(yellowstone_grpc_proto::geyser::subscribe_update::UpdateOneof::Slot(_))) {
+                if matches!(update.update_oneof, Some(UpdateOneof::Slot(_))) {
                     if update.filters.contains(&"user-slot-sub".to_string()) {
                         println!("✓ Slot update correctly contains user filter: {:?}", update.filters);
                     } else {

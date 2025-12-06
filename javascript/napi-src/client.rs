@@ -6,7 +6,7 @@ use serde::Deserialize;
 use serde_json;
 use base64::{Engine as _, engine::general_purpose};
 
-use yellowstone_grpc_proto::geyser::{
+use laserstream_core_proto::geyser::{
     SubscribeRequest, SubscribeRequestFilterAccounts, SubscribeRequestFilterBlocks,
     SubscribeRequestFilterSlots, SubscribeRequestFilterTransactions,
     SubscribeRequestFilterBlocksMeta, SubscribeRequestFilterEntry,
@@ -16,6 +16,7 @@ use yellowstone_grpc_proto::geyser::{
     subscribe_request_filter_accounts_filter_memcmp,
     subscribe_request_filter_accounts_filter_lamports,
     subscribe_request_filter_accounts_filter,
+    SubscribePreprocessedRequest, SubscribePreprocessedRequestFilterTransactions,
 };
 
 use crate::stream::StreamInner;
@@ -166,6 +167,25 @@ pub struct JsPing {
     pub id: i32,
 }
 
+// Preprocessed subscription structures
+#[derive(Deserialize, Debug)]
+pub struct JsSubscribePreprocessedRequest {
+    pub transactions: Option<HashMap<String, JsPreprocessedTransactionFilter>>,
+    pub ping: Option<JsPing>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct JsPreprocessedTransactionFilter {
+    pub vote: Option<bool>,
+    pub signature: Option<String>,
+    #[serde(alias = "accountInclude")]
+    pub account_include: Option<Vec<String>>,
+    #[serde(alias = "accountExclude")]
+    pub account_exclude: Option<Vec<String>>,
+    #[serde(alias = "accountRequired")]
+    pub account_required: Option<Vec<String>>,
+}
+
 impl ClientInner {
     pub fn new(
         endpoint: String,
@@ -174,6 +194,9 @@ impl ClientInner {
         channel_options: Option<ChannelOptions>,
         replay: Option<bool>,
     ) -> Result<Self> {
+        // Initialize rustls crypto provider
+        crate::init_rustls();
+
         Ok(Self {
             endpoint,
             token,
@@ -424,6 +447,47 @@ impl ClientInner {
         Ok(request)
     }
 
+    pub fn js_to_subscribe_preprocessed_request(&self, env: &Env, js_obj: Object) -> Result<SubscribePreprocessedRequest> {
+        let js_request: JsSubscribePreprocessedRequest = env.from_js_value(js_obj)?;
+
+        let mut request = SubscribePreprocessedRequest::default();
+
+        // Handle transactions
+        if let Some(transactions) = js_request.transactions {
+            let mut transactions_map = HashMap::new();
+            for (key, filter) in transactions {
+                let mut preprocessed_filter = SubscribePreprocessedRequestFilterTransactions::default();
+
+                preprocessed_filter.vote = filter.vote;
+                preprocessed_filter.signature = filter.signature;
+
+                if let Some(account_include) = filter.account_include {
+                    preprocessed_filter.account_include = account_include;
+                }
+
+                if let Some(account_exclude) = filter.account_exclude {
+                    preprocessed_filter.account_exclude = account_exclude;
+                }
+
+                if let Some(account_required) = filter.account_required {
+                    preprocessed_filter.account_required = account_required;
+                }
+
+                transactions_map.insert(key, preprocessed_filter);
+            }
+            request.transactions = transactions_map;
+        }
+
+        // Handle ping
+        if let Some(ping) = js_request.ping {
+            request.ping = Some(SubscribeRequestPing {
+                id: ping.id,
+            });
+        }
+
+        Ok(request)
+    }
+
     pub async fn subscribe_internal_bytes(
         &self,
         subscribe_request: SubscribeRequest,
@@ -443,6 +507,35 @@ impl ClientInner {
             self.max_reconnect_attempts,
             self.channel_options.clone(),
             self.replay,
+        )?);
+
+        // Register stream in global registry for lifecycle management
+        crate::register_stream(stream_id.clone(), stream_inner.clone());
+
+        Ok(crate::StreamHandle {
+            id: stream_id,
+            inner: stream_inner,
+        })
+    }
+
+    pub async fn subscribe_preprocessed_internal_bytes(
+        &self,
+        subscribe_request: SubscribePreprocessedRequest,
+        ts_callback: napi::threadsafe_function::ThreadsafeFunction<
+            crate::SubscribePreprocessedUpdateBytes,
+            napi::threadsafe_function::ErrorStrategy::CalleeHandled,
+        >,
+    ) -> Result<crate::StreamHandle> {
+        let stream_id = Uuid::new_v4().to_string();
+
+        let stream_inner = Arc::new(StreamInner::new_preprocessed_bytes(
+            stream_id.clone(),
+            self.endpoint.clone(),
+            self.token.clone(),
+            subscribe_request,
+            ts_callback,
+            self.max_reconnect_attempts,
+            self.channel_options.clone(),
         )?);
 
         // Register stream in global registry for lifecycle management
