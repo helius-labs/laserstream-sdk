@@ -54,7 +54,7 @@ jobs:
         with:
           node-version: 20
       - name: Install dependencies
-        run: npm ci
+        run: npm install --ignore-scripts
         working-directory: javascript
       - name: Install cross-compilation toolchains
         if: matrix.settings.host == 'ubuntu-latest'
@@ -172,7 +172,7 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org/
       - name: Install dependencies
-        run: npm ci
+        run: npm install --ignore-scripts
         working-directory: javascript
       - name: Download all artifacts
         uses: actions/download-artifact@v4
