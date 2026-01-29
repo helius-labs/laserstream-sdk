@@ -336,11 +336,6 @@ async fn connect_and_subscribe_once(
             };
             geyser_client = geyser_client.accept_compressed(encoding);
         }
-    } else {
-        // Default: accept both gzip and zstd like yellowstone-grpc
-        geyser_client = geyser_client
-            .accept_compressed(CompressionEncoding::Gzip)
-            .accept_compressed(CompressionEncoding::Zstd);
     }
 
     // Create bidirectional stream
