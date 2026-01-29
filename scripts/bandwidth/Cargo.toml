@@ -1,6 +1,6 @@
 [package]
 name = "helius-laserstream-bandwidth"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 authors = ["Helius <support@helius.xyz>"]
 description = "Rust bandwidth test for Helius LaserStream gRPC"
