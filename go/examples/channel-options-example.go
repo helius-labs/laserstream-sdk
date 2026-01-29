@@ -47,9 +47,6 @@ func main() {
 		// Buffer settings
 		WriteBufferSize: 128 * 1024, // 128KB instead of default 64KB
 		ReadBufferSize:  128 * 1024, // 128KB read buffer
-
-		// Compression settings
-		UseCompression: true, // Enable gzip compression
 	}
 
 	// Create client configuration with custom channel options
@@ -77,7 +74,6 @@ func main() {
 	fmt.Println("- Keepalive interval: 15s")
 	fmt.Println("- Initial stream window: 8MB")
 	fmt.Println("- Write buffer size: 128KB")
-	fmt.Println("- Compression: gzip enabled")
 
 	// Data handler
 	dataHandler := func(update *laserstream.SubscribeUpdate) {
