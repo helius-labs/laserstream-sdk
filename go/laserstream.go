@@ -16,7 +16,6 @@ import (
 	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/encoding/gzip"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -33,7 +32,7 @@ const (
 // SDK metadata constants
 const (
 	SDKName    = "laserstream-go"
-	SDKVersion = "0.1.0"
+	SDKVersion = "0.1.1"
 )
 
 // Commitment levels
@@ -74,9 +73,6 @@ type ChannelOptions struct {
 	// Buffer settings
 	WriteBufferSize int // Default: 64KB
 	ReadBufferSize  int // Default: 64KB
-
-	// Compression settings
-	UseCompression bool // Enable gzip compression. Default: false
 }
 
 // DataCallback defines the function signature for handling received data.
@@ -592,17 +588,10 @@ func (c *Client) connect(ctx context.Context) error {
 	}
 
 	// Configure default call options
-	callOpts := []grpc.CallOption{
+	opts = append(opts, grpc.WithDefaultCallOptions(
 		grpc.MaxCallRecvMsgSize(maxRecvMsgSize),
 		grpc.MaxCallSendMsgSize(maxSendMsgSize),
-	}
-
-	// Add compression if enabled
-	if channelOpts.UseCompression {
-		callOpts = append(callOpts, grpc.UseCompressor(gzip.Name))
-	}
-
-	opts = append(opts, grpc.WithDefaultCallOptions(callOpts...))
+	))
 
 	// Connection parameters
 	minConnectTimeout := 10 * time.Second

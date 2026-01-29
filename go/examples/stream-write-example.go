@@ -26,15 +26,10 @@ func main() {
 		log.Fatal("LASERSTREAM_PRODUCTION_API_KEY required")
 	}
 
-	// Create client with compression enabled
-	channelOptions := &laserstream.ChannelOptions{
-		UseCompression: true,
-	}
-
+	// Create client
 	config := laserstream.LaserstreamConfig{
-		Endpoint:       endpoint,
-		APIKey:         apiKey,
-		ChannelOptions: channelOptions,
+		Endpoint: endpoint,
+		APIKey:   apiKey,
 	}
 
 	// Create client

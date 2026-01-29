@@ -87,9 +87,8 @@ config := laserstream.LaserstreamConfig{
         // Flow control
         InitialWindowSize:     8 * 1024 * 1024,  // 8MB
         InitialConnWindowSize: 16 * 1024 * 1024, // 16MB
-        
-        // Performance
-        UseCompression: true, // Enable gzip
+
+        // Buffer sizes
         WriteBufferSize: 128 * 1024,
         ReadBufferSize:  128 * 1024,
     },
