@@ -1,6 +1,6 @@
 [package]
 name = "helius-laserstream-bandwidth"
-version = "0.0.2"
+version = "0.0.3"
 edition = "2021"
 authors = ["Helius <support@helius.xyz>"]
 description = "Rust bandwidth test for Helius LaserStream gRPC"
@@ -33,4 +33,4 @@ sha2 = "0.10"
 clap = { version = "4.5", features = ["derive"] }
 solana-sdk = "2.0.0"
 solana-client = "2.0.0"
-helius-laserstream = "0.1.5"
+helius-laserstream = "0.1.6"
