@@ -12,11 +12,7 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-yellowstone-grpc-proto = "4.0.0"
-yellowstone-grpc-client = "4.0.0"
-tonic = { version = "0.12.1", features = ["transport", "tls"] }
-prost = "0.13.5"
-prost-types = "0.13.5"
+prost = "0.14"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
 tokio-stream = "0.1"
 bs58 = "0.5"
@@ -37,4 +33,4 @@ sha2 = "0.10"
 clap = { version = "4.5", features = ["derive"] }
 solana-sdk = "2.0.0"
 solana-client = "2.0.0"
-helius-laserstream = "0.0.3"
+helius-laserstream = "0.1.5"

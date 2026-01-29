@@ -1,13 +1,13 @@
 use futures_util::StreamExt;
 use helius_laserstream::{
     grpc::{
-        SubscribeRequest,
-        SubscribeRequestFilterTransactions,
+        CommitmentLevel, SubscribeRequest, SubscribeRequestFilterAccounts,
+        SubscribeRequestFilterBlocksMeta, SubscribeRequestFilterEntry,
+        SubscribeRequestFilterSlots, SubscribeRequestFilterTransactions,
     },
-    subscribe, LaserstreamConfig,
+    subscribe, LaserstreamConfig, ChannelOptions,
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
-use yellowstone_grpc_proto::geyser::{CommitmentLevel, SubscribeRequestFilterAccounts, SubscribeRequestFilterBlocksMeta, SubscribeRequestFilterEntry, SubscribeRequestFilterSlots};
 use std::{collections::HashMap, time::Instant};
 use clap::Parser;
 use prost::Message;
@@ -23,6 +23,10 @@ struct Args {
     /// Laserstream endpoint URL
     #[arg(long)]
     laserstream_url: String,
+
+    /// Enable zstd compression
+    #[arg(long, default_value_t = false)]
+    compression: bool,
 }
 
 #[tokio::main]
@@ -31,10 +35,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let api_key = args.api_key;
     let endpoint_url = args.laserstream_url;
+    let compression_enabled = args.compression;
+
+    let channel_options = if compression_enabled {
+        ChannelOptions::default().with_zstd_compression()
+    } else {
+        ChannelOptions::default()
+    };
 
     let config = LaserstreamConfig {
         api_key: api_key.clone(),
         endpoint: endpoint_url.parse()?,
+        channel_options,
         ..Default::default()
     };
 
@@ -77,8 +89,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // --- Subscribe and Process ---
-    println!("Connecting and subscribing...");
-    let stream = subscribe(config, request);
+    println!("Connecting and subscribing (compression: {})...", if compression_enabled { "zstd" } else { "disabled" });
+    let (stream, _handle) = subscribe(config, request);
 
 
     // Pin the stream to the stack
