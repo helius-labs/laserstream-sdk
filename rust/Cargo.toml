@@ -1,6 +1,6 @@
 [package]
 name = "helius-laserstream"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2021"
 authors = ["Helius <support@helius.xyz>"]
 description = "Rust client for Helius LaserStream gRPC with robust reconnection and slot tracking"
@@ -53,3 +53,7 @@ path = "test/transaction_integrity.rs"
 [[bin]]
 name = "block_integrity_test"
 path = "test/block_integrity.rs"
+
+[[bin]]
+name = "subscription_replacement_persistence_test"
+path = "test/subscription_replacement_persistence.rs"

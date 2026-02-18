@@ -22,7 +22,7 @@ use laserstream_core_proto::geyser::{
 const HARD_CAP_RECONNECT_ATTEMPTS: u32 = (20 * 60) / 5; // 20 mins / 5 sec interval
 const FIXED_RECONNECT_INTERVAL_MS: u64 = 5000; // 5 seconds fixed interval
 const SDK_NAME: &str = "laserstream-rust";
-const SDK_VERSION: &str = "0.1.5";
+const SDK_VERSION: &str = "0.1.7";
 
 /// Custom interceptor that adds SDK metadata headers to all gRPC requests
 #[derive(Clone)]
@@ -121,6 +121,11 @@ pub fn subscribe(
         let api_key_string = config.api_key.clone(); 
 
         loop {
+            // Drain any pending write requests that arrived during reconnection delay.
+            // This ensures writes sent while disconnected are included in the next connection.
+            while let Ok(write_request) = write_rx.try_recv() {
+                merge_subscribe_requests(&mut current_request, &write_request, &internal_slot_sub_id);
+            }
 
             let mut attempt_request = current_request.clone();
 
@@ -228,6 +233,9 @@ pub fn subscribe(
                             
                             // Handle write requests from the user
                             Some(write_request) = write_rx.recv() => {
+                                // Merge the write_request into current_request so it persists across reconnections
+                                merge_subscribe_requests(&mut current_request, &write_request, &internal_slot_sub_id);
+
                                 if let Err(e) = sender.send(write_request).await {
                                     warn!(error = %e, "Failed to send write request");
                                     break;
@@ -478,3 +486,46 @@ async fn connect_and_subscribe_preprocessed_once(
 
     Ok(response.into_inner())
 }
+
+/// Merges a write request into the current stored request so that subscription
+/// changes made via `write()` persist across reconnections.
+///
+/// Replaces all user subscription fields with the modification's values while
+/// preserving the internal slot tracker subscription used for replay.
+/// `from_slot` and `ping` are not replaced as they are connection-specific.
+fn merge_subscribe_requests(
+    current: &mut SubscribeRequest,
+    modification: &SubscribeRequest,
+    internal_slot_sub_id: &str,
+) {
+    // Save the internal slot tracker before replacing slots
+    let internal_tracker = current
+        .slots
+        .get(internal_slot_sub_id)
+        .cloned();
+
+    // Replace all subscription types (Yellowstone gRPC replaces, not merges)
+    current.accounts = modification.accounts.clone();
+    current.slots = modification.slots.clone();
+    current.transactions = modification.transactions.clone();
+    current.transactions_status = modification.transactions_status.clone();
+    current.blocks = modification.blocks.clone();
+    current.blocks_meta = modification.blocks_meta.clone();
+    current.entry = modification.entry.clone();
+    current.accounts_data_slice = modification.accounts_data_slice.clone();
+
+    // Restore the internal slot tracker if it existed
+    if let Some(value) = internal_tracker {
+        current
+            .slots
+            .insert(internal_slot_sub_id.to_string(), value);
+    }
+
+    // Update commitment if specified in the modification
+    if modification.commitment.is_some() {
+        current.commitment = modification.commitment;
+    }
+
+    // Note: from_slot and ping are not replaced as they are connection-specific
+}
+
