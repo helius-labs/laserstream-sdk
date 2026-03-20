@@ -231,7 +231,11 @@ impl codec::Codec for SubscribeRawCodec {
 /// Peek at raw protobuf bytes to determine the SubscribeUpdate oneof field number.
 /// Returns the field number (2=account, 3=slot, 4=transaction, 5=block, 6=ping,
 /// 7=block_meta, 8=entry, 9=pong, 10=transaction_status).
-/// All SubscribeUpdate field numbers are 1-11 (single-byte tags in protobuf wire format).
+///
+/// NOTE: This assumes all field tags are single-byte (field numbers 1-15, which encode
+/// as one byte in protobuf wire format). This is correct for the current SubscribeUpdate
+/// proto (fields 1-11). If the proto ever adds field number >= 16, the tag becomes a
+/// multi-byte varint and this parser would need updating.
 fn peek_update_type(data: &[u8]) -> Option<u8> {
     let mut pos = 0;
     while pos < data.len() {
@@ -477,7 +481,7 @@ impl StreamInner {
         }
 
         grpc.ready().await.map_err(|e| {
-            Box::new(std::io::Error::new(std::io::ErrorKind::Other, format!("Service not ready: {}", e)))
+            Box::new(Status::unavailable(format!("Service not ready: {}", e)))
                 as Box<dyn std::error::Error + Send + Sync>
         })?;
 
@@ -552,7 +556,7 @@ impl StreamInner {
                                             continue;
                                         }
 
-                                        let bytes_wrapper = crate::SubscribeUpdateBytes(buf);
+                                        let bytes_wrapper = crate::SubscribeUpdateBytes(buf.into());
                                         progress_flag.store(true, Ordering::SeqCst);
                                         let _status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
                                     }
@@ -562,7 +566,7 @@ impl StreamInner {
                                 // entry=8, transaction_status=10): forward raw bytes directly.
                                 // No prost decode or re-encode needed - just one memcpy.
                                 _ => {
-                                    let bytes_wrapper = crate::SubscribeUpdateBytes(raw_bytes.to_vec());
+                                    let bytes_wrapper = crate::SubscribeUpdateBytes(raw_bytes);
                                     progress_flag.store(true, Ordering::SeqCst);
                                     let _status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
                                 }

@@ -36,14 +36,16 @@ static STREAM_REGISTRY: LazyLock<Mutex<HashMap<String, Arc<stream::StreamInner>>
 static SIGNAL_HANDLERS_REGISTERED: AtomicBool = AtomicBool::new(false);
 static ACTIVE_STREAM_COUNT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
 
-// Simple wrapper that contains the protobuf bytes
-pub struct SubscribeUpdateBytes(pub Vec<u8>);
+// Simple wrapper that contains the protobuf bytes as ref-counted bytes::Bytes.
+// Using Bytes instead of Vec<u8> avoids an eager copy on the hot path — the .to_vec()
+// is deferred to ToNapiValue when the JS event loop actually picks up the callback.
+pub struct SubscribeUpdateBytes(pub bytes::Bytes);
 
 impl ToNapiValue for SubscribeUpdateBytes {
     unsafe fn to_napi_value(env: napi::sys::napi_env, val: Self) -> napi::Result<napi::sys::napi_value> {
-        // Create a Uint8Array from the protobuf bytes (zero-copy)
+        // Create a Uint8Array from the protobuf bytes
         let env = unsafe { napi::Env::from_raw(env) };
-        let buffer = env.create_buffer_with_data(val.0)?;
+        let buffer = env.create_buffer_with_data(val.0.to_vec())?;
         unsafe { Ok(buffer.into_unknown().raw()) }
     }
 }
@@ -182,7 +184,7 @@ impl LaserstreamClient {
         // Threadsafe function that forwards protobuf bytes to JS
         // Use bounded queue to prevent unbounded memory growth when callbacks are slow
         let ts_callback: ThreadsafeFunction<SubscribeUpdateBytes, ErrorStrategy::CalleeHandled> =
-            callback.create_threadsafe_function(100000, |ctx| {
+            callback.create_threadsafe_function(1000, |ctx| {
                 let bytes_wrapper: SubscribeUpdateBytes = ctx.value;
                 let js_uint8array = unsafe { SubscribeUpdateBytes::to_napi_value(ctx.env.raw(), bytes_wrapper)? };
                 Ok(vec![unsafe { napi::JsUnknown::from_raw(ctx.env.raw(), js_uint8array)? }])
@@ -209,7 +211,7 @@ impl LaserstreamClient {
 
         // Threadsafe function that forwards protobuf bytes to JS
         let ts_callback: ThreadsafeFunction<SubscribePreprocessedUpdateBytes, ErrorStrategy::CalleeHandled> =
-            callback.create_threadsafe_function(100000, |ctx| {
+            callback.create_threadsafe_function(1000, |ctx| {
                 let bytes_wrapper: SubscribePreprocessedUpdateBytes = ctx.value;
                 let js_uint8array = unsafe { SubscribePreprocessedUpdateBytes::to_napi_value(ctx.env.raw(), bytes_wrapper)? };
                 Ok(vec![unsafe { napi::JsUnknown::from_raw(ctx.env.raw(), js_uint8array)? }])
