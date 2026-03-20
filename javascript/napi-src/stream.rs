@@ -7,10 +7,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::oneshot;
+use bytes::Buf;
 use laserstream_core_client::{ClientTlsConfig, Interceptor};
 use laserstream_core_proto::prelude::{geyser_client::GeyserClient};
 use laserstream_core_proto::geyser;
-use laserstream_core_proto::tonic::{codec::CompressionEncoding, transport::Endpoint, Request, Status, metadata::MetadataValue};
+use laserstream_core_proto::tonic::{codec::{self, CompressionEncoding}, transport::Endpoint, Request, Status, metadata::MetadataValue};
 use uuid;
 use prost::Message;
 use crate::client::ChannelOptions;
@@ -22,7 +23,7 @@ const FORK_DEPTH_SAFETY_MARGIN: u64 = 31; // Max fork depth for processed commit
 
 // SDK metadata constants
 const SDK_NAME: &str = "laserstream-javascript";
-const SDK_VERSION: &str = "0.2.9";
+const SDK_VERSION: &str = "0.3.1";
 
 /// Custom interceptor that adds SDK metadata headers to all gRPC requests
 #[derive(Clone)]
@@ -161,16 +162,133 @@ fn configure_endpoint(
             .initial_stream_window_size(Some(4 * 1024 * 1024))
             .initial_connection_window_size(Some(8 * 1024 * 1024));
     } else {
-        // Use defaults
+        // Apply performance defaults even without explicit channel_options.
+        // tcp_nodelay disables Nagle's algorithm (critical for H2 WINDOW_UPDATE latency).
+        // Adaptive windows and large initial window sizes prevent H2 flow control
+        // from throttling high-throughput streams (default 65KB window is far too small).
         endpoint = endpoint
             .connect_timeout(Duration::from_secs(10))
-            .timeout(Duration::from_secs(10));
+            .timeout(Duration::from_secs(10))
+            .http2_adaptive_window(true)
+            .tcp_nodelay(true)
+            .initial_stream_window_size(Some(4 * 1024 * 1024))
+            .initial_connection_window_size(Some(8 * 1024 * 1024));
     }
 
     // Configure TLS
     endpoint = endpoint.tls_config(ClientTlsConfig::new().with_enabled_roots())?;
 
     Ok(endpoint)
+}
+
+// --- Custom Raw Bytes Codec ---
+// Eliminates double-serialization: instead of prost decode → Rust struct → prost re-encode,
+// the decoder passes raw protobuf bytes through directly. Only slot/ping/pong messages
+// (tiny, <1% of traffic) are decoded with prost for connection health and slot tracking.
+
+/// Decoder that passes raw protobuf bytes through without deserializing.
+struct RawBytesDecoder;
+
+impl codec::Decoder for RawBytesDecoder {
+    type Item = bytes::Bytes;
+    type Error = Status;
+
+    fn decode(&mut self, src: &mut codec::DecodeBuf<'_>) -> std::result::Result<Option<Self::Item>, Self::Error> {
+        let len = src.remaining();
+        if len == 0 {
+            return Ok(None);
+        }
+        Ok(Some(src.copy_to_bytes(len)))
+    }
+}
+
+/// Encoder that serializes SubscribeRequest using prost (for outgoing pings/writes).
+struct ProstRequestEncoder;
+
+impl codec::Encoder for ProstRequestEncoder {
+    type Item = geyser::SubscribeRequest;
+    type Error = Status;
+
+    fn encode(&mut self, item: Self::Item, dst: &mut codec::EncodeBuf<'_>) -> std::result::Result<(), Self::Error> {
+        item.encode(dst)
+            .map_err(|e| Status::internal(format!("prost encode error: {}", e)))
+    }
+}
+
+/// Custom codec: prost-encodes outgoing SubscribeRequests, passes incoming bytes through raw.
+struct SubscribeRawCodec;
+
+impl codec::Codec for SubscribeRawCodec {
+    type Encode = geyser::SubscribeRequest;
+    type Decode = bytes::Bytes;
+    type Encoder = ProstRequestEncoder;
+    type Decoder = RawBytesDecoder;
+
+    fn encoder(&mut self) -> Self::Encoder { ProstRequestEncoder }
+    fn decoder(&mut self) -> Self::Decoder { RawBytesDecoder }
+}
+
+/// Peek at raw protobuf bytes to determine the SubscribeUpdate oneof field number.
+/// Returns the field number (2=account, 3=slot, 4=transaction, 5=block, 6=ping,
+/// 7=block_meta, 8=entry, 9=pong, 10=transaction_status).
+///
+/// NOTE: This assumes all field tags are single-byte (field numbers 1-15, which encode
+/// as one byte in protobuf wire format). This is correct for the current SubscribeUpdate
+/// proto (fields 1-11). If the proto ever adds field number >= 16, the tag becomes a
+/// multi-byte varint and this parser would need updating.
+fn peek_update_type(data: &[u8]) -> Option<u8> {
+    let mut pos = 0;
+    while pos < data.len() {
+        let tag = data[pos];
+        pos += 1;
+        let field_number = tag >> 3;
+        let wire_type = tag & 0x07;
+
+        // Fields 2-10 are the oneof variants we care about
+        if field_number >= 2 && field_number <= 10 {
+            return Some(field_number);
+        }
+
+        // Skip this field's value based on wire type
+        match wire_type {
+            0 => {
+                // Varint: skip bytes until MSB is 0
+                while pos < data.len() && data[pos] & 0x80 != 0 {
+                    pos += 1;
+                }
+                if pos < data.len() {
+                    pos += 1; // skip the final byte (MSB = 0)
+                }
+            }
+            2 => {
+                // Length-delimited: read varint length, then skip that many bytes
+                if let Some((len, bytes_read)) = read_varint(&data[pos..]) {
+                    pos += bytes_read + len as usize;
+                } else {
+                    return None;
+                }
+            }
+            _ => return None, // Unexpected wire type for SubscribeUpdate fields
+        }
+    }
+    None
+}
+
+/// Read a varint from a byte slice. Returns (value, bytes_consumed).
+fn read_varint(data: &[u8]) -> Option<(u64, usize)> {
+    let mut result: u64 = 0;
+    let mut shift = 0;
+    for (i, &byte) in data.iter().enumerate() {
+        result |= ((byte & 0x7F) as u64) << shift;
+        if byte & 0x80 == 0 {
+            return Some((result, i + 1));
+        }
+        shift += 7;
+        if shift >= 64 {
+            return None;
+        }
+    }
+    None
 }
 
 pub struct StreamInner {
@@ -344,28 +462,42 @@ impl StreamInner {
         // Connect to create channel
         let channel = endpoint_configured.connect().await?;
 
-        // Create geyser client with our custom interceptor and channel config
-        let mut geyser_client = GeyserClient::with_interceptor(channel, interceptor)
+        // Use low-level Grpc client with custom raw bytes codec instead of GeyserClient.
+        // This eliminates the double-serialization bottleneck: instead of
+        //   gRPC bytes → prost decode → Rust struct → prost re-encode → Vec<u8> → JS
+        // the fast path is now:
+        //   gRPC bytes → copy_to_bytes() → Vec<u8> → JS
+        let svc = laserstream_core_proto::tonic::codegen::InterceptedService::new(channel, interceptor);
+        let mut grpc = laserstream_core_proto::tonic::client::Grpc::new(svc)
             .max_decoding_message_size(channel_config.max_recv_msg_size)
             .max_encoding_message_size(channel_config.max_send_msg_size);
 
         // Configure compression if specified
         if let Some(encoding) = channel_config.send_compression {
-            geyser_client = geyser_client.send_compressed(encoding);
+            grpc = grpc.send_compressed(encoding);
         }
         if let Some(encoding) = channel_config.accept_compression {
-            geyser_client = geyser_client.accept_compressed(encoding);
+            grpc = grpc.accept_compressed(encoding);
         }
 
-        // Create bidirectional stream
+        grpc.ready().await.map_err(|e| {
+            Box::new(Status::unavailable(format!("Service not ready: {}", e)))
+                as Box<dyn std::error::Error + Send + Sync>
+        })?;
+
+        // Create bidirectional stream with raw bytes codec
         let (mut sender, mut stream) = {
             use futures_channel::mpsc as futures_mpsc;
             let (mut subscribe_tx, subscribe_rx) = futures_mpsc::unbounded();
             subscribe_tx.send(request.clone()).await?;
-            let response = geyser_client.subscribe(subscribe_rx).await?;
+            let codec = SubscribeRawCodec;
+            let path = laserstream_core_proto::tonic::codegen::http::uri::PathAndQuery::from_static(
+                "/geyser.Geyser/Subscribe",
+            );
+            let response = grpc.streaming(Request::new(subscribe_rx), path, codec).await?;
             (subscribe_tx, response.into_inner())
         };
-        
+
         // Ping interval timer
         let mut ping_interval = tokio::time::interval(Duration::from_secs(30));
         ping_interval.tick().await; // Skip first immediate tick
@@ -382,93 +514,70 @@ impl StreamInner {
                     };
                     let _ = sender.send(ping_request).await;
                 },
-                // Handle incoming messages from the server
+                // Handle incoming messages from the server (raw bytes via custom codec)
                 Some(result) = stream.next() => {
                     match result {
-                Ok(message) => {
-                    
-                    // Handle ping/pong mechanism for connection health
-                    if let Some(geyser::subscribe_update::UpdateOneof::Ping(_ping)) = &message.update_oneof {
-                        // Respond with pong to maintain connection (use static ID since ping doesn't contain one)
-                        let pong_request = geyser::SubscribeRequest {
-                            ping: Some(geyser::SubscribeRequestPing { id: 1 }),
-                            ..Default::default()
-                        };
-                        // Send pong response (ignore errors as connection issues will be handled by reconnect logic)
-                        let _ = sender.send(pong_request).await;
-                        // Don't forward ping messages to JavaScript - they're internal connection health
-                        continue;
-                    }
-                        // Do not forward server 'Pong' updates to JavaScript either
-                        if let Some(geyser::subscribe_update::UpdateOneof::Pong(_pong)) = &message.update_oneof {
-                            continue;
+                        Ok(raw_bytes) => {
+                            // Peek at protobuf wire format to classify message type without full decode
+                            let update_type = peek_update_type(&raw_bytes);
+
+                            match update_type {
+                                // Ping (field 6): respond with pong, don't forward to JS
+                                Some(6) => {
+                                    let pong_request = geyser::SubscribeRequest {
+                                        ping: Some(geyser::SubscribeRequestPing { id: 1 }),
+                                        ..Default::default()
+                                    };
+                                    let _ = sender.send(pong_request).await;
+                                    continue;
+                                }
+                                // Pong (field 9): don't forward to JS
+                                Some(9) => continue,
+                                // Slot (field 3): decode for slot tracking, then forward with filter cleanup
+                                Some(3) => {
+                                    if let Ok(message) = geyser::SubscribeUpdate::decode(raw_bytes.as_ref()) {
+                                        if let Some(geyser::subscribe_update::UpdateOneof::Slot(slot)) = &message.update_oneof {
+                                            tracked_slot.fetch_max(slot.slot, Ordering::SeqCst);
+                                        }
+
+                                        // If exclusively from internal subscription, skip forwarding
+                                        if message.filters.len() == 1 && message.filters.contains(&internal_slot_sub_id) {
+                                            continue;
+                                        }
+
+                                        // User also has a slot subscription - remove internal filter and re-encode
+                                        let mut clean_message = message;
+                                        if let Some(pos) = clean_message.filters.iter().position(|id| id == &internal_slot_sub_id) {
+                                            clean_message.filters.swap_remove(pos);
+                                        }
+
+                                        let mut buf = Vec::new();
+                                        if let Err(_e) = clean_message.encode(&mut buf) {
+                                            continue;
+                                        }
+
+                                        let bytes_wrapper = crate::SubscribeUpdateBytes(buf.into());
+                                        progress_flag.store(true, Ordering::SeqCst);
+                                        let _status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
+                                    }
+                                    continue;
+                                }
+                                // All other messages (account=2, transaction=4, block=5, block_meta=7,
+                                // entry=8, transaction_status=10): forward raw bytes directly.
+                                // No prost decode or re-encode needed - just one memcpy.
+                                _ => {
+                                    let bytes_wrapper = crate::SubscribeUpdateBytes(raw_bytes);
+                                    progress_flag.store(true, Ordering::SeqCst);
+                                    let _status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
+                                }
+                            }
                         }
-
-                    // Track slot updates for reconnection (only decode when necessary)
-                    if let Some(geyser::subscribe_update::UpdateOneof::Slot(slot)) = &message.update_oneof {
-                        tracked_slot.store(slot.slot, Ordering::SeqCst);
-
-                        // Check if this slot update is EXCLUSIVELY from our internal subscription
-                        // Only skip if the message contains ONLY the internal filter ID (not mixed with user subscriptions)
-                        if message.filters.len() == 1 && message.filters.contains(&internal_slot_sub_id) {
-                            continue; // Skip forwarding this message
-                        }
-
-                        // If we reach here, user ALSO has a slot subscription
-                        // Remove internal filter ID so it doesn't leak to user
-                        // OPTIMIZATION: Only clean filters for slot messages (not all messages)
-                        let mut clean_message = message;
-                        if let Some(pos) = clean_message.filters.iter().position(|id| id == &internal_slot_sub_id) {
-                            clean_message.filters.swap_remove(pos);
-                        }
-
-                        // Serialize the protobuf message to bytes
-                        let mut buf = Vec::new();
-                        if let Err(_e) = clean_message.encode(&mut buf) {
-                            // Failed to encode protobuf message, skip this message
-                            continue;
-                        }
-
-                        let bytes_wrapper = crate::SubscribeUpdateBytes(buf);
-
-                        // mark that at least one message was forwarded in this session
-                        progress_flag.store(true, Ordering::SeqCst);
-
-                        // Use Blocking mode to prevent message drops and handle errors
-                        let status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
-                        if status != napi::Status::Ok {
-                            // Failed to deliver bytes to JavaScript, continue processing
-                            // Continue processing other messages instead of breaking the stream
-                        }
-                        continue; // Skip to next message
-                    }
-
-                    // For all non-slot messages, forward as-is (no filter cleanup needed)
-                    // Internal slot ID will never appear in account/transaction/block messages
-                    let mut buf = Vec::new();
-                    if let Err(_e) = message.encode(&mut buf) {
-                        // Failed to encode protobuf message, skip this message
-                        continue;
-                    }
-
-                    let bytes_wrapper = crate::SubscribeUpdateBytes(buf);
-
-                    // mark that at least one message was forwarded in this session
-                    progress_flag.store(true, Ordering::SeqCst);
-
-                    // Use Blocking mode to prevent message drops and handle errors
-                    let status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
-                    if status != napi::Status::Ok {
-                        // Failed to deliver bytes to JavaScript, continue processing
-                        // Continue processing other messages instead of breaking the stream
-                    }
-                }
                         Err(e) => {
                             return Err(Box::new(e));
                         }
                     }
                 },
-                
+
                 // Handle write requests from the JavaScript client
                 Some(write_request) = write_rx.recv() => {
                     // IMPORTANT: Merge the write_request into current_request so it persists across reconnections
@@ -482,14 +591,14 @@ impl StreamInner {
                         return Err(Box::new(e));
                     }
                 },
-                
+
                 // If both streams are closed, exit
                 else => {
                     break;
                 },
             }
         }
-        
+
         Ok(())
     }
 
