@@ -1,6 +1,6 @@
 [package]
 name = "helius-laserstream"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2021"
 authors = ["Helius <support@helius.xyz>"]
 description = "Rust client for Helius LaserStream gRPC with robust reconnection and slot tracking"

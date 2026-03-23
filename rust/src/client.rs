@@ -22,7 +22,7 @@ use laserstream_core_proto::geyser::{
 const HARD_CAP_RECONNECT_ATTEMPTS: u32 = (20 * 60) / 5; // 20 mins / 5 sec interval
 const FIXED_RECONNECT_INTERVAL_MS: u64 = 5000; // 5 seconds fixed interval
 const SDK_NAME: &str = "laserstream-rust";
-const SDK_VERSION: &str = "0.1.7";
+const SDK_VERSION: &str = "0.1.8";
 
 /// Custom interceptor that adds SDK metadata headers to all gRPC requests
 #[derive(Clone)]
