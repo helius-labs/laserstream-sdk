@@ -22,7 +22,7 @@ use laserstream_core_proto::geyser::{
 const HARD_CAP_RECONNECT_ATTEMPTS: u32 = (20 * 60) / 5; // 20 mins / 5 sec interval
 const FIXED_RECONNECT_INTERVAL_MS: u64 = 5000; // 5 seconds fixed interval
 const SDK_NAME: &str = "laserstream-rust";
-const SDK_VERSION: &str = "0.1.8";
+const SDK_VERSION: &str = "0.1.9";
 
 /// Custom interceptor that adds SDK metadata headers to all gRPC requests
 #[derive(Clone)]
@@ -118,7 +118,7 @@ pub fn subscribe(
             current_request.from_slot = None;
         }
 
-        let api_key_string = config.api_key.clone(); 
+        let api_key_string = config.api_key.clone();
 
         loop {
             // Drain any pending write requests that arrived during reconnection delay.
@@ -127,23 +127,22 @@ pub fn subscribe(
                 merge_subscribe_requests(&mut current_request, &write_request, &internal_slot_sub_id);
             }
 
-            let mut attempt_request = current_request.clone();
-
-            // On reconnection, use the last tracked slot with fork safety only if replay is enabled
-            if reconnect_attempts > 0 && tracked_slot > 0 && replay_enabled {
-                // Apply fork safety margin for PROCESSED commitment (default)
-                let commitment_level = attempt_request.commitment.unwrap_or(0);
+            // Always update from_slot on current_request based on tracked_slot.
+            // This ensures reconnections always use the most recent slot, even after
+            // a successful connection that subsequently errors on the stream.
+            if tracked_slot > 0 && replay_enabled {
+                let commitment_level = current_request.commitment.unwrap_or(0);
                 let from_slot = match commitment_level {
                     0 => tracked_slot.saturating_sub(31), // PROCESSED: rewind by 31 slots
                     1 | 2 => tracked_slot,                 // CONFIRMED/FINALIZED: exact slot
                     _ => tracked_slot.saturating_sub(31),  // Unknown: default to safe behavior
-                    };
-                    
-                attempt_request.from_slot = Some(from_slot);
+                };
+                current_request.from_slot = Some(from_slot);
             } else if !replay_enabled {
-                // Ensure from_slot is always None when replay is disabled
-                attempt_request.from_slot = None;
+                current_request.from_slot = None;
             }
+
+            let attempt_request = current_request.clone();
 
             match connect_and_subscribe_once(&config, attempt_request, api_key_string.clone()).await {
                 Ok((sender, stream)) => {
