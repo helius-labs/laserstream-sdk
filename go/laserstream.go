@@ -32,7 +32,7 @@ const (
 // SDK metadata constants
 const (
 	SDKName    = "laserstream-go"
-	SDKVersion = "0.1.1"
+	SDKVersion = "0.1.2"
 )
 
 // Commitment levels
@@ -349,46 +349,57 @@ func (c *Client) connectAndStream(ctx context.Context) error {
 
 // handleStream processes messages from the stream
 func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeClient) error {
-	// Start a goroutine to handle write requests
+	// All Send() calls go through a single goroutine to avoid concurrent
+	// stream.Send() which is not safe on gRPC bidirectional streams.
+	sendChan := make(chan *SubscribeRequest, 100)
+	sendErrChan := make(chan error, 1)
+
+	sendCtx, cancelSend := context.WithCancel(ctx)
+	defer cancelSend()
+
 	go func() {
+		pingTicker := time.NewTicker(30 * time.Second)
+		defer pingTicker.Stop()
+
 		for {
 			select {
-			case <-ctx.Done():
+			case <-sendCtx.Done():
 				return
 			case <-c.writeStopChan:
 				return
 			case req := <-c.writeChan:
 				if req != nil {
+					// Merge into originalRequest so writes survive reconnection
+					c.mergeSubscribeRequest(req)
 					if err := stream.Send(req); err != nil {
-						if c.errorCallback != nil {
-							c.errorCallback(fmt.Errorf("failed to send write request: %w", err))
+						select {
+						case sendErrChan <- err:
+						default:
 						}
+						return
 					}
 				}
-			}
-		}
-	}()
-
-	// Start periodic ping goroutine
-	pingCtx, cancelPing := context.WithCancel(ctx)
-	defer cancelPing()
-	
-	go func() {
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-		
-		for {
-			select {
-			case <-pingCtx.Done():
-				return
-			case <-ticker.C:
+			case req := <-sendChan:
+				if req != nil {
+					if err := stream.Send(req); err != nil {
+						select {
+						case sendErrChan <- err:
+						default:
+						}
+						return
+					}
+				}
+			case <-pingTicker.C:
 				pingReq := &SubscribeRequest{
 					Ping: &SubscribeRequestPing{
 						Id: int32(time.Now().UnixMilli()),
 					},
 				}
 				if err := stream.Send(pingReq); err != nil {
-					// If ping fails, let main stream handler deal with reconnection
+					select {
+					case sendErrChan <- err:
+					default:
+					}
 					return
 				}
 			}
@@ -399,6 +410,8 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 		select {
 		case <-ctx.Done():
 			return nil
+		case err := <-sendErrChan:
+			return fmt.Errorf("send error: %w", err)
 		default:
 		}
 
@@ -419,12 +432,13 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 		// Handle ping/pong for connection health
 		if pingUpdate, ok := resp.UpdateOneof.(*pb.SubscribeUpdate_Ping); ok {
 			if pingUpdate.Ping != nil {
-				// Respond with pong
 				pongReq := &SubscribeRequest{
 					Ping: &SubscribeRequestPing{Id: 1},
 				}
-				if err := stream.Send(pongReq); err != nil {
-					return fmt.Errorf("failed to send pong: %w", err)
+				select {
+				case sendChan <- pongReq:
+				default:
+					return fmt.Errorf("failed to send pong: send channel full")
 				}
 			}
 			continue
@@ -473,6 +487,53 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 			c.dataCallback(resp)
 		}
 	}
+}
+
+// mergeSubscribeRequest replaces the subscription fields in originalRequest with
+// the write request, preserving the internal slot tracker and from_slot.
+// This ensures writes survive reconnection, matching JS/Rust SDK behavior.
+func (c *Client) mergeSubscribeRequest(modification *SubscribeRequest) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Save internal slot tracker before replacing slots
+	var internalKey string
+	var internalVal *SubscribeRequestFilterSlots
+	if c.originalRequest.Slots != nil {
+		for k, v := range c.originalRequest.Slots {
+			if strings.HasPrefix(k, "__internal_slot_tracker_") {
+				internalKey = k
+				internalVal = v
+				break
+			}
+		}
+	}
+
+	// Replace all subscription fields
+	c.originalRequest.Accounts = modification.Accounts
+	c.originalRequest.Slots = modification.Slots
+	c.originalRequest.Transactions = modification.Transactions
+	c.originalRequest.TransactionsStatus = modification.TransactionsStatus
+	c.originalRequest.Blocks = modification.Blocks
+	c.originalRequest.BlocksMeta = modification.BlocksMeta
+	c.originalRequest.Entry = modification.Entry
+	c.originalRequest.AccountsDataSlice = modification.AccountsDataSlice
+
+	// Restore internal slot tracker
+	if internalKey != "" && internalVal != nil {
+		if c.originalRequest.Slots == nil {
+			c.originalRequest.Slots = make(map[string]*SubscribeRequestFilterSlots)
+		}
+		c.originalRequest.Slots[internalKey] = internalVal
+	}
+
+	// Update commitment if specified, and sync commitmentLevel used for reconnection
+	if modification.Commitment != nil {
+		c.originalRequest.Commitment = modification.Commitment
+		c.commitmentLevel = int32(*modification.Commitment)
+	}
+
+	// Note: FromSlot and Ping are not replaced — they are connection-specific
 }
 
 // updateRequestForReconnection updates the request with from_slot for reconnection
