@@ -369,10 +369,14 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 				return
 			case req := <-c.writeChan:
 				if req != nil {
+					// Merge into originalRequest so writes survive reconnection
+					c.mergeSubscribeRequest(req)
 					if err := stream.Send(req); err != nil {
-						if c.errorCallback != nil {
-							c.errorCallback(fmt.Errorf("failed to send write request: %w", err))
+						select {
+						case sendErrChan <- err:
+						default:
 						}
+						return
 					}
 				}
 			case req := <-sendChan:
@@ -486,6 +490,52 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 }
 
 // updateRequestForReconnection updates the request with from_slot for reconnection
+// mergeSubscribeRequest replaces the subscription fields in originalRequest with
+// the write request, preserving the internal slot tracker and from_slot.
+// This ensures writes survive reconnection, matching JS/Rust SDK behavior.
+func (c *Client) mergeSubscribeRequest(modification *SubscribeRequest) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Save internal slot tracker before replacing slots
+	var internalKey string
+	var internalVal *SubscribeRequestFilterSlots
+	if c.originalRequest.Slots != nil {
+		for k, v := range c.originalRequest.Slots {
+			if strings.HasPrefix(k, "__internal_slot_tracker_") {
+				internalKey = k
+				internalVal = v
+				break
+			}
+		}
+	}
+
+	// Replace all subscription fields
+	c.originalRequest.Accounts = modification.Accounts
+	c.originalRequest.Slots = modification.Slots
+	c.originalRequest.Transactions = modification.Transactions
+	c.originalRequest.TransactionsStatus = modification.TransactionsStatus
+	c.originalRequest.Blocks = modification.Blocks
+	c.originalRequest.BlocksMeta = modification.BlocksMeta
+	c.originalRequest.Entry = modification.Entry
+	c.originalRequest.AccountsDataSlice = modification.AccountsDataSlice
+
+	// Restore internal slot tracker
+	if internalKey != "" && internalVal != nil {
+		if c.originalRequest.Slots == nil {
+			c.originalRequest.Slots = make(map[string]*SubscribeRequestFilterSlots)
+		}
+		c.originalRequest.Slots[internalKey] = internalVal
+	}
+
+	// Update commitment if specified
+	if modification.Commitment != nil {
+		c.originalRequest.Commitment = modification.Commitment
+	}
+
+	// Note: FromSlot and Ping are not replaced — they are connection-specific
+}
+
 func (c *Client) updateRequestForReconnection() {
 	// Only use from_slot when replay is enabled
 	if !c.isReplayEnabled() {
