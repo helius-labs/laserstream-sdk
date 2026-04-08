@@ -489,7 +489,6 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 	}
 }
 
-// updateRequestForReconnection updates the request with from_slot for reconnection
 // mergeSubscribeRequest replaces the subscription fields in originalRequest with
 // the write request, preserving the internal slot tracker and from_slot.
 // This ensures writes survive reconnection, matching JS/Rust SDK behavior.
@@ -528,14 +527,16 @@ func (c *Client) mergeSubscribeRequest(modification *SubscribeRequest) {
 		c.originalRequest.Slots[internalKey] = internalVal
 	}
 
-	// Update commitment if specified
+	// Update commitment if specified, and sync commitmentLevel used for reconnection
 	if modification.Commitment != nil {
 		c.originalRequest.Commitment = modification.Commitment
+		c.commitmentLevel = int32(*modification.Commitment)
 	}
 
 	// Note: FromSlot and Ping are not replaced — they are connection-specific
 }
 
+// updateRequestForReconnection updates the request with from_slot for reconnection
 func (c *Client) updateRequestForReconnection() {
 	// Only use from_slot when replay is enabled
 	if !c.isReplayEnabled() {
