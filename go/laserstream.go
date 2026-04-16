@@ -16,7 +16,7 @@ import (
 	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
+
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -28,7 +28,6 @@ const (
 	HardCapReconnectAttempts = 240  // 20 minutes / 5 seconds = 240 attempts
 	FixedReconnectIntervalMs = 5000 // 5 seconds fixed interval
 	ForkDepthSafetyMargin    = 31   // Max fork depth for processed commitment
-	StreamStallTimeout       = 60 * time.Second // Force reconnect if no messages (including pongs) for this duration
 )
 
 // SDK metadata constants
@@ -36,12 +35,6 @@ const (
 	SDKName    = "laserstream-go"
 	SDKVersion = "0.1.3"
 )
-
-// recvResult holds the result of an asynchronous stream.Recv() call
-type recvResult struct {
-	resp *pb.SubscribeUpdate
-	err  error
-}
 
 // Commitment levels
 const (
@@ -139,20 +132,6 @@ func (c *Client) isReplayEnabled() bool {
 		return true
 	}
 	return *c.config.Replay
-}
-
-// storeMaxSlot atomically updates trackedSlot only if newVal is greater than the current value.
-// This prevents slot regression when out-of-order messages arrive.
-func (c *Client) storeMaxSlot(newVal uint64) {
-	for {
-		current := atomic.LoadUint64(&c.trackedSlot)
-		if newVal <= current {
-			return
-		}
-		if atomic.CompareAndSwapUint64(&c.trackedSlot, current, newVal) {
-			return
-		}
-	}
 }
 
 // SubscribeWithContext initiates a subscription using the provided context.
@@ -337,11 +316,7 @@ func (c *Client) connectAndStream(ctx context.Context) error {
 	// Create gRPC client and stream
 	geyserClient := pb.NewGeyserClient(c.conn)
 
-	// Create cancellable context for the stream. This allows the stall detector
-	// to cancel the stream (unblocking Recv) without cancelling the parent context.
-	streamCtx, cancelStream := context.WithCancel(ctx)
-	defer cancelStream()
-
+	streamCtx := ctx
 	// Create metadata with SDK information and API key
 	md := metadata.New(map[string]string{
 		"x-sdk-name":    SDKName,
@@ -370,23 +345,19 @@ func (c *Client) connectAndStream(ctx context.Context) error {
 	c.mu.Unlock()
 
 	// Handle streaming messages
-	return c.handleStream(ctx, stream, cancelStream)
+	return c.handleStream(ctx, stream)
 }
 
-// handleStream processes messages from the stream.
-// cancelStream can be called to cancel the gRPC stream context, which unblocks
-// any pending Recv() call. This is used by the stall detector.
-func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeClient, cancelStream context.CancelFunc) error {
+// handleStream processes messages from the stream
+func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeClient) error {
 	// All Send() calls go through a single goroutine to avoid concurrent
 	// stream.Send() which is not safe on gRPC bidirectional streams.
 	sendChan := make(chan *SubscribeRequest, 100)
 	sendErrChan := make(chan error, 1)
-	recvChan := make(chan recvResult, 1)
 
 	sendCtx, cancelSend := context.WithCancel(ctx)
 	defer cancelSend()
 
-	// Send goroutine: handles pings, pongs, and write requests
 	go func() {
 		pingTicker := time.NewTicker(30 * time.Second)
 		defer pingTicker.Stop()
@@ -449,135 +420,85 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 		}
 	}()
 
-	// Receive goroutine: runs Recv() in a goroutine so the main loop can
-	// select on it alongside the stall timer and context cancellation.
-	// This fixes the core issue where a blocking Recv() prevented detection
-	// of stalled streams (no messages but HTTP/2 connection alive).
-	go func() {
-		for {
-			resp, err := stream.Recv()
-			select {
-			case recvChan <- recvResult{resp: resp, err: err}:
-			case <-sendCtx.Done():
-				return
-			}
-			if err != nil {
-				return
-			}
-		}
-	}()
-
-	// Stall detection: if no message is received within StreamStallTimeout
-	// (including pongs from our 30s pings), the stream is considered dead.
-	// This catches scenarios where the gRPC stream silently stops delivering
-	// data while the HTTP/2 connection remains alive.
-	stallTimer := time.NewTimer(StreamStallTimeout)
-	defer stallTimer.Stop()
-
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-
 		case err := <-sendErrChan:
 			return fmt.Errorf("send error: %w", err)
+		default:
+		}
 
-		case <-stallTimer.C:
-			// If the parent context was also cancelled, exit gracefully
-			if ctx.Err() != nil {
-				return nil
-			}
-			fmt.Printf("RECONNECT: Stream stalled (no messages received for %v), forcing reconnect\n", StreamStallTimeout)
-			cancelStream()
-			return fmt.Errorf("stream stalled: no messages received for %v", StreamStallTimeout)
-
-		case result := <-recvChan:
-			if result.err != nil {
-				if result.err == io.EOF {
-					return fmt.Errorf("stream ended")
-				}
-
-				st, ok := status.FromError(result.err)
-				if ok && (st.Code() == codes.Unavailable || st.Code() == codes.DeadlineExceeded) {
-					return fmt.Errorf("stream unavailable: %w", result.err)
-				}
-
-				// Don't report context cancellation from stall detection as a stream error
-				if ctx.Err() != nil {
-					return nil
-				}
-
-				return fmt.Errorf("stream error: %w", result.err)
+		resp, err := stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				return fmt.Errorf("stream ended")
 			}
 
-			resp := result.resp
+			st, ok := status.FromError(err)
+			if ok && (st.Code() == codes.Unavailable || st.Code() == codes.DeadlineExceeded) {
+				return fmt.Errorf("stream unavailable: %w", err)
+			}
 
-			// Reset stall timer on every received message (including pings/pongs)
-			if !stallTimer.Stop() {
+			return fmt.Errorf("stream error: %w", err)
+		}
+
+		// Handle ping/pong for connection health
+		if pingUpdate, ok := resp.UpdateOneof.(*pb.SubscribeUpdate_Ping); ok {
+			if pingUpdate.Ping != nil {
+				pongReq := &SubscribeRequest{
+					Ping: &SubscribeRequestPing{Id: 1},
+				}
 				select {
-				case <-stallTimer.C:
+				case sendChan <- pongReq:
 				default:
+					return fmt.Errorf("failed to send pong: send channel full")
 				}
 			}
-			stallTimer.Reset(StreamStallTimeout)
+			continue
+		}
 
-			// Handle ping/pong for connection health
-			if pingUpdate, ok := resp.UpdateOneof.(*pb.SubscribeUpdate_Ping); ok {
-				if pingUpdate.Ping != nil {
-					pongReq := &SubscribeRequest{
-						Ping: &SubscribeRequestPing{Id: 1},
-					}
-					select {
-					case sendChan <- pongReq:
-					default:
-						return fmt.Errorf("failed to send pong: send channel full")
-					}
-				}
-				continue
+		// Hide any server-side pong updates from user callbacks
+		if _, ok := resp.UpdateOneof.(*pb.SubscribeUpdate_Pong); ok {
+			continue
+		}
+
+		// Track slot updates for reconnection only when replay is enabled
+		if slotUpdate, ok := resp.UpdateOneof.(*pb.SubscribeUpdate_Slot); ok {
+			if slotUpdate.Slot != nil && c.isReplayEnabled() {
+				atomic.StoreUint64(&c.trackedSlot, slotUpdate.Slot.Slot)
 			}
 
-			// Hide any server-side pong updates from user callbacks
-			if _, ok := resp.UpdateOneof.(*pb.SubscribeUpdate_Pong); ok {
-				continue
+			// Check if this slot update is EXCLUSIVELY from our internal subscription
+			if c.isReplayEnabled() && len(resp.Filters) == 1 && resp.Filters[0] == c.internalSlotSubID {
+				continue // Skip forwarding this message
 			}
+		}
 
-			// Track slot updates for reconnection only when replay is enabled
-			if slotUpdate, ok := resp.UpdateOneof.(*pb.SubscribeUpdate_Slot); ok {
-				if slotUpdate.Slot != nil && c.isReplayEnabled() {
-					c.storeMaxSlot(slotUpdate.Slot.Slot)
-				}
-
-				// Check if this slot update is EXCLUSIVELY from our internal subscription
-				if c.isReplayEnabled() && len(resp.Filters) == 1 && resp.Filters[0] == c.internalSlotSubID {
-					continue // Skip forwarding this message
-				}
+		// Also track slots from block updates when replay is enabled (for cases where no slot subscription exists)
+		if blockUpdate, ok := resp.UpdateOneof.(*pb.SubscribeUpdate_Block); ok {
+			if blockUpdate.Block != nil && c.isReplayEnabled() {
+				atomic.StoreUint64(&c.trackedSlot, blockUpdate.Block.Slot)
 			}
+		}
 
-			// Also track slots from block updates when replay is enabled (for cases where no slot subscription exists)
-			if blockUpdate, ok := resp.UpdateOneof.(*pb.SubscribeUpdate_Block); ok {
-				if blockUpdate.Block != nil && c.isReplayEnabled() {
-					c.storeMaxSlot(blockUpdate.Block.Slot)
+		// Clean up internal filter ID from ALL message types (only when replay is enabled)
+		if c.isReplayEnabled() {
+			cleanedFilters := make([]string, 0, len(resp.Filters))
+			for _, filter := range resp.Filters {
+				if filter != c.internalSlotSubID {
+					cleanedFilters = append(cleanedFilters, filter)
 				}
 			}
+			resp.Filters = cleanedFilters
+		}
 
-			// Clean up internal filter ID from ALL message types (only when replay is enabled)
-			if c.isReplayEnabled() {
-				cleanedFilters := make([]string, 0, len(resp.Filters))
-				for _, filter := range resp.Filters {
-					if filter != c.internalSlotSubID {
-						cleanedFilters = append(cleanedFilters, filter)
-					}
-				}
-				resp.Filters = cleanedFilters
-			}
+		// Mark that at least one message was forwarded in this session
+		atomic.StoreUint64(&c.madeProgress, 1)
 
-			// Mark that at least one message was forwarded in this session
-			atomic.StoreUint64(&c.madeProgress, 1)
-
-			// Forward to user callback
-			if c.dataCallback != nil {
-				c.dataCallback(resp)
-			}
+		// Forward to user callback
+		if c.dataCallback != nil {
+			c.dataCallback(resp)
 		}
 	}
 }
@@ -677,25 +598,18 @@ func (c *Client) connect(ctx context.Context) error {
 
 	// Handle production endpoint formats
 	var target string
-	useTLS := true
 	if strings.HasPrefix(endpoint, "https://") || strings.HasPrefix(endpoint, "http://") {
-		// URL format (e.g., https://example.com or http://localhost:4003)
+		// URL format (e.g., https://example.com or https://example.com:443)
 		u, err := url.Parse(endpoint)
 		if err != nil {
 			return fmt.Errorf("error parsing endpoint URL: %w", err)
 		}
 
-		// http:// means plaintext/insecure (used for testing with local proxies)
-		if u.Scheme == "http" {
-			useTLS = false
-		}
-
+		// Always use TLS and default HTTPS port
 		if u.Port() != "" {
 			target = u.Host
-		} else if useTLS {
-			target = u.Hostname() + ":443"
 		} else {
-			target = u.Hostname() + ":80"
+			target = u.Hostname() + ":443"
 		}
 	} else {
 		// Simple host:port format (e.g., localhost:4003, example.com:80, example.com)
@@ -709,12 +623,8 @@ func (c *Client) connect(ctx context.Context) error {
 	}
 
 	var opts []grpc.DialOption
-	if useTLS {
-		creds := credentials.NewClientTLSFromCert(nil, "")
-		opts = append(opts, grpc.WithTransportCredentials(creds))
-	} else {
-		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	}
+	creds := credentials.NewClientTLSFromCert(nil, "")
+	opts = append(opts, grpc.WithTransportCredentials(creds))
 
 	// Apply channel options with defaults
 	channelOpts := c.config.ChannelOptions
