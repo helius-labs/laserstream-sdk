@@ -32,7 +32,7 @@ const (
 // SDK metadata constants
 const (
 	SDKName    = "laserstream-go"
-	SDKVersion = "0.1.2"
+	SDKVersion = "0.1.3"
 )
 
 // Commitment levels
@@ -369,9 +369,15 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 				return
 			case req := <-c.writeChan:
 				if req != nil {
-					// Merge into originalRequest so writes survive reconnection
+					// Send merged originalRequest (preserves internal slot tracker, strips FromSlot)
 					c.mergeSubscribeRequest(req)
-					if err := stream.Send(req); err != nil {
+					c.mu.RLock()
+					sendReq := proto.Clone(c.originalRequest).(*SubscribeRequest)
+					c.mu.RUnlock()
+					sendReq.FromSlot = nil
+					sendReq.Ping = nil
+
+					if err := stream.Send(sendReq); err != nil {
 						select {
 						case sendErrChan <- err:
 						default:
