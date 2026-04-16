@@ -16,7 +16,6 @@ import (
 	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
-
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -370,15 +369,8 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 				return
 			case req := <-c.writeChan:
 				if req != nil {
-					// Merge into originalRequest so writes survive reconnection
+					// Send merged originalRequest (preserves internal slot tracker, strips FromSlot)
 					c.mergeSubscribeRequest(req)
-
-					// Build the request to send to the server from the merged
-					// originalRequest. This ensures:
-					// 1. Internal slot tracker is included (so server keeps tracking slots)
-					// 2. FromSlot is stripped (only valid on initial subscribe; sending it
-					//    mid-stream can cause the server to restart/confuse the replay)
-					// 3. Ping is stripped (connection-specific)
 					c.mu.RLock()
 					sendReq := proto.Clone(c.originalRequest).(*SubscribeRequest)
 					c.mu.RUnlock()
