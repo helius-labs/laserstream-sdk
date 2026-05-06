@@ -1,6 +1,6 @@
 {
   "name": "helius-laserstream",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "High-performance Laserstream gRPC client with automatic reconnection",
   "main": "client.js",
   "types": "client.d.ts",

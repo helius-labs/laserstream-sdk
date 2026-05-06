@@ -22,7 +22,7 @@ use laserstream_core_proto::geyser::{
 const HARD_CAP_RECONNECT_ATTEMPTS: u32 = (20 * 60) / 5; // 20 mins / 5 sec interval
 const FIXED_RECONNECT_INTERVAL_MS: u64 = 5000; // 5 seconds fixed interval
 const SDK_NAME: &str = "laserstream-rust";
-const SDK_VERSION: &str = "0.1.9";
+const SDK_VERSION: &str = "0.1.10";
 
 /// Custom interceptor that adds SDK metadata headers to all gRPC requests
 #[derive(Clone)]
@@ -235,7 +235,15 @@ pub fn subscribe(
                                 // Merge the write_request into current_request so it persists across reconnections
                                 merge_subscribe_requests(&mut current_request, &write_request, &internal_slot_sub_id);
 
-                                if let Err(e) = sender.send(write_request).await {
+                                // Send the merged current_request (which preserves the internal slot
+                                // tracker) instead of the raw write_request. Yellowstone gRPC replaces
+                                // all subscriptions on each write, so the raw request would drop the
+                                // internal slot tracker and cause tracked_slot to go stale.
+                                let mut send_req = current_request.clone();
+                                send_req.from_slot = None;
+                                send_req.ping = None;
+
+                                if let Err(e) = sender.send(send_req).await {
                                     warn!(error = %e, "Failed to send write request");
                                     break;
                                 }

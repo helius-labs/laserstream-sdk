@@ -23,7 +23,7 @@ const FORK_DEPTH_SAFETY_MARGIN: u64 = 31; // Max fork depth for processed commit
 
 // SDK metadata constants
 const SDK_NAME: &str = "laserstream-javascript";
-const SDK_VERSION: &str = "0.3.1";
+const SDK_VERSION: &str = "0.3.2";
 
 /// Custom interceptor that adds SDK metadata headers to all gRPC requests
 #[derive(Clone)]
@@ -580,14 +580,21 @@ impl StreamInner {
 
                 // Handle write requests from the JavaScript client
                 Some(write_request) = write_rx.recv() => {
-                    // IMPORTANT: Merge the write_request into current_request so it persists across reconnections
-                    {
+                    // Merge the write_request into current_request so it persists across reconnections.
+                    // Then send the merged current_request (which preserves the internal slot
+                    // tracker) instead of the raw write_request. Yellowstone gRPC replaces
+                    // all subscriptions on each write, so the raw request would drop the
+                    // internal slot tracker and cause tracked_slot to go stale.
+                    let send_req = {
                         let mut req = current_request.lock();
                         Self::merge_subscribe_requests(&mut req, &write_request);
-                    }
+                        let mut snapshot = req.clone();
+                        snapshot.from_slot = None;
+                        snapshot.ping = None;
+                        snapshot
+                    };
 
-                    // Send the modification to the active stream
-                    if let Err(e) = sender.send(write_request).await {
+                    if let Err(e) = sender.send(send_req).await {
                         return Err(Box::new(e));
                     }
                 },
