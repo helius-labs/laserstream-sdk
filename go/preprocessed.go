@@ -13,6 +13,7 @@ import (
 	pb "github.com/helius-labs/laserstream-sdk/go/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
@@ -138,13 +139,19 @@ func (c *PreprocessedClient) connectAndStream(ctx context.Context) error {
 	// Parse endpoint
 	endpoint := c.config.Endpoint
 	target := endpoint
+	// useInsecure is set when the endpoint uses the plaintext http:// scheme
+	// (e.g. http://localhost:4003 for the chaos proxy). Otherwise we use TLS.
+	useInsecure := false
 	if strings.HasPrefix(endpoint, "https://") || strings.HasPrefix(endpoint, "http://") {
 		u, err := url.Parse(endpoint)
 		if err != nil {
 			return fmt.Errorf("error parsing endpoint URL: %w", err)
 		}
+		useInsecure = u.Scheme == "http"
 		if u.Port() != "" {
 			target = u.Host
+		} else if useInsecure {
+			target = u.Hostname() + ":80"
 		} else {
 			target = u.Hostname() + ":443"
 		}
@@ -152,8 +159,12 @@ func (c *PreprocessedClient) connectAndStream(ctx context.Context) error {
 
 	// Create connection
 	var opts []grpc.DialOption
-	creds := credentials.NewClientTLSFromCert(nil, "")
-	opts = append(opts, grpc.WithTransportCredentials(creds))
+	if useInsecure {
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	} else {
+		creds := credentials.NewClientTLSFromCert(nil, "")
+		opts = append(opts, grpc.WithTransportCredentials(creds))
+	}
 
 	conn, err := grpc.DialContext(ctx, target, opts...)
 	if err != nil {
