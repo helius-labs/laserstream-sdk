@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -32,7 +33,7 @@ const (
 // SDK metadata constants
 const (
 	SDKName    = "laserstream-go"
-	SDKVersion = "0.1.3"
+	SDKVersion = "0.1.4"
 )
 
 // Commitment levels
@@ -590,16 +591,24 @@ func (c *Client) connect(ctx context.Context) error {
 
 	// Handle production endpoint formats
 	var target string
+	// useInsecure is set when the endpoint uses the plaintext http:// scheme
+	// (e.g. http://localhost:4003 for the chaos proxy). Otherwise we use TLS.
+	useInsecure := false
 	if strings.HasPrefix(endpoint, "https://") || strings.HasPrefix(endpoint, "http://") {
-		// URL format (e.g., https://example.com or https://example.com:443)
+		// URL format (e.g., https://example.com or http://localhost:4003)
 		u, err := url.Parse(endpoint)
 		if err != nil {
 			return fmt.Errorf("error parsing endpoint URL: %w", err)
 		}
 
-		// Always use TLS and default HTTPS port
+		useInsecure = u.Scheme == "http"
+
+		// Use the explicit port if present, otherwise default to the
+		// scheme's standard port (80 for http, 443 for https).
 		if u.Port() != "" {
 			target = u.Host
+		} else if useInsecure {
+			target = u.Hostname() + ":80"
 		} else {
 			target = u.Hostname() + ":443"
 		}
@@ -615,8 +624,12 @@ func (c *Client) connect(ctx context.Context) error {
 	}
 
 	var opts []grpc.DialOption
-	creds := credentials.NewClientTLSFromCert(nil, "")
-	opts = append(opts, grpc.WithTransportCredentials(creds))
+	if useInsecure {
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	} else {
+		creds := credentials.NewClientTLSFromCert(nil, "")
+		opts = append(opts, grpc.WithTransportCredentials(creds))
+	}
 
 	// Apply channel options with defaults
 	channelOpts := c.config.ChannelOptions
