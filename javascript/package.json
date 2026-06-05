@@ -20,6 +20,7 @@
     "build:all": "napi build --platform --release --target x86_64-apple-darwin --target aarch64-apple-darwin --target x86_64-unknown-linux-gnu",
     "build:musl": "cargo zigbuild --release --target $CARGO_BUILD_TARGET && napi build --platform --release --skip-build",
     "example:account-sub": "ts-node examples/account-sub.ts",
+    "example:cuckoo-account-sub": "ts-node examples/cuckoo-account-sub.ts",
     "example:accounts-data-slice-sub": "ts-node examples/accounts-data-slice-sub.ts",
     "example:slot-sub": "ts-node examples/slot-sub.ts",
     "example:transaction-sub": "ts-node examples/transaction-sub.ts",
