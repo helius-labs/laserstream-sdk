@@ -9,7 +9,7 @@ import {
 async function main() {
   const config: LaserstreamConfig = {
     apiKey: 'your-api-key',
-    endpoint: 'your-endpoint', // must be a cuckoo-enabled LaserStream endpoint
+    endpoint: 'your-endpoint',
   };
 
   // The accounts you want to track.
