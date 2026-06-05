@@ -101,3 +101,16 @@ export declare function decodeSubscribeUpdate(bytes: Uint8Array): SubscribeUpdat
 export declare function decodeSubscribePreprocessedUpdate(bytes: Uint8Array): SubscribePreprocessedUpdate;
 export declare function shutdownAllStreams(): void;
 export declare function getActiveStreamCount(): number;
+
+// ============================================================================
+// Compressed account (cuckoo) filtering
+// ============================================================================
+
+export {
+  CompressedAccountFilterSet,
+  TableFullError,
+  DEFAULT_HASH_SEED,
+  CuckooFilterProto,
+  CuckooAccountFilter,
+  PubkeyInput,
+} from './cuckoo';

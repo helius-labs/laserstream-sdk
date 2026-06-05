@@ -1271,15 +1271,16 @@ dependencies = [
 
 [[package]]
 name = "laserstream-core-proto"
-version = "9.0.2"
+version = "9.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a12d5ab2767a78aea87aeee99c7e62a241319a7976711e3f02f8b33844e33c03"
+checksum = "ced4061ea101ea32a275b8a1b226292cc06cf48f772b8ccd41ad5d3bd8290d96"
 dependencies = [
  "anyhow",
  "bincode",
  "prost 0.14.1",
  "prost-types",
  "protobuf-src",
+ "siphasher",
  "solana-account",
  "solana-account-decoder",
  "solana-clock",
@@ -2225,6 +2226,12 @@ checksum = "9203b8055f63a2a00e2f593bb0510367fe707d7ff1e5c872de2f537b339e5410"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "siphasher"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ee5873ec9cce0195efcb7a4e9507a04cd49aec9c83d0389df45b1ef7ba2e649"
 
 [[package]]
 name = "slab"

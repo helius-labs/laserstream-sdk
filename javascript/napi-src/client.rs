@@ -17,6 +17,7 @@ use laserstream_core_proto::geyser::{
     subscribe_request_filter_accounts_filter_lamports,
     subscribe_request_filter_accounts_filter,
     SubscribePreprocessedRequest, SubscribePreprocessedRequestFilterTransactions,
+    CuckooFilter,
 };
 
 use crate::stream::StreamInner;
@@ -86,6 +87,26 @@ pub struct JsAccountFilter {
     pub account_exclude: Option<Vec<String>>,
     #[serde(alias = "accountRequired")]
     pub account_required: Option<Vec<String>>,
+    // Compressed account (cuckoo) filter, built client-side via CompressedAccountFilterSet.
+    #[serde(alias = "cuckooAccountsFilter")]
+    pub cuckoo_accounts_filter: Option<JsCuckooFilter>,
+}
+
+// Wire form of a client-built cuckoo filter. `data` is base64 (LE u16 fingerprints)
+// and `hash_seed` is a decimal string (u64 exceeds JS safe-integer range).
+#[derive(Deserialize, Debug)]
+pub struct JsCuckooFilter {
+    pub data: String, // base64
+    #[serde(alias = "bucketCount")]
+    pub bucket_count: u32,
+    #[serde(alias = "entriesPerBucket")]
+    pub entries_per_bucket: u32,
+    #[serde(alias = "fingerprintBits")]
+    pub fingerprint_bits: u32,
+    #[serde(alias = "hashSeed")]
+    pub hash_seed: String, // decimal u64
+    #[serde(alias = "hashAlgorithm")]
+    pub hash_algorithm: i32,
 }
 
 #[derive(Deserialize, Debug)]
@@ -303,7 +324,23 @@ impl ClientInner {
                     }
                     yellowstone_filter.filters = yellowstone_filters;
                 }
-                
+
+                // Handle compressed account (cuckoo) filter — pass through bytes built client-side.
+                if let Some(cuckoo) = filter.cuckoo_accounts_filter {
+                    let data = general_purpose::STANDARD.decode(&cuckoo.data)
+                        .map_err(|e| Error::new(Status::InvalidArg, format!("Invalid base64 cuckoo data: {}", e)))?;
+                    let hash_seed = cuckoo.hash_seed.parse::<u64>()
+                        .map_err(|e| Error::new(Status::InvalidArg, format!("Invalid cuckoo hash_seed: {}", e)))?;
+                    yellowstone_filter.cuckoo_accounts_filter = Some(CuckooFilter {
+                        data,
+                        bucket_count: cuckoo.bucket_count,
+                        entries_per_bucket: cuckoo.entries_per_bucket,
+                        fingerprint_bits: cuckoo.fingerprint_bits,
+                        hash_seed,
+                        hash_algorithm: cuckoo.hash_algorithm,
+                    });
+                }
+
                 accounts_map.insert(key, yellowstone_filter);
             }
             request.accounts = accounts_map;

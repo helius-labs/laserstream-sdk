@@ -33,6 +33,8 @@
     "example:grpc-options": "ts-node examples/grpc-options-comprehensive.ts",
     "example:preprocessed-transaction-sub": "ts-node examples/preprocessed-transaction-sub.ts",
     "example:preprocessed-filters-test": "ts-node examples/preprocessed-filters-test.ts",
+    "test:cuckoo": "node test/cuckoo-vectors.test.js && node test/cuckoo-differential.test.js",
+    "test:cuckoo-e2e": "node test/cuckoo-e2e-thorough.js",
     "perf:test": "ts-node performance/pump-raydium-performance-test.ts",
     "perf:slot": "ts-node performance/slot-performance-test.ts",
     "perf:token": "ts-node performance/token-performance-test.ts",
@@ -67,6 +69,8 @@
     "index.d.ts",
     "client.js",
     "client.d.ts",
+    "cuckoo.js",
+    "cuckoo.d.ts",
     "proto-decoder.js",
     "proto/",
     "README.md"

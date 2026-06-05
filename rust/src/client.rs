@@ -331,7 +331,7 @@ async fn connect_and_subscribe_once(
     // Configure message size limits
     geyser_client = geyser_client
         .max_decoding_message_size(options.max_decoding_message_size.unwrap_or(1_000_000_000))
-        .max_encoding_message_size(options.max_encoding_message_size.unwrap_or(32_000_000));
+        .max_encoding_message_size(options.max_encoding_message_size.unwrap_or(64 * 1024 * 1024));
 
     // Configure compression if specified
     if let Some(send_comp) = options.send_compression {
@@ -468,7 +468,7 @@ async fn connect_and_subscribe_preprocessed_once(
 
     let mut geyser_client = GeyserClient::with_interceptor(channel, interceptor)
         .max_decoding_message_size(options.max_decoding_message_size.unwrap_or(1_000_000_000))
-        .max_encoding_message_size(options.max_encoding_message_size.unwrap_or(32_000_000));
+        .max_encoding_message_size(options.max_encoding_message_size.unwrap_or(64 * 1024 * 1024));
 
     // Apply compression if specified
     if let Some(compression) = &options.send_compression {
