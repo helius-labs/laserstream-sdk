@@ -1,6 +1,6 @@
 'use strict';
 
-// Thorough live E2E for cuckoo filtering against a cuckoo-enabled endpoint (SLC).
+// Thorough live E2E for cuckoo filtering against a live LaserStream endpoint.
 //   Test 1: correctness — tracked accounts match, 0 non-tracked.
 //   Test 2: MAX-SIZE filter — a 32 MiB wire filter (capacity 8M) sends successfully
 //           (exceeds the old 32,000,000 send cap) and still matches.

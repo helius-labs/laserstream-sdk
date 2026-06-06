@@ -262,7 +262,6 @@ Notes:
 - **Account subscriptions only.** Filters up to 32 MiB (~10M accounts).
 - `insert()` throws `TableFullError` if the filter saturates — rebuild with a larger capacity.
 - `contains()` is exact (backed by an internal `Set`); the cuckoo table is used only on the wire.
-- Requires a LaserStream endpoint with server-side cuckoo matching enabled.
 
 ## Compression Examples
 
