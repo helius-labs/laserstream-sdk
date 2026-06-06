@@ -315,7 +315,7 @@ Account subscriptions only; filters up to 32 MiB (~10M accounts). See
 
 ## Compression Examples
 
-### Zstd Compression (Recommended)
+### Zstd Compression
 ```rust
 let channel_options = ChannelOptions::default()
     .with_zstd_compression();

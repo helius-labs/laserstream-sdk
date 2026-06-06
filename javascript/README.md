@@ -265,7 +265,7 @@ Notes:
 
 ## Compression Examples
 
-### Zstd Compression (Recommended)
+### Zstd Compression
 ```typescript
 import { CompressionAlgorithms } from 'helius-laserstream';
 
