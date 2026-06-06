@@ -33,11 +33,8 @@ async function main() {
     config,
     request,
     async (update: SubscribeUpdate) => {
-      const pubkey = update.account?.account?.pubkey;
-      // Re-check locally to drop the server's rare false positives.
-      if (pubkey && tracked.contains(pubkey)) {
-        console.log('tracked account update:', update.account);
-      }
+      // cuckoo filters have <1% false positives; re-check with tracked.contains(pubkey) if you need exactness
+      console.log('account update:', update.account);
     },
     (error: Error) => {
       console.error('Stream error:', error);
