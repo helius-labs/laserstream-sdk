@@ -1,6 +1,6 @@
 [package]
 name = "helius-laserstream"
-version = "0.1.10"
+version = "0.2.0"
 edition = "2021"
 authors = ["Helius <support@helius.xyz>"]
 description = "Rust client for Helius LaserStream gRPC with robust reconnection and slot tracking"
@@ -12,7 +12,7 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-laserstream-core-proto = { version = "9.0.2", default-features = false, features = ["tonic", "tonic-compression"] }
+laserstream-core-proto = { version = "9.1.0", default-features = false, features = ["tonic", "tonic-compression"] }
 laserstream-core-client = "9.0.2"
 tonic = { version = "0.12.1", features = ["transport", "tls", "zstd", "gzip"] }
 prost = "0.12"
@@ -35,9 +35,24 @@ uuid = { version = "1.7.0", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde", "clock"] }
 reqwest = { version = "0.12", features = ["json", "gzip", "rustls-tls"] }
 sha2 = "0.10"
+# Pubkey type for the cuckoo CompressedAccountFilterSet API; only pulled in with the
+# `cuckoo` feature. Version matches laserstream-core-proto's `convert`, so types unify.
+solana-pubkey = { version = "3.0", optional = true }
+
+[features]
+# `cuckoo` (compressed account filters) is on by default. It enables the proto
+# `convert` feature + solana-pubkey, which are heavier deps; opt out with
+# `default-features = false` if you don't need the filter builder.
+default = ["cuckoo"]
+cuckoo = ["laserstream-core-proto/convert", "dep:solana-pubkey"]
 
 [dev-dependencies]
 dotenv = "0.15"
+
+[[example]]
+name = "cuckoo_account_filter"
+path = "examples/cuckoo_account_filter.rs"
+required-features = ["cuckoo"]
 
 [build-dependencies]
 tonic-build = "0.10.2"

@@ -272,9 +272,50 @@ while let Some(result) = stream.next().await {
 }
 ```
 
+## Compressed Account Filters (Cuckoo)
+
+When tracking a large set of accounts (tens of thousands to millions), sending an
+explicit pubkey list in every `SubscribeRequest` is expensive (~32 bytes/account).
+A **cuckoo filter** replaces that list with a compact probabilistic set
+(~3 bytes/account): the server matches with **no false negatives** and **<1% false
+positives**, and you re-check incoming accounts locally with `contains()`.
+
+`CompressedAccountFilterSet` keeps an exact set alongside the wire filter, so
+`remove` and `contains` are exact. Requires `solana-pubkey = "3"`.
+
+```rust
+use helius_laserstream::{
+    cuckoo::{CompressedAccountFilterSet, Pubkey},
+    grpc::SubscribeRequest,
+    subscribe, LaserstreamConfig,
+};
+
+let mut tracked = CompressedAccountFilterSet::with_capacity(2_000_000)?;
+for pk in my_tracked_pubkeys {
+    tracked.insert(pk)?; // Err(TableFullError) if under-sized
+}
+
+let mut request = SubscribeRequest::default();
+tracked.insert_into_subscribe_request(&mut request, "tracked_accounts");
+
+let (stream, handle) = subscribe(config, request);
+// ... on each account update, re-check locally:
+//     if tracked.contains(pubkey) { /* really tracked */ }
+
+// Update on the fly and re-send on the SAME stream:
+tracked.insert(new_pk)?;          // or tracked.remove(old_pk)
+if tracked.take_dirty() {
+    tracked.insert_into_subscribe_request(&mut request, "tracked_accounts");
+    handle.write(request).await?;
+}
+```
+
+Account subscriptions only; filters up to 32 MiB (~10M accounts). See
+`examples/cuckoo_account_filter.rs`.
+
 ## Compression Examples
 
-### Zstd Compression (Recommended)
+### Zstd Compression
 ```rust
 let channel_options = ChannelOptions::default()
     .with_zstd_compression();

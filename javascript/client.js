@@ -1,5 +1,6 @@
 const { LaserstreamClient: NapiClient, CommitmentLevel, shutdownAllStreams, getActiveStreamCount } = require('./index');
 const { initProtobuf, decodeSubscribeUpdate, decodeSubscribePreprocessedUpdate } = require('./proto-decoder');
+const { CompressedAccountFilterSet, TableFullError, DEFAULT_HASH_SEED } = require('./cuckoo');
 
 // Compression algorithms enum
 const CompressionAlgorithms = {
@@ -127,4 +128,8 @@ module.exports = {
   // re-export lifecycle helpers from native binding
   shutdownAllStreams,
   getActiveStreamCount,
-}; 
+  // compressed account (cuckoo) filtering
+  CompressedAccountFilterSet,
+  TableFullError,
+  DEFAULT_HASH_SEED,
+};

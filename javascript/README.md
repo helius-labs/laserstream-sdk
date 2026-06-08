@@ -217,9 +217,55 @@ stream.write({
 });
 ```
 
+## Compressed Account Filters (Cuckoo)
+
+When you track a large set of accounts (tens of thousands to millions), sending an
+explicit pubkey list in every `SubscribeRequest` is expensive (~32 bytes/account).
+A **cuckoo filter** replaces that list with a compact probabilistic set
+(~3 bytes/account). The server matches accounts against the filter with **no false
+negatives** and **<1% false positives** — you re-check each incoming account locally
+against your exact set with `contains()`, making the stream exact for your code.
+
+```typescript
+import { subscribe, CommitmentLevel, CompressedAccountFilterSet } from 'helius-laserstream';
+
+// Size the filter for your peak tracked-set size.
+const tracked = new CompressedAccountFilterSet(2_000_000);
+for (const pubkey of myTrackedPubkeys) {
+  tracked.insert(pubkey); // base58 string, Uint8Array/Buffer, or web3.js PublicKey
+}
+
+// Attach the filter to the request (no explicit account list needed).
+const request = { accounts: {}, commitment: CommitmentLevel.CONFIRMED };
+tracked.insertIntoSubscribeRequest(request, 'tracked_accounts');
+
+const stream = await subscribe(config, request, (update) => {
+  const acct = update.account?.account;
+  // Re-check locally to drop the server's rare false positives.
+  if (acct && tracked.contains(acct.pubkey)) {
+    handleTrackedAccount(acct);
+  }
+});
+```
+
+Update the tracked set on the fly and re-send on the **same** stream:
+
+```typescript
+tracked.insert(newPubkey);   // or tracked.remove(oldPubkey)
+if (tracked.takeDirty()) {   // only re-send when the set actually changed
+  tracked.insertIntoSubscribeRequest(request, 'tracked_accounts');
+  await stream.write(request);
+}
+```
+
+Notes:
+- **Account subscriptions only.** Filters up to 32 MiB (~10M accounts).
+- `insert()` throws `TableFullError` if the filter saturates — rebuild with a larger capacity.
+- `contains()` is exact (backed by an internal `Set`); the cuckoo table is used only on the wire.
+
 ## Compression Examples
 
-### Zstd Compression (Recommended)
+### Zstd Compression
 ```typescript
 import { CompressionAlgorithms } from 'helius-laserstream';
 

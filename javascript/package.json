@@ -1,6 +1,6 @@
 {
   "name": "helius-laserstream",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "High-performance Laserstream gRPC client with automatic reconnection",
   "main": "client.js",
   "types": "client.d.ts",
@@ -20,6 +20,7 @@
     "build:all": "napi build --platform --release --target x86_64-apple-darwin --target aarch64-apple-darwin --target x86_64-unknown-linux-gnu",
     "build:musl": "cargo zigbuild --release --target $CARGO_BUILD_TARGET && napi build --platform --release --skip-build",
     "example:account-sub": "ts-node examples/account-sub.ts",
+    "example:cuckoo-account-sub": "ts-node examples/cuckoo-account-sub.ts",
     "example:accounts-data-slice-sub": "ts-node examples/accounts-data-slice-sub.ts",
     "example:slot-sub": "ts-node examples/slot-sub.ts",
     "example:transaction-sub": "ts-node examples/transaction-sub.ts",
@@ -33,6 +34,8 @@
     "example:grpc-options": "ts-node examples/grpc-options-comprehensive.ts",
     "example:preprocessed-transaction-sub": "ts-node examples/preprocessed-transaction-sub.ts",
     "example:preprocessed-filters-test": "ts-node examples/preprocessed-filters-test.ts",
+    "test:cuckoo": "node test/cuckoo-vectors.test.js",
+    "test:cuckoo-e2e": "node test/cuckoo-e2e-thorough.js",
     "perf:test": "ts-node performance/pump-raydium-performance-test.ts",
     "perf:slot": "ts-node performance/slot-performance-test.ts",
     "perf:token": "ts-node performance/token-performance-test.ts",
@@ -67,6 +70,8 @@
     "index.d.ts",
     "client.js",
     "client.d.ts",
+    "cuckoo.js",
+    "cuckoo.d.ts",
     "proto-decoder.js",
     "proto/",
     "README.md"
@@ -85,12 +90,12 @@
     }
   },
   "optionalDependencies": {
-    "helius-laserstream-darwin-arm64": "0.3.1",
-    "helius-laserstream-darwin-x64": "0.3.1",
-    "helius-laserstream-linux-arm64-gnu": "0.3.1",
-    "helius-laserstream-linux-arm64-musl": "0.3.1",
-    "helius-laserstream-linux-x64-gnu": "0.3.1",
-    "helius-laserstream-linux-x64-musl": "0.3.1"
+    "helius-laserstream-darwin-arm64": "0.4.0",
+    "helius-laserstream-darwin-x64": "0.4.0",
+    "helius-laserstream-linux-arm64-gnu": "0.4.0",
+    "helius-laserstream-linux-arm64-musl": "0.4.0",
+    "helius-laserstream-linux-x64-gnu": "0.4.0",
+    "helius-laserstream-linux-x64-musl": "0.4.0"
   },
   "dependencies": {
     "laserstream-core-proto-js": "^9.0.2",
