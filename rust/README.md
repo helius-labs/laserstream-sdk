@@ -151,6 +151,38 @@ let request = SubscribeRequest {
 };
 ```
 
+#### tokenAccounts (ATA) Expansion
+
+Set `token_accounts` on a transaction filter to also match transactions that
+touch an **Associated Token Account (ATA)** owned by one of the
+`account_include` wallets, not just transactions naming the wallet directly.
+Modes (server wire values):
+
+- `"none"` — no expansion (default; same as leaving the field unset).
+- `"balanceChanged"` — also match txs touching an ATA owned by an
+  `account_include` wallet whose token balance changed.
+- `"all"` — match any tx touching an ATA owned by an `account_include` wallet.
+
+```rust
+use helius_laserstream::grpc::{SubscribeRequest, SubscribeRequestFilterTransactions};
+
+let request = SubscribeRequest {
+    transactions: HashMap::from([(
+        "wallet-and-atas".to_string(),
+        SubscribeRequestFilterTransactions {
+            account_include: vec!["vines1vzrYbzLMRdu58ou5XTby4qAqVRLmqo36NKPTg".to_string()],
+            vote: Some(false),
+            failed: Some(false),
+            token_accounts: Some("balanceChanged".to_string()),
+            ..Default::default()
+        },
+    )]),
+    ..Default::default()
+};
+```
+
+See [`examples/token_accounts_filter.rs`](./examples/token_accounts_filter.rs).
+
 ### Block Subscriptions
 ```rust
 use helius_laserstream::grpc::{

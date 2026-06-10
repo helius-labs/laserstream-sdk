@@ -1,6 +1,6 @@
 [package]
 name = "helius-laserstream"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["Helius <support@helius.xyz>"]
 description = "Rust client for Helius LaserStream gRPC with robust reconnection and slot tracking"
@@ -12,8 +12,12 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-laserstream-core-proto = { version = "9.1.0", default-features = false, features = ["tonic", "tonic-compression"] }
-laserstream-core-client = "9.0.2"
+# token_accounts (ATA) filter field #30 is not yet on a published core-proto
+# release; pull proto + client straight from the Helius yellowstone-grpc fork
+# branch. `package = ...` keeps the `laserstream_core_proto` / `_client` import
+# paths intact. Retarget to the published crates once field #30 ships there.
+laserstream-core-proto = { git = "https://github.com/helius-labs/yellowstone-grpc", branch = "feat/token-accounts-filter-field-v9.0.1", package = "yellowstone-grpc-proto", default-features = false, features = ["tonic", "tonic-compression"] }
+laserstream-core-client = { git = "https://github.com/helius-labs/yellowstone-grpc", branch = "feat/token-accounts-filter-field-v9.0.1", package = "yellowstone-grpc-client" }
 tonic = { version = "0.12.1", features = ["transport", "tls", "zstd", "gzip"] }
 prost = "0.12"
 prost-types = "0.12"
@@ -36,8 +40,11 @@ chrono = { version = "0.4", features = ["serde", "clock"] }
 reqwest = { version = "0.12", features = ["json", "gzip", "rustls-tls"] }
 sha2 = "0.10"
 # Pubkey type for the cuckoo CompressedAccountFilterSet API; only pulled in with the
-# `cuckoo` feature. Version matches laserstream-core-proto's `convert`, so types unify.
-solana-pubkey = { version = "3.0", optional = true }
+# `cuckoo` feature. Pinned to 2.x to match the yellowstone-grpc fork branch's
+# `convert` feature (solana-pubkey 2.0), so the re-exported Pubkey type unifies with
+# `CompressedAccountFilterSet::contains`. Bump back to 3.0 when retargeting to the
+# published core-proto release (which pins solana-pubkey 3.0).
+solana-pubkey = { version = "2.0", optional = true }
 
 [features]
 # `cuckoo` (compressed account filters) is on by default. It enables the proto

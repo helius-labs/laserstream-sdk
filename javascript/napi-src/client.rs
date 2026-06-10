@@ -153,6 +153,9 @@ pub struct JsTransactionFilter {
     pub account_exclude: Option<Vec<String>>,
     #[serde(alias = "accountRequired")]
     pub account_required: Option<Vec<String>>,
+    // Helius ATA expansion control (proto field #30): "none" | "balanceChanged" | "all".
+    #[serde(alias = "tokenAccounts")]
+    pub token_accounts: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -387,6 +390,8 @@ impl ClientInner {
                     yellowstone_filter.account_required = account_required;
                 }
                 
+                yellowstone_filter.token_accounts = filter.token_accounts;
+                
                 transactions_map.insert(key, yellowstone_filter);
             }
             request.transactions = transactions_map;
@@ -413,6 +418,8 @@ impl ClientInner {
                 if let Some(account_required) = filter.account_required {
                     yellowstone_filter.account_required = account_required;
                 }
+                
+                yellowstone_filter.token_accounts = filter.token_accounts;
                 
                 transactions_status_map.insert(key, yellowstone_filter);
             }

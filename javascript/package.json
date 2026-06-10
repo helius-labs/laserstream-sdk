@@ -1,6 +1,6 @@
 {
   "name": "helius-laserstream",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "High-performance Laserstream gRPC client with automatic reconnection",
   "main": "client.js",
   "types": "client.d.ts",
@@ -24,6 +24,7 @@
     "example:accounts-data-slice-sub": "ts-node examples/accounts-data-slice-sub.ts",
     "example:slot-sub": "ts-node examples/slot-sub.ts",
     "example:transaction-sub": "ts-node examples/transaction-sub.ts",
+    "example:token-accounts-sub": "ts-node examples/token-accounts-sub.ts",
     "example:transaction-status-sub": "ts-node examples/transaction-status-sub.ts",
     "example:block-sub": "ts-node examples/block-sub.ts",
     "example:block-meta-sub": "ts-node examples/block-meta-sub.ts",
@@ -90,12 +91,12 @@
     }
   },
   "optionalDependencies": {
-    "helius-laserstream-darwin-arm64": "0.4.0",
-    "helius-laserstream-darwin-x64": "0.4.0",
-    "helius-laserstream-linux-arm64-gnu": "0.4.0",
-    "helius-laserstream-linux-arm64-musl": "0.4.0",
-    "helius-laserstream-linux-x64-gnu": "0.4.0",
-    "helius-laserstream-linux-x64-musl": "0.4.0"
+    "helius-laserstream-darwin-arm64": "0.5.0",
+    "helius-laserstream-darwin-x64": "0.5.0",
+    "helius-laserstream-linux-arm64-gnu": "0.5.0",
+    "helius-laserstream-linux-arm64-musl": "0.5.0",
+    "helius-laserstream-linux-x64-gnu": "0.5.0",
+    "helius-laserstream-linux-x64-musl": "0.5.0"
   },
   "dependencies": {
     "laserstream-core-proto-js": "^9.0.2",
