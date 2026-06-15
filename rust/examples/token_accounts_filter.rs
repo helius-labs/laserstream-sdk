@@ -2,16 +2,18 @@
 //
 // Subscribe to transactions touching a wallet *and* its Associated Token
 // Accounts (ATAs) by setting the `token_accounts` field on a transaction
-// filter alongside `account_include`. Modes (server wire values):
+// filter alongside `account_include`. Modes:
 //
-//   - "none"           — no expansion (default; same as leaving it unset).
-//   - "balanceChanged" — also match txs touching an ATA owned by an
-//                        `account_include` wallet whose token balance changed.
-//   - "all"            — match any tx touching an ATA owned by an
-//                        `account_include` wallet.
+//   - Unset / None                                       — no expansion (default).
+//   - TokenAccountExpansionControlFlag::BalanceChanged   — also match txs touching
+//       an ATA owned by an `account_include` wallet whose token balance changed.
+//   - TokenAccountExpansionControlFlag::All              — match any tx touching
+//       an ATA owned by an `account_include` wallet.
 //
 // Run with: cargo run --example token_accounts_filter
-use helius_laserstream::grpc::{SubscribeRequest, SubscribeRequestFilterTransactions};
+use helius_laserstream::grpc::{
+    SubscribeRequest, SubscribeRequestFilterTransactions, TokenAccountExpansionControlFlag,
+};
 use helius_laserstream::{subscribe, LaserstreamConfig};
 use futures::StreamExt;
 use std::env;
@@ -42,7 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             account_include: vec![wallet],
             // Expand the subscription to ATAs owned by the watched wallet whose
             // token balance changed in the transaction.
-            token_accounts: Some("balanceChanged".to_string()),
+            token_accounts: Some(TokenAccountExpansionControlFlag::BalanceChanged as i32),
             ..Default::default()
         },
     );

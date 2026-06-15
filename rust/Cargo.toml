@@ -12,7 +12,7 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-laserstream-core-proto = { version = "9.2.0", default-features = false, features = ["tonic", "tonic-compression"] }
+laserstream-core-proto = { version = "9.3.0", default-features = false, features = ["tonic", "tonic-compression"] }
 laserstream-core-client = "9.0.2"
 tonic = { version = "0.12.1", features = ["transport", "tls", "zstd", "gzip"] }
 prost = "0.12"
@@ -36,7 +36,7 @@ chrono = { version = "0.4", features = ["serde", "clock"] }
 reqwest = { version = "0.12", features = ["json", "gzip", "rustls-tls"] }
 sha2 = "0.10"
 # Pubkey type for the cuckoo CompressedAccountFilterSet API; only pulled in with the
-# `cuckoo` feature. Pinned to 3.x to match laserstream-core-proto 9.2.0's
+# `cuckoo` feature. Pinned to 3.x to match laserstream-core-proto 9.3.0's
 # `convert` feature (solana-pubkey 3.0), so the re-exported Pubkey type unifies
 # with `CompressedAccountFilterSet::contains`.
 solana-pubkey = { version = "3.0", optional = true }
