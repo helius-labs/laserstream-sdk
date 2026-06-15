@@ -142,6 +142,36 @@ const request = {
 };
 ```
 
+#### tokenAccounts (ATA) Expansion
+
+Set `tokenAccounts` on a transaction filter to also match transactions that
+touch an **Associated Token Account (ATA)** owned by one of the `accountInclude`
+wallets, not just transactions naming the wallet directly. Modes (server wire
+values):
+
+- `"none"` — no expansion (default; same as omitting the field).
+- `"balanceChanged"` — also match txs touching an ATA owned by an
+  `accountInclude` wallet whose token balance changed.
+- `"all"` — match any tx touching an ATA owned by an `accountInclude` wallet.
+
+```typescript
+const request = {
+  transactions: {
+    "wallet-and-atas": {
+      accountInclude: ["vines1vzrYbzLMRdu58ou5XTby4qAqVRLmqo36NKPTg"],
+      accountExclude: [],
+      accountRequired: [],
+      vote: false,
+      failed: false,
+      tokenAccounts: "balanceChanged",
+    },
+  },
+  commitment: CommitmentLevel.CONFIRMED,
+};
+```
+
+See [`examples/token-accounts-sub.ts`](./examples/token-accounts-sub.ts).
+
 ### Block Subscriptions
 ```typescript
 const request = {

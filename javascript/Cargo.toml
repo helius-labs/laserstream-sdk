@@ -1,6 +1,6 @@
 [package]
 name = "laserstream-napi"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 
 [lib]
@@ -24,7 +24,7 @@ futures-channel = "0.3"
 parking_lot = "0.12"
 uuid = { version = "1", features = ["v4"] }
 laserstream-core-client = "9.0.2"
-laserstream-core-proto = { version = "9.1.0", default-features = false, features = ["tonic", "tonic-compression"] }
+laserstream-core-proto = { version = "9.3.0", default-features = false, features = ["tonic", "tonic-compression"] }
 prost = "0.14"
 bs58 = "0.5.0"
 fastrand = "2.0"

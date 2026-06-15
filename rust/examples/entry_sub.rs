@@ -1,5 +1,5 @@
 use helius_laserstream::{subscribe, LaserstreamConfig};
-use yellowstone_grpc_proto::geyser::{SubscribeRequest, SubscribeRequestFilterEntry};
+use helius_laserstream::grpc::{SubscribeRequest, SubscribeRequestFilterEntry};
 use futures::StreamExt;
 use std::env;
 

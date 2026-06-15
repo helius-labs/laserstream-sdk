@@ -114,3 +114,35 @@ export {
   CuckooAccountFilter,
   PubkeyInput,
 } from './cuckoo';
+
+// ============================================================================
+// tokenAccounts (ATA) transaction filter
+// ============================================================================
+
+/**
+ * ATA (Associated Token Account) expansion mode for the `tokenAccounts` field
+ * on transaction / transactionsStatus filters.
+ *
+ * - `"none"`           — no expansion (default; same as omitting the field).
+ * - `"balanceChanged"` — also match txs touching an ATA owned by an
+ *                        `accountInclude` wallet whose token balance changed.
+ * - `"all"`            — match any tx touching an ATA owned by an
+ *                        `accountInclude` wallet.
+ *
+ * The JS-facing API accepts these strings for ergonomics; the NAPI layer
+ * converts to the proto enum (`TokenAccountExpansionControlFlag` at field
+ * #30) before sending on the wire. Invalid strings raise at subscribe time.
+ */
+export type TokenAccountsFilterMode = 'none' | 'balanceChanged' | 'all';
+
+// Augment the generated proto type so `tokenAccounts` is accepted on
+// transaction filters without forking the generated bindings. Removed once a
+// core-proto-js release ships field #30 natively.
+declare module 'laserstream-core-proto-js/generated' {
+  namespace geyser {
+    interface ISubscribeRequestFilterTransactions {
+      /** Helius ATA expansion control (proto field #30). */
+      tokenAccounts?: (TokenAccountsFilterMode | string | null);
+    }
+  }
+}
