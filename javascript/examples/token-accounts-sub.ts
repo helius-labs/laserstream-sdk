@@ -2,7 +2,8 @@
 //
 // Subscribe to transactions touching a wallet *and* its Associated Token
 // Accounts (ATAs) by setting `tokenAccounts` on a transaction filter alongside
-// `accountInclude`. Modes (server wire values):
+// `accountInclude`. Modes (the SDK accepts these strings; the NAPI layer
+// converts to the proto enum before sending):
 //
 //   - "none"           — no expansion (default; same as omitting the field).
 //   - "balanceChanged" — also match txs touching an ATA owned by an

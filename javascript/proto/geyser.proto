@@ -131,9 +131,20 @@ message SubscribeRequestFilterTransactions {
   repeated string account_include = 3;
   repeated string account_exclude = 4;
   repeated string account_required = 6;
-  // Helius extension: ATA / token-account expansion control.
-  // One of "none" (default), "balanceChanged", "all".
-  optional string token_accounts = 30;
+  // Helius extension: ATA / token-account expansion control. When set,
+  // account_include / account_exclude / account_required also match
+  // against owners of pre/post token balances on each transaction.
+  // Absent = no expansion.
+  optional TokenAccountExpansionControlFlag token_accounts = 30;
+}
+
+// Helius extension: discriminator for `SubscribeRequestFilterTransactions.token_accounts`.
+enum TokenAccountExpansionControlFlag {
+  // Match an owner if it owns a pre OR post token balance on the tx.
+  ALL = 0;
+  // Match an owner whose token balance changed in amount (per
+  // `account_index`) or whose token account was closed.
+  BALANCE_CHANGED = 1;
 }
 
 message SubscribeRequestFilterBlocks {

@@ -17,8 +17,24 @@ use laserstream_core_proto::geyser::{
     subscribe_request_filter_accounts_filter_lamports,
     subscribe_request_filter_accounts_filter,
     SubscribePreprocessedRequest, SubscribePreprocessedRequestFilterTransactions,
-    CuckooFilter,
+    CuckooFilter, TokenAccountExpansionControlFlag,
 };
+
+/// Map the JS-facing `tokenAccounts` string to the proto enum tag the wire
+/// format expects. Returns `Ok(None)` for an absent / "none" value so the
+/// proto field stays omitted (= no ATA expansion). Returns an error for
+/// any other string so a typo is loud at subscribe time, not a silent
+/// "no expansion happened".
+fn parse_token_accounts_mode(value: Option<String>) -> std::result::Result<Option<i32>, String> {
+    match value.as_deref() {
+        None | Some("") | Some("none") => Ok(None),
+        Some("all") => Ok(Some(TokenAccountExpansionControlFlag::All as i32)),
+        Some("balanceChanged") => Ok(Some(TokenAccountExpansionControlFlag::BalanceChanged as i32)),
+        Some(other) => Err(format!(
+            "invalid tokenAccounts mode `{other}`; expected \"none\", \"balanceChanged\", or \"all\""
+        )),
+    }
+}
 
 use crate::stream::StreamInner;
 
@@ -389,38 +405,40 @@ impl ClientInner {
                 if let Some(account_required) = filter.account_required {
                     yellowstone_filter.account_required = account_required;
                 }
-                
-                yellowstone_filter.token_accounts = filter.token_accounts;
-                
+
+                yellowstone_filter.token_accounts = parse_token_accounts_mode(filter.token_accounts)
+                    .map_err(Error::from_reason)?;
+
                 transactions_map.insert(key, yellowstone_filter);
             }
             request.transactions = transactions_map;
         }
-        
+
         // Handle transactions_status with complete filter support
         if let Some(transactions_status) = js_request.transactions_status {
             let mut transactions_status_map = HashMap::new();
             for (key, filter) in transactions_status {
                 let mut yellowstone_filter = SubscribeRequestFilterTransactions::default();
-                
+
                 yellowstone_filter.vote = filter.vote;
                 yellowstone_filter.failed = filter.failed;
                 yellowstone_filter.signature = filter.signature;
-                
+
                 if let Some(account_include) = filter.account_include {
                     yellowstone_filter.account_include = account_include;
                 }
-                
+
                 if let Some(account_exclude) = filter.account_exclude {
                     yellowstone_filter.account_exclude = account_exclude;
                 }
-                
+
                 if let Some(account_required) = filter.account_required {
                     yellowstone_filter.account_required = account_required;
                 }
-                
-                yellowstone_filter.token_accounts = filter.token_accounts;
-                
+
+                yellowstone_filter.token_accounts = parse_token_accounts_mode(filter.token_accounts)
+                    .map_err(Error::from_reason)?;
+
                 transactions_status_map.insert(key, yellowstone_filter);
             }
             request.transactions_status = transactions_status_map;

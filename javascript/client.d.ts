@@ -121,13 +121,17 @@ export {
 
 /**
  * ATA (Associated Token Account) expansion mode for the `tokenAccounts` field
- * on transaction / transactionsStatus filters. Mirrors the server wire values:
+ * on transaction / transactionsStatus filters.
  *
  * - `"none"`           — no expansion (default; same as omitting the field).
  * - `"balanceChanged"` — also match txs touching an ATA owned by an
  *                        `accountInclude` wallet whose token balance changed.
  * - `"all"`            — match any tx touching an ATA owned by an
  *                        `accountInclude` wallet.
+ *
+ * The JS-facing API accepts these strings for ergonomics; the NAPI layer
+ * converts to the proto enum (`TokenAccountExpansionControlFlag` at field
+ * #30) before sending on the wire. Invalid strings raise at subscribe time.
  */
 export type TokenAccountsFilterMode = 'none' | 'balanceChanged' | 'all';
 
