@@ -218,9 +218,9 @@ pub fn subscribe(
                                             }
                                         }
                                         Err(status) => {
-                                            // Yield the error to consumer AND continue with reconnection
+                                            // Transient error: reconnect silently. Surfaced to the consumer
+                                            // only on terminal failure (max attempts) — see the Err arm below.
                                             warn!(error = %status, "Stream error, will reconnect after 5s delay");
-                                            yield Err(LaserstreamError::Status(status.clone()));
                                             break;
                                         }
                                     }

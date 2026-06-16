@@ -139,6 +139,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let deadline = Instant::now() + Duration::from_secs(180);
 
+    // Reconnects aren't surfaced as errors anymore — detect one via a >4s data gap.
+    let gap_threshold = Duration::from_secs(4);
+    let mut last_update = Instant::now();
+    let mut in_gap = false;
+    let mut seen_first = false;
+
     while Instant::now() < deadline {
         // Early exit: Phase 3 has enough messages
         let p3_total = usdc_phase3.load(Ordering::Relaxed) + usdt_phase3.load(Ordering::Relaxed);
@@ -151,6 +157,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Some(result) = stream.next() => {
                 match result {
                     Ok(update) => {
+                        last_update = Instant::now();
+                        in_gap = false;
+                        seen_first = true;
                         if let Some(UpdateOneof::Transaction(_)) = &update.update_oneof {
                             let now = Instant::now();
                             let write_time = *write_completed_time.lock().await;
@@ -185,21 +194,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                     Err(e) => {
-                        let recon_num = total_reconnects.fetch_add(1, Ordering::SeqCst) + 1;
-                        let write_time = *write_completed_time.lock().await;
-
-                        if write_time.is_some() {
-                            let n = reconnects_after_write.fetch_add(1, Ordering::SeqCst) + 1;
-                            reconnected_after_write.store(true, Ordering::SeqCst);
-                            *reconnect_after_write_time.lock().await = Some(Instant::now());
-                            eprintln!("[reconnect #{}] (after write, #{} post-write) {}", recon_num, n, e);
-                        } else {
-                            eprintln!("[reconnect #{}] (before write) {}", recon_num, e);
-                        }
+                        // Only fires on terminal failure (max attempts) now.
+                        eprintln!("[terminal error] stream yielded error: {}", e);
+                        break;
                     }
                 }
             }
-            _ = sleep(Duration::from_millis(100)) => {}
+            _ = sleep(Duration::from_millis(100)) => {
+                let now = Instant::now();
+                if seen_first && !in_gap && now.duration_since(last_update) > gap_threshold {
+                    in_gap = true;
+                    let gap_s = now.duration_since(last_update).as_secs_f64();
+                    let recon_num = total_reconnects.fetch_add(1, Ordering::SeqCst) + 1;
+                    let write_time = *write_completed_time.lock().await;
+                    if write_time.is_some() {
+                        let n = reconnects_after_write.fetch_add(1, Ordering::SeqCst) + 1;
+                        reconnected_after_write.store(true, Ordering::SeqCst);
+                        *reconnect_after_write_time.lock().await = Some(now);
+                        eprintln!("[reconnect #{}] (after write, #{} post-write) data gap {:.1}s", recon_num, n, gap_s);
+                    } else {
+                        eprintln!("[reconnect #{}] (before write) data gap {:.1}s", recon_num, gap_s);
+                    }
+                }
+            }
         }
     }
 
