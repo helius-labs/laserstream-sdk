@@ -240,7 +240,7 @@ impl ClientInner {
         Ok(Self {
             endpoint,
             token,
-            max_reconnect_attempts: max_reconnect_attempts.unwrap_or(120),
+            max_reconnect_attempts: max_reconnect_attempts.unwrap_or(240),
             channel_options,
             // Default to true (replay enabled) unless explicitly set to false
             replay: replay.unwrap_or(true),
