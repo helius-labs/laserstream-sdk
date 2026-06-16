@@ -218,9 +218,12 @@ pub fn subscribe(
                                             }
                                         }
                                         Err(status) => {
-                                            // Yield the error to consumer AND continue with reconnection
+                                            // Transient stream error: log and reconnect silently. Per the SDK
+                                            // error contract, reconnect failures are NOT surfaced to the
+                                            // consumer — an error is only yielded once reconnection ultimately
+                                            // fails (max attempts reached, see the Err(err) arm below). This
+                                            // matches subscribe_preprocessed and the Go/JS SDKs.
                                             warn!(error = %status, "Stream error, will reconnect after 5s delay");
-                                            yield Err(LaserstreamError::Status(status.clone()));
                                             break;
                                         }
                                     }
