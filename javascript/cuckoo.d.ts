@@ -30,6 +30,14 @@ export interface CuckooAccountFilter {
   cuckooAccountsFilter: CuckooFilterProto;
 }
 
+/** Transaction filter carrying only a cuckoo filter. */
+export interface CuckooTransactionFilter {
+  accountInclude: string[];
+  accountExclude: string[];
+  accountRequired: string[];
+  cuckooAccountInclude: CuckooFilterProto;
+}
+
 /** A pubkey accepted by the filter: base58 string, raw 32 bytes, or PublicKey-like. */
 export type PubkeyInput = string | Uint8Array | Buffer | number[] | { toBytes(): Uint8Array };
 
@@ -72,6 +80,8 @@ export declare class CompressedAccountFilterSet {
   toBytes(): Buffer;
   /** An account filter carrying only this cuckoo filter. */
   toAccountFilter(): CuckooAccountFilter;
+  /** A transaction filter carrying only this cuckoo filter. */
+  toTransactionFilter(): CuckooTransactionFilter;
   /** Insert into request.accounts[name] (replacing any existing entry) and clear the dirty flag. */
   insertIntoSubscribeRequest(request: SubscribeRequest, name: string): SubscribeRequest;
 }

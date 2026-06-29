@@ -172,6 +172,9 @@ pub struct JsTransactionFilter {
     // Helius ATA expansion control (proto field #30): "none" | "balanceChanged" | "all".
     #[serde(alias = "tokenAccounts")]
     pub token_accounts: Option<String>,
+    // Cuckoo filter over accountInclude (proto field #31), built client-side.
+    #[serde(alias = "cuckooAccountInclude")]
+    pub cuckoo_account_include: Option<JsCuckooFilter>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -408,6 +411,22 @@ impl ClientInner {
 
                 yellowstone_filter.token_accounts = parse_token_accounts_mode(filter.token_accounts)
                     .map_err(Error::from_reason)?;
+
+                // Handle compressed account (cuckoo) filter — pass through bytes built client-side.
+                if let Some(cuckoo) = filter.cuckoo_account_include {
+                    let data = general_purpose::STANDARD.decode(&cuckoo.data)
+                        .map_err(|e| Error::new(Status::InvalidArg, format!("Invalid base64 cuckoo data: {}", e)))?;
+                    let hash_seed = cuckoo.hash_seed.parse::<u64>()
+                        .map_err(|e| Error::new(Status::InvalidArg, format!("Invalid cuckoo hash_seed: {}", e)))?;
+                    yellowstone_filter.cuckoo_account_include = Some(CuckooFilter {
+                        data,
+                        bucket_count: cuckoo.bucket_count,
+                        entries_per_bucket: cuckoo.entries_per_bucket,
+                        fingerprint_bits: cuckoo.fingerprint_bits,
+                        hash_seed,
+                        hash_algorithm: cuckoo.hash_algorithm,
+                    });
+                }
 
                 transactions_map.insert(key, yellowstone_filter);
             }

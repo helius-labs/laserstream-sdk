@@ -376,6 +376,16 @@ class CompressedAccountFilterSet {
     };
   }
 
+  /** A transaction filter carrying only this cuckoo filter (no accountInclude list). */
+  toTransactionFilter() {
+    return {
+      accountInclude: [],
+      accountExclude: [],
+      accountRequired: [],
+      cuckooAccountInclude: this.toProto(),
+    };
+  }
+
   /**
    * Insert this filter into `request.accounts[name]` (replacing any existing
    * entry, preserving others) and clear the dirty flag. Re-send the request on
