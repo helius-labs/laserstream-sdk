@@ -342,8 +342,12 @@ if tracked.take_dirty() {
 }
 ```
 
-Account subscriptions only; filters up to 32 MiB (~10M accounts). See
-`examples/cuckoo_account_filter.rs`.
+The same filter also works on **transaction subscriptions**: set its `to_proto()`
+on a `SubscribeRequestFilterTransactions.cuckoo_account_include` (OR-combined with
+the explicit `account_include` list) and add it to `request.transactions`. See
+`examples/cuckoo_transaction_filter.rs`.
+
+Filters up to 32 MiB (~10M accounts). See `examples/cuckoo_account_filter.rs`.
 
 ## Compression Examples
 

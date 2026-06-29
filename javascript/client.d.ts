@@ -112,6 +112,7 @@ export {
   DEFAULT_HASH_SEED,
   CuckooFilterProto,
   CuckooAccountFilter,
+  CuckooTransactionFilter,
   PubkeyInput,
 } from './cuckoo';
 
@@ -143,6 +144,11 @@ declare module 'laserstream-core-proto-js/generated' {
     interface ISubscribeRequestFilterTransactions {
       /** Helius ATA expansion control (proto field #30). */
       tokenAccounts?: (TokenAccountsFilterMode | string | null);
+      /**
+       * Compressed account (cuckoo) filter over `accountInclude` (proto field #31).
+       * Built client-side via {@link CompressedAccountFilterSet.toTransactionFilter}.
+       */
+      cuckooAccountInclude?: (import('./cuckoo').CuckooFilterProto | null);
     }
   }
 }

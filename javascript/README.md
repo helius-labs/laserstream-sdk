@@ -288,8 +288,26 @@ if (tracked.takeDirty()) {   // only re-send when the set actually changed
 }
 ```
 
+The same filter also works on **transaction** subscriptions, where it stands in for the
+`accountInclude` list (match any transaction that mentions a tracked account):
+
+```typescript
+const tracked = new CompressedAccountFilterSet(2_000_000);
+for (const pubkey of myTrackedPubkeys) {
+  tracked.insert(pubkey);
+}
+
+const request = { transactions: {}, commitment: CommitmentLevel.CONFIRMED };
+request.transactions['tracked_transactions'] = tracked.toTransactionFilter();
+
+const stream = await subscribe(config, request, (update) => {
+  // Re-check the touched accounts locally to drop the server's rare false positives.
+  console.log('transaction update:', update.transaction);
+});
+```
+
 Notes:
-- **Account subscriptions only.** Filters up to 32 MiB (~10M accounts).
+- **Account and transaction subscriptions.** Filters up to 32 MiB (~10M accounts).
 - `insert()` throws `TableFullError` if the filter saturates — rebuild with a larger capacity.
 - `contains()` is exact (backed by an internal `Set`); the cuckoo table is used only on the wire.
 

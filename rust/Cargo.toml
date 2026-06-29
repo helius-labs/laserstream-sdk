@@ -12,7 +12,7 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-laserstream-core-proto = { version = "9.3.0", default-features = false, features = ["tonic", "tonic-compression"] }
+laserstream-core-proto = { version = "9.4.0", default-features = false, features = ["tonic", "tonic-compression"] }
 laserstream-core-client = "9.0.2"
 tonic = { version = "0.12.1", features = ["transport", "tls", "zstd", "gzip"] }
 prost = "0.12"
@@ -54,6 +54,11 @@ dotenv = "0.15"
 [[example]]
 name = "cuckoo_account_filter"
 path = "examples/cuckoo_account_filter.rs"
+required-features = ["cuckoo"]
+
+[[example]]
+name = "cuckoo_transaction_filter"
+path = "examples/cuckoo_transaction_filter.rs"
 required-features = ["cuckoo"]
 
 [build-dependencies]

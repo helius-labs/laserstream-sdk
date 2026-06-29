@@ -36,6 +36,10 @@ pub use laserstream_core_proto::solana;
 ///     // handle.write(req).await
 /// }
 /// ```
+///
+/// Also works on transaction subscriptions: put `set.to_proto()` on
+/// `SubscribeRequestFilterTransactions.cuckoo_account_include` (see the
+/// `cuckoo_transaction_filter` example).
 #[cfg(feature = "cuckoo")]
 pub mod cuckoo {
     pub use laserstream_core_proto::cuckoo::{
