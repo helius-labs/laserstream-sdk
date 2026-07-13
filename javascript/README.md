@@ -112,7 +112,10 @@ const request = {
     "token-program-accounts": {
       account: [],
       owner: ["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"],
-      filters: []
+      filters: [],
+      // Opt in to only receive accounts a transaction actually mutated,
+      // dropping write-locked-but-unchanged accounts (bandwidth reduction).
+      onlyModified: true
     }
   },
   commitment: CommitmentLevel.CONFIRMED,

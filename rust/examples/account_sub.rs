@@ -22,6 +22,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         SubscribeRequestFilterAccounts {
             account: vec!["EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string()],
             nonempty_txn_signature: Some(true),
+            // Opt in to only receive accounts a transaction actually mutated,
+            // dropping write-locked-but-unchanged accounts (bandwidth reduction).
+            only_modified: Some(true),
             ..Default::default()
         },
     );

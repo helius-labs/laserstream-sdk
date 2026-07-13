@@ -150,5 +150,13 @@ declare module 'laserstream-core-proto-js/generated' {
        */
       cuckooAccountInclude?: (import('./cuckoo').CuckooFilterProto | null);
     }
+    interface ISubscribeRequestFilterAccounts {
+      /**
+       * Opt in to receive only accounts a transaction actually mutated, dropping
+       * write-locked-but-unchanged accounts (proto field #31). Removed once a
+       * core-proto-js release ships this field natively.
+       */
+      onlyModified?: (boolean | null);
+    }
   }
 }

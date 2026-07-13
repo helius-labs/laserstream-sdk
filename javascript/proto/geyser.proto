@@ -90,6 +90,10 @@ message SubscribeRequestFilterAccounts {
   repeated string owner = 3;
   repeated SubscribeRequestFilterAccountsFilter filters = 4;
   optional bool nonempty_txn_signature = 5;
+  // Opt in to receive only accounts that were actually mutated by a
+  // transaction, dropping write-locked-but-unchanged accounts. High tag number
+  // matches the Laserstream server proto.
+  optional bool only_modified = 31;
 }
 
 message SubscribeRequestFilterAccountsFilter {
