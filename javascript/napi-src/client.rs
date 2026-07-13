@@ -96,6 +96,9 @@ pub struct JsAccountFilter {
     pub filters: Option<Vec<JsAccountsFilter>>,
     #[serde(alias = "nonemptyTxnSignature")]
     pub nonempty_txn_signature: Option<bool>,
+    // Opt in to only receive accounts a transaction actually mutated.
+    #[serde(alias = "onlyModified")]
+    pub only_modified: Option<bool>,
     // Add aliases for consistent interface matching transactions
     #[serde(alias = "accountInclude")]
     pub account_include: Option<Vec<String>>,
@@ -289,6 +292,10 @@ impl ClientInner {
                     // accountRequired not directly supported for account subscriptions
                 }
                 
+                if let Some(only_modified) = filter.only_modified {
+                    yellowstone_filter.only_modified = Some(only_modified);
+                }
+
                 if let Some(nonempty_txn_signature) = filter.nonempty_txn_signature {
                     yellowstone_filter.nonempty_txn_signature = Some(nonempty_txn_signature);
                 }

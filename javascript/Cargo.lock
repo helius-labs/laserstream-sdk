@@ -1301,7 +1301,6 @@ dependencies = [
  "futures-channel",
  "futures-util",
  "laserstream-core-client",
- "laserstream-core-proto",
  "napi",
  "napi-build",
  "napi-derive",
@@ -1314,6 +1313,7 @@ dependencies = [
  "tokio-stream",
  "tonic 0.11.0",
  "uuid",
+ "yellowstone-grpc-proto",
 ]
 
 [[package]]
@@ -4254,6 +4254,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f42320e61fe2cfd34354ecb597f86f413484a798ba44a8ca1165c58d42da6c1"
 dependencies = [
  "bitflags 2.9.1",
+]
+
+[[package]]
+name = "yellowstone-grpc-proto"
+version = "9.0.1"
+source = "git+ssh://git@github.com/helius-labs/yellowstone-grpc?branch=cameron%2Fonly-modified-filter#696dba55294c4c883c7dd87a996dc7f1f332cc11"
+dependencies = [
+ "anyhow",
+ "prost 0.14.1",
+ "prost-types",
+ "protobuf-src",
+ "siphasher",
+ "tonic 0.14.2",
+ "tonic-build",
+ "tonic-prost",
+ "tonic-prost-build",
 ]
 
 [[package]]
