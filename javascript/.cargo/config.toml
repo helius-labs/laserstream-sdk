@@ -3,8 +3,3 @@ rustflags = ["-C", "target-feature=-crt-static", "-C", "link-arg=-lgcc"]
 
 [target.aarch64-unknown-linux-musl]
 rustflags = ["-C", "target-feature=-crt-static", "-C", "link-arg=-lgcc"]
-
-# Fetch git deps via the git CLI so the private yellowstone-grpc SSH pin
-# (laserstream-core-proto) authenticates in CI.
-[net]
-git-fetch-with-cli = true
