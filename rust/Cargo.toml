@@ -18,7 +18,14 @@ readme = "README.md"
 # dep-key alias keeps the `laserstream_core_proto::` import path.
 # Revert to a crates.io version once that release is published.
 laserstream-core-proto = { git = "https://github.com/helius-labs/yellowstone-grpc", branch = "cameron/only-modified-filter", package = "yellowstone-grpc-proto", default-features = false, features = ["tonic", "tonic-compression"] }
-laserstream-core-client = "9.0.2"
+# Must be git-pinned to the SAME fork branch as the proto: laserstream-core-client
+# bundles its own yellowstone-grpc-proto, so a crates.io client would carry a
+# DIFFERENT proto crate than the git-pinned one above — making `SubscribeRequest`
+# from `helius_laserstream::grpc` a distinct type from what the client's
+# `subscribe_with_request` expects (two-proto-crates build failure). One shared
+# proto crate = pin both. Revert both to crates.io once a release with
+# only_modified (= 31) is published.
+laserstream-core-client = { git = "https://github.com/helius-labs/yellowstone-grpc", branch = "cameron/only-modified-filter", package = "yellowstone-grpc-client" }
 tonic = { version = "0.12.1", features = ["transport", "tls", "zstd", "gzip"] }
 prost = "0.12"
 prost-types = "0.12"
