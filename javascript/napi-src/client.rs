@@ -7,6 +7,7 @@ use serde_json;
 use base64::{Engine as _, engine::general_purpose};
 
 use laserstream_core_proto::geyser::{
+    AccountState,
     SubscribeRequest, SubscribeRequestFilterAccounts, SubscribeRequestFilterBlocks,
     SubscribeRequestFilterSlots, SubscribeRequestFilterTransactions,
     SubscribeRequestFilterBlocksMeta, SubscribeRequestFilterEntry,
@@ -96,9 +97,10 @@ pub struct JsAccountFilter {
     pub filters: Option<Vec<JsAccountsFilter>>,
     #[serde(alias = "nonemptyTxnSignature")]
     pub nonempty_txn_signature: Option<bool>,
-    // Opt in to only receive accounts a transaction actually mutated.
-    #[serde(alias = "onlyModified")]
-    pub only_modified: Option<bool>,
+    // Which write-locked accounts to deliver: "locked" (default, all) or
+    // "written" (only accounts a transaction actually mutated).
+    #[serde(alias = "accountState")]
+    pub account_state: Option<String>,
     // Add aliases for consistent interface matching transactions
     #[serde(alias = "accountInclude")]
     pub account_include: Option<Vec<String>>,
@@ -292,8 +294,15 @@ impl ClientInner {
                     // accountRequired not directly supported for account subscriptions
                 }
                 
-                if let Some(only_modified) = filter.only_modified {
-                    yellowstone_filter.only_modified = Some(only_modified);
+                // Map the "locked" | "written" opt-in to the proto AccountState
+                // enum (default LOCKED). Unknown strings fall back to LOCKED so a
+                // client typo never silently filters.
+                if let Some(account_state) = filter.account_state.as_deref() {
+                    let state = match account_state {
+                        "written" => AccountState::Written,
+                        _ => AccountState::Locked,
+                    };
+                    yellowstone_filter.account_state = state as i32;
                 }
 
                 if let Some(nonempty_txn_signature) = filter.nonempty_txn_signature {

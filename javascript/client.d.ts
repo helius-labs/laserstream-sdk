@@ -152,11 +152,12 @@ declare module 'laserstream-core-proto-js/generated' {
     }
     interface ISubscribeRequestFilterAccounts {
       /**
-       * Opt in to receive only accounts a transaction actually mutated, dropping
-       * write-locked-but-unchanged accounts (proto field #31). Removed once a
-       * core-proto-js release ships this field natively.
+       * Which write-locked accounts to deliver (proto field #31). `'locked'`
+       * (default) delivers all; `'written'` delivers only accounts a transaction
+       * actually mutated, dropping write-locked-but-unchanged ones. Removed once
+       * a core-proto-js release ships this field natively.
        */
-      onlyModified?: (boolean | null);
+      accountState?: ('locked' | 'written' | null);
     }
   }
 }
