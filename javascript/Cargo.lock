@@ -4259,7 +4259,7 @@ dependencies = [
 [[package]]
 name = "yellowstone-grpc-proto"
 version = "9.0.1"
-source = "git+https://github.com/helius-labs/yellowstone-grpc?branch=cameron%2Fonly-modified-filter#00d6797f9098d15d5cfb274bd0169693b2768521"
+source = "git+https://github.com/helius-labs/yellowstone-grpc?branch=subscribe-raw-client-with-unconfirmed-v9.0.1#8aee7169ce2b984d780da37875439609acd8ed85"
 dependencies = [
  "anyhow",
  "prost 0.14.1",
