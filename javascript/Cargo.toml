@@ -23,13 +23,9 @@ futures-util = "0.3"
 futures-channel = "0.3"
 parking_lot = "0.12"
 uuid = { version = "1", features = ["v4"] }
-laserstream-core-client = "9.0.2"
-# TEMP: laserstream-core-proto is yellowstone-grpc-proto published under a rename.
-# Until a release with only_modified (= 31) ships, git-pin it to the YS branch
-# over https (the repo is publicly fetchable, so CI needs no credentials). The
-# dep-key alias keeps the `laserstream_core_proto::` import path.
-# Revert to a crates.io version once that release is published.
-laserstream-core-proto = { git = "https://github.com/helius-labs/yellowstone-grpc", branch = "subscribe-raw-client-with-unconfirmed-v9.0.1", package = "yellowstone-grpc-proto", default-features = false, features = ["tonic", "tonic-compression"] }
+laserstream-core-client = "10.0.0"
+# Published release carrying only_modified (account_state / is_unmodified = 31).
+laserstream-core-proto = { version = "10.0.1", default-features = false, features = ["tonic", "tonic-compression"] }
 prost = "0.14"
 bs58 = "0.5.0"
 fastrand = "2.0"

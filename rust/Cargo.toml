@@ -12,20 +12,11 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# TEMP: laserstream-core-proto is yellowstone-grpc-proto published under a rename.
-# Until a release with only_modified (= 31) ships, git-pin it to the YS branch
-# over https (the repo is publicly fetchable, so CI needs no credentials). The
-# dep-key alias keeps the `laserstream_core_proto::` import path.
-# Revert to a crates.io version once that release is published.
-laserstream-core-proto = { git = "https://github.com/helius-labs/yellowstone-grpc", branch = "subscribe-raw-client-with-unconfirmed-v9.0.1", package = "yellowstone-grpc-proto", default-features = false, features = ["tonic", "tonic-compression"] }
-# Must be git-pinned to the SAME fork branch as the proto: laserstream-core-client
-# bundles its own yellowstone-grpc-proto, so a crates.io client would carry a
-# DIFFERENT proto crate than the git-pinned one above — making `SubscribeRequest`
-# from `helius_laserstream::grpc` a distinct type from what the client's
-# `subscribe_with_request` expects (two-proto-crates build failure). One shared
-# proto crate = pin both. Revert both to crates.io once a release with
-# only_modified (= 31) is published.
-laserstream-core-client = { git = "https://github.com/helius-labs/yellowstone-grpc", branch = "subscribe-raw-client-with-unconfirmed-v9.0.1", package = "yellowstone-grpc-client" }
+# Published release carrying only_modified (account_state / is_unmodified = 31).
+laserstream-core-proto = { version = "10.0.1", default-features = false, features = ["tonic", "tonic-compression"] }
+# Pin proto + client together: the client bundles its own proto, so a mismatched
+# version would make `SubscribeRequest` a distinct type from the client's API.
+laserstream-core-client = "10.0.0"
 tonic = { version = "0.12.1", features = ["transport", "tls", "zstd", "gzip"] }
 prost = "0.12"
 prost-types = "0.12"
