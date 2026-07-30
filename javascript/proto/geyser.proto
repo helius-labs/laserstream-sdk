@@ -88,9 +88,9 @@ message SubscribeRequest {
 // Which account updates a subscriber wants delivered. LOCKED (default,
 // zero-value) = all write-locked accounts (current behavior). WRITTEN = only
 // accounts a transaction actually mutated. Matches the Laserstream server proto.
-enum AccountState {
-  ACCOUNT_STATE_LOCKED = 0;
-  ACCOUNT_STATE_WRITTEN = 1;
+enum NotifyOn {
+  NOTIFY_ON_LOCK = 0;
+  NOTIFY_ON_WRITE = 1;
 }
 
 message SubscribeRequestFilterAccounts {
@@ -100,7 +100,7 @@ message SubscribeRequestFilterAccounts {
   optional bool nonempty_txn_signature = 5;
   // Opt in to only-mutated delivery. LOCKED (default) = all; WRITTEN = only
   // mutated. High tag number matches the Laserstream server proto.
-  AccountState account_state = 31;
+  NotifyOn notify_on = 31;
 }
 
 message SubscribeRequestFilterAccountsFilter {

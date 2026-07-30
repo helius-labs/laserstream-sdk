@@ -23,9 +23,9 @@ futures-util = "0.3"
 futures-channel = "0.3"
 parking_lot = "0.12"
 uuid = { version = "1", features = ["v4"] }
-laserstream-core-client = "10.0.0"
-# Published release carrying only_modified (account_state / is_unmodified = 31).
-laserstream-core-proto = { version = "10.0.1", default-features = false, features = ["tonic", "tonic-compression"] }
+laserstream-core-client = { git = "https://github.com/helius-labs/yellowstone-grpc", branch = "cameron/notify-on-rename", package = "yellowstone-grpc-client" }
+# Git-pinned to the YS NotifyOn rename branch (AccountState -> NotifyOn, tag 31 unchanged).
+laserstream-core-proto = { git = "https://github.com/helius-labs/yellowstone-grpc", branch = "cameron/notify-on-rename", package = "yellowstone-grpc-proto", default-features = false, features = ["tonic", "tonic-compression"] }
 prost = "0.14"
 bs58 = "0.5.0"
 fastrand = "2.0"

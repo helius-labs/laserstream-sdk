@@ -1,5 +1,5 @@
 use helius_laserstream::{subscribe, LaserstreamConfig};
-use helius_laserstream::grpc::{AccountState, SubscribeRequest, SubscribeRequestFilterAccounts};
+use helius_laserstream::grpc::{NotifyOn, SubscribeRequest, SubscribeRequestFilterAccounts};
 use futures::StreamExt;
 use std::env;
 
@@ -24,7 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             nonempty_txn_signature: Some(true),
             // Opt in to only-mutated delivery (WRITTEN), dropping write-locked-
             // but-unchanged accounts (bandwidth reduction). Default is LOCKED (all).
-            account_state: AccountState::Written as i32,
+            notify_on: NotifyOn::Write as i32,
             ..Default::default()
         },
     );

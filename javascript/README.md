@@ -113,9 +113,9 @@ const request = {
       account: [],
       owner: ["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"],
       filters: [],
-      // Opt in to only-mutated delivery ('written'), dropping write-locked-but-
-      // unchanged accounts (bandwidth reduction). Default is 'locked' (all).
-      accountState: 'written'
+      // Opt in to only-mutated delivery ('write'), dropping write-locked-but-
+      // unchanged accounts (bandwidth reduction). Default is 'lock' (all).
+      notifyOn: 'write'
     }
   },
   commitment: CommitmentLevel.CONFIRMED,
