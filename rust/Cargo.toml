@@ -12,11 +12,11 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# Git-pinned to the YS NotifyOn rename branch (AccountState -> NotifyOn, tag 31 unchanged).
-laserstream-core-proto = { git = "https://github.com/helius-labs/yellowstone-grpc", branch = "cameron/notify-on-rename", package = "yellowstone-grpc-proto", default-features = false, features = ["tonic", "tonic-compression"] }
+# Git-pinned to the YS 9.0.1 base branch, which now carries the NotifyOn rename (AccountState -> NotifyOn, tag 31 unchanged).
+laserstream-core-proto = { git = "https://github.com/helius-labs/yellowstone-grpc", branch = "subscribe-raw-client-with-unconfirmed-v9.0.1", package = "yellowstone-grpc-proto", default-features = false, features = ["tonic", "tonic-compression"] }
 # Pin proto + client together: the client bundles its own proto, so a mismatched
 # version would make `SubscribeRequest` a distinct type from the client's API.
-laserstream-core-client = { git = "https://github.com/helius-labs/yellowstone-grpc", branch = "cameron/notify-on-rename", package = "yellowstone-grpc-client" }
+laserstream-core-client = { git = "https://github.com/helius-labs/yellowstone-grpc", branch = "subscribe-raw-client-with-unconfirmed-v9.0.1", package = "yellowstone-grpc-client" }
 tonic = { version = "0.12.1", features = ["transport", "tls", "zstd", "gzip"] }
 prost = "0.12"
 prost-types = "0.12"

@@ -4827,7 +4827,7 @@ checksum = "1ffae5123b2d3fc086436f8834ae3ab053a283cfac8fe0a0b8eaae044768a4c4"
 [[package]]
 name = "yellowstone-grpc-client"
 version = "9.0.1"
-source = "git+https://github.com/helius-labs/yellowstone-grpc?branch=cameron%2Fnotify-on-rename#2768da072935faca740c03bf0385e6b1e40fe4de"
+source = "git+https://github.com/helius-labs/yellowstone-grpc?branch=subscribe-raw-client-with-unconfirmed-v9.0.1#c1c1f947138df99fd94ad00e0f8cea7e2dc9d13b"
 dependencies = [
  "bytes",
  "futures",
@@ -4840,7 +4840,7 @@ dependencies = [
 [[package]]
 name = "yellowstone-grpc-proto"
 version = "9.0.1"
-source = "git+https://github.com/helius-labs/yellowstone-grpc?branch=cameron%2Fnotify-on-rename#2768da072935faca740c03bf0385e6b1e40fe4de"
+source = "git+https://github.com/helius-labs/yellowstone-grpc?branch=subscribe-raw-client-with-unconfirmed-v9.0.1#c1c1f947138df99fd94ad00e0f8cea7e2dc9d13b"
 dependencies = [
  "anyhow",
  "bincode",
