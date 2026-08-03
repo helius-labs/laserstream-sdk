@@ -7,6 +7,7 @@ use serde_json;
 use base64::{Engine as _, engine::general_purpose};
 
 use laserstream_core_proto::geyser::{
+    NotifyOn,
     SubscribeRequest, SubscribeRequestFilterAccounts, SubscribeRequestFilterBlocks,
     SubscribeRequestFilterSlots, SubscribeRequestFilterTransactions,
     SubscribeRequestFilterBlocksMeta, SubscribeRequestFilterEntry,
@@ -96,6 +97,10 @@ pub struct JsAccountFilter {
     pub filters: Option<Vec<JsAccountsFilter>>,
     #[serde(alias = "nonemptyTxnSignature")]
     pub nonempty_txn_signature: Option<bool>,
+    // Which write-locked accounts to deliver: "lock" (default, all) or
+    // "write" (only accounts a transaction actually mutated).
+    #[serde(alias = "notifyOn")]
+    pub notify_on: Option<String>,
     // Add aliases for consistent interface matching transactions
     #[serde(alias = "accountInclude")]
     pub account_include: Option<Vec<String>>,
@@ -289,6 +294,17 @@ impl ClientInner {
                     // accountRequired not directly supported for account subscriptions
                 }
                 
+                // Map the "lock" | "write" opt-in to the proto NotifyOn
+                // enum (default Lock). Unknown strings fall back to Lock so a
+                // client typo never silently filters.
+                if let Some(notify_on) = filter.notify_on.as_deref() {
+                    let state = match notify_on {
+                        "write" => NotifyOn::Write,
+                        _ => NotifyOn::Lock,
+                    };
+                    yellowstone_filter.notify_on = state as i32;
+                }
+
                 if let Some(nonempty_txn_signature) = filter.nonempty_txn_signature {
                     yellowstone_filter.nonempty_txn_signature = Some(nonempty_txn_signature);
                 }

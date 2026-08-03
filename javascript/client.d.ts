@@ -150,5 +150,14 @@ declare module 'laserstream-core-proto-js/generated' {
        */
       cuckooAccountInclude?: (import('./cuckoo').CuckooFilterProto | null);
     }
+    interface ISubscribeRequestFilterAccounts {
+      /**
+       * Which write-locked accounts to deliver (proto field #31). `'lock'`
+       * (default) delivers all; `'write'` delivers only accounts a transaction
+       * actually mutated, dropping write-locked-but-unchanged ones. Removed once
+       * a core-proto-js release ships this field natively.
+       */
+      notifyOn?: ('lock' | 'write' | null);
+    }
   }
 }
