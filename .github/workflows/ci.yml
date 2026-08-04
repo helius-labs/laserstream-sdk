@@ -33,7 +33,7 @@ jobs:
             target: x86_64-unknown-linux-gnu
             docker: gnu
             build: npm run build -- --target x86_64-unknown-linux-gnu
-          - host: ubuntu-latest
+          - host: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             docker: gnu
             build: npm run build -- --target aarch64-unknown-linux-gnu
@@ -41,7 +41,7 @@ jobs:
             target: x86_64-unknown-linux-musl
             docker: musl
             build: npm run build -- --target x86_64-unknown-linux-musl
-          - host: ubuntu-latest
+          - host: ubuntu-24.04-arm
             target: aarch64-unknown-linux-musl
             docker: musl
             build: npm run build -- --target aarch64-unknown-linux-musl
@@ -82,8 +82,11 @@ jobs:
           restore-keys: |
             ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}-
             ${{ matrix.settings.target }}-cargo-
+      # QEMU is only needed when the runner arch differs from the container arch
+      # (x86 host building an arm64 container). Native aarch64 runners
+      # (ubuntu-24.04-arm) run the arm64 container directly — no emulation.
       - name: Set up QEMU for cross-compilation
-        if: matrix.settings.docker
+        if: matrix.settings.docker && matrix.settings.host == 'ubuntu-latest'
         uses: docker/setup-qemu-action@v3
       - name: Build in Docker (musl)
         if: matrix.settings.docker == 'musl'
