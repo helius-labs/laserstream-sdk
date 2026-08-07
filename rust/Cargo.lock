@@ -1044,7 +1044,7 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "helius-laserstream"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "async-stream",
  "bs58",
@@ -1053,8 +1053,6 @@ dependencies = [
  "futures",
  "futures-channel",
  "futures-util",
- "laserstream-core-client",
- "laserstream-core-proto",
  "prost 0.12.6",
  "prost-types 0.12.6",
  "rand 0.8.7",
@@ -1072,6 +1070,8 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "uuid",
+ "yellowstone-grpc-client",
+ "yellowstone-grpc-proto",
 ]
 
 [[package]]
@@ -1212,7 +1212,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "system-configuration",
  "tokio",
  "tower-service",
@@ -1440,53 +1440,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb26cec98cce3a3d96cbb7bced3c4b16e3d13f27ec56dbd62cbc8f39cfb9d653"
 dependencies = [
  "cpufeatures 0.2.17",
-]
-
-[[package]]
-name = "laserstream-core-client"
-version = "11.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "615ec650bd8f82e12df9c71aef2ad59d7bb38d240f4cca3ca6c12c9a1e83234d"
-dependencies = [
- "bytes",
- "futures",
- "laserstream-core-proto",
- "thiserror 1.0.69",
- "tonic 0.14.6",
- "tonic-health",
-]
-
-[[package]]
-name = "laserstream-core-proto"
-version = "11.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "053eb6acdd1f0ccf9fcb1b498a6dd1f99f07b9681286c5137c6dc0e9d45fb98a"
-dependencies = [
- "anyhow",
- "bincode",
- "prost 0.14.4",
- "prost-types 0.14.4",
- "protobuf-src",
- "siphasher",
- "solana-account 4.3.1",
- "solana-account-decoder",
- "solana-address 2.6.1",
- "solana-clock",
- "solana-hash",
- "solana-instruction-error",
- "solana-message",
- "solana-pubkey 4.2.0",
- "solana-reward-info",
- "solana-short-vec",
- "solana-signature",
- "solana-transaction",
- "solana-transaction-context",
- "solana-transaction-error",
- "solana-transaction-status",
- "tonic 0.14.6",
- "tonic-build 0.14.6",
- "tonic-prost",
- "tonic-prost-build",
 ]
 
 [[package]]
@@ -2060,7 +2013,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "thiserror 2.0.19",
  "tokio",
  "tracing",
@@ -2098,7 +2051,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.6.5",
+ "socket2 0.5.10",
  "tracing",
  "windows-sys 0.61.2",
 ]
@@ -4870,6 +4823,47 @@ name = "writeable"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ffae5123b2d3fc086436f8834ae3ab053a283cfac8fe0a0b8eaae044768a4c4"
+
+[[package]]
+name = "yellowstone-grpc-client"
+version = "9.0.1"
+source = "git+https://github.com/helius-labs/yellowstone-grpc?branch=cameron%2Fnotify-on-write-default#b946a0f6fcd4097bb2b5901aedcf3e5b03103c83"
+dependencies = [
+ "bytes",
+ "futures",
+ "thiserror 1.0.69",
+ "tonic 0.14.6",
+ "tonic-health",
+ "yellowstone-grpc-proto",
+]
+
+[[package]]
+name = "yellowstone-grpc-proto"
+version = "9.0.1"
+source = "git+https://github.com/helius-labs/yellowstone-grpc?branch=cameron%2Fnotify-on-write-default#b946a0f6fcd4097bb2b5901aedcf3e5b03103c83"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "prost 0.14.4",
+ "prost-types 0.14.4",
+ "protobuf-src",
+ "siphasher",
+ "solana-account 4.3.1",
+ "solana-account-decoder",
+ "solana-clock",
+ "solana-hash",
+ "solana-message",
+ "solana-pubkey 4.2.0",
+ "solana-signature",
+ "solana-transaction",
+ "solana-transaction-context",
+ "solana-transaction-error",
+ "solana-transaction-status",
+ "tonic 0.14.6",
+ "tonic-build 0.14.6",
+ "tonic-prost",
+ "tonic-prost-build",
+]
 
 [[package]]
 name = "yoke"

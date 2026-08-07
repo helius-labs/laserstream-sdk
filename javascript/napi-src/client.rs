@@ -97,8 +97,8 @@ pub struct JsAccountFilter {
     pub filters: Option<Vec<JsAccountsFilter>>,
     #[serde(alias = "nonemptyTxnSignature")]
     pub nonempty_txn_signature: Option<bool>,
-    // Which write-locked accounts to deliver: "lock" (default, all) or
-    // "write" (only accounts a transaction actually mutated).
+    // Which write-locked accounts to deliver: "write" (default, only accounts
+    // a transaction actually mutated) or "lock" (all write-locked accounts).
     #[serde(alias = "notifyOn")]
     pub notify_on: Option<String>,
     // Add aliases for consistent interface matching transactions
@@ -294,13 +294,14 @@ impl ClientInner {
                     // accountRequired not directly supported for account subscriptions
                 }
                 
-                // Map the "lock" | "write" opt-in to the proto NotifyOn
-                // enum (default Lock). Unknown strings fall back to Lock so a
-                // client typo never silently filters.
+                // Map the "lock" | "write" opt-in to the proto NotifyOn enum.
+                // Only "lock" opts back into all write-locked accounts
+                // (LockExplicit); everything else, and an omitted field, yields
+                // Write (the server default).
                 if let Some(notify_on) = filter.notify_on.as_deref() {
                     let state = match notify_on {
-                        "write" => NotifyOn::Write,
-                        _ => NotifyOn::Lock,
+                        "lock" => NotifyOn::LockExplicit,
+                        _ => NotifyOn::Write,
                     };
                     yellowstone_filter.notify_on = state as i32;
                 }
