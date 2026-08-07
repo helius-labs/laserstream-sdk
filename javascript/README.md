@@ -113,8 +113,8 @@ const request = {
       account: [],
       owner: ["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"],
       filters: [],
-      // Opt in to only-mutated delivery ('write'), dropping write-locked-but-
-      // unchanged accounts (bandwidth reduction). Default is 'lock' (all).
+      // Which write-locked accounts to deliver. Default is 'write' (only
+      // accounts a transaction mutated); 'lock' opts back into all.
       notifyOn: 'write'
     }
   },

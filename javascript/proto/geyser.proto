@@ -85,12 +85,13 @@ message SubscribeRequest {
   optional uint64 from_slot = 11;
 }
 
-// Which account updates a subscriber wants delivered. LOCKED (default,
-// zero-value) = all write-locked accounts (current behavior). WRITTEN = only
-// accounts a transaction actually mutated. Matches the Laserstream server proto.
+// Which account updates a subscriber wants delivered; unset/zero is treated as WRITE by Laserstream.
 enum NotifyOn {
+  // Legacy zero-value; wire-indistinguishable from unset, so treated as WRITE — send LOCK_EXPLICIT for all.
   NOTIFY_ON_LOCK = 0;
   NOTIFY_ON_WRITE = 1;
+  // Explicit opt-back-in to delivering every write-locked account.
+  NOTIFY_ON_LOCK_EXPLICIT = 2;
 }
 
 message SubscribeRequestFilterAccounts {
@@ -98,8 +99,8 @@ message SubscribeRequestFilterAccounts {
   repeated string owner = 3;
   repeated SubscribeRequestFilterAccountsFilter filters = 4;
   optional bool nonempty_txn_signature = 5;
-  // Opt in to only-mutated delivery. LOCKED (default) = all; WRITTEN = only
-  // mutated. High tag number matches the Laserstream server proto.
+  // Unset/WRITE (default) = only mutated accounts; LOCK_EXPLICIT = all.
+  // High tag number matches the Laserstream server proto.
   NotifyOn notify_on = 31;
 }
 
