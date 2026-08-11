@@ -6,8 +6,9 @@ use serde::Deserialize;
 use serde_json;
 use base64::{Engine as _, engine::general_purpose};
 
+#[allow(deprecated)] // NotifyOn is a deprecated no-op (Agave 4.2); kept for backward-compat mapping
+use laserstream_core_proto::geyser::NotifyOn;
 use laserstream_core_proto::geyser::{
-    NotifyOn,
     SubscribeRequest, SubscribeRequestFilterAccounts, SubscribeRequestFilterBlocks,
     SubscribeRequestFilterSlots, SubscribeRequestFilterTransactions,
     SubscribeRequestFilterBlocksMeta, SubscribeRequestFilterEntry,
@@ -299,6 +300,7 @@ impl ClientInner {
                 // string to the proto NotifyOn enum for backward compatibility.
                 // The server ignores it — write-only delivery is now the default
                 // and only behavior. Unknown strings fall back to Lock.
+                #[allow(deprecated)]
                 if let Some(notify_on) = filter.notify_on.as_deref() {
                     let state = match notify_on {
                         "write" => NotifyOn::Write,
