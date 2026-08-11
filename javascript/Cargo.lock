@@ -778,6 +778,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "laserstream-core-client"
+version = "11.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9fa8ce6192955baeeff32a77cbc2a39c91967861735d443ef893c7e2403f7817"
+dependencies = [
+ "bytes",
+ "futures",
+ "laserstream-core-proto",
+ "thiserror",
+ "tonic 0.14.6",
+ "tonic-health",
+]
+
+[[package]]
+name = "laserstream-core-proto"
+version = "11.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18ac4a3743baa7a34a548a990b838d0db7c3e50bb614e7aedbd18443617cfc59"
+dependencies = [
+ "anyhow",
+ "prost 0.14.4",
+ "prost-types",
+ "protobuf-src",
+ "siphasher",
+ "tonic 0.14.6",
+ "tonic-build",
+ "tonic-prost",
+ "tonic-prost-build",
+]
+
+[[package]]
 name = "laserstream-napi"
 version = "0.8.2"
 dependencies = [
@@ -788,6 +819,8 @@ dependencies = [
  "futures",
  "futures-channel",
  "futures-util",
+ "laserstream-core-client",
+ "laserstream-core-proto",
  "napi",
  "napi-build",
  "napi-derive",
@@ -800,8 +833,6 @@ dependencies = [
  "tokio-stream",
  "tonic 0.11.0",
  "uuid",
- "yellowstone-grpc-client",
- "yellowstone-grpc-proto",
 ]
 
 [[package]]
@@ -2094,35 +2125,6 @@ name = "windows_x86_64_msvc"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
-
-[[package]]
-name = "yellowstone-grpc-client"
-version = "9.0.1"
-source = "git+https://github.com/helius-labs/yellowstone-grpc?branch=feat%2Fdeprecate-notify-on#8b41d067490e6bd4f67c0d07590be37328c7a5dd"
-dependencies = [
- "bytes",
- "futures",
- "thiserror",
- "tonic 0.14.6",
- "tonic-health",
- "yellowstone-grpc-proto",
-]
-
-[[package]]
-name = "yellowstone-grpc-proto"
-version = "9.0.1"
-source = "git+https://github.com/helius-labs/yellowstone-grpc?branch=feat%2Fdeprecate-notify-on#8b41d067490e6bd4f67c0d07590be37328c7a5dd"
-dependencies = [
- "anyhow",
- "prost 0.14.4",
- "prost-types",
- "protobuf-src",
- "siphasher",
- "tonic 0.14.6",
- "tonic-build",
- "tonic-prost",
- "tonic-prost-build",
-]
 
 [[package]]
 name = "zerocopy"
