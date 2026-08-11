@@ -50,6 +50,10 @@ type LaserstreamConfig struct {
 	MaxReconnectAttempts *int            // nil uses default (240 attempts)
 	ChannelOptions       *ChannelOptions // nil uses defaults
 	Replay               *bool           // nil => default true; set to pointer false to disable
+	// ReconnectCallback, when non-nil, is invoked once per failed connection
+	// attempt — including the attempts the SDK recovers from on its own, which
+	// ErrorCallback never reports. nil keeps the previous behaviour exactly.
+	ReconnectCallback ReconnectCallback
 }
 
 // ChannelOptions configures gRPC channel behavior
@@ -80,18 +84,53 @@ type ChannelOptions struct {
 type DataCallback func(data *SubscribeUpdate)
 
 // ErrorCallback defines the function signature for handling errors.
+//
+// It fires ONLY after reconnection is abandoned (MaxReconnectAttempts
+// exhausted). For visibility into the retries leading up to that — a stream
+// that is flapping but still recovering — use ReconnectCallback.
 type ErrorCallback func(err error)
+
+// ReconnectInfo describes a single failed connection attempt.
+//
+// It carries no error. Reconnection is the SDK's job, so the cause of a retry
+// the SDK recovers from is the SDK's business; the consumer is told only THAT
+// it happened, so it can see a stream flapping. The error surfaces once, via
+// ErrorCallback, if reconnection is ultimately abandoned.
+type ReconnectInfo struct {
+	// Attempt is the current consecutive-failure count, starting at 1. It
+	// resets once a connection makes progress, so it measures the CURRENT
+	// burst rather than the lifetime total.
+	Attempt uint32
+	// MaxAttempts is the effective ceiling; reaching it ends the stream and
+	// fires ErrorCallback.
+	MaxAttempts uint32
+	// RecoveredSincePreviousFailure reports that the connection successfully
+	// carried data before failing again. It is the difference between a link
+	// that is down and one that is flapping — a distinction invisible to a
+	// caller that only sees the terminal error.
+	RecoveredSincePreviousFailure bool
+}
+
+// ReconnectCallback is invoked once per failed connection attempt, so a caller
+// can observe a stream that is retrying without being handed the server-side
+// errors the SDK is there to absorb.
+//
+// It runs ON the stream's reconnect goroutine, immediately before the retry
+// backoff. Implementations must not block: work done here delays reconnection,
+// which is the opposite of what an observer wants. Record a metric and return.
+type ReconnectCallback func(info ReconnectInfo)
 
 // Client manages the connection and subscription to Laserstream.
 type Client struct {
-	config        LaserstreamConfig
-	conn          *grpc.ClientConn
-	stream        pb.Geyser_SubscribeClient
-	mu            sync.RWMutex
-	cancel        context.CancelFunc
-	running       bool
-	dataCallback  DataCallback
-	errorCallback ErrorCallback
+	config            LaserstreamConfig
+	conn              *grpc.ClientConn
+	stream            pb.Geyser_SubscribeClient
+	mu                sync.RWMutex
+	cancel            context.CancelFunc
+	running           bool
+	dataCallback      DataCallback
+	errorCallback     ErrorCallback
+	reconnectCallback ReconnectCallback
 
 	// Enhanced slot tracking
 	trackedSlot  uint64
@@ -120,9 +159,10 @@ func NewLaserstreamConfig(endpoint, apiKey string) LaserstreamConfig {
 // NewClient creates a new Laserstream client instance.
 func NewClient(config LaserstreamConfig) *Client {
 	return &Client{
-		config:        config,
-		writeChan:     make(chan *SubscribeRequest, 100),
-		writeStopChan: make(chan struct{}),
+		config:            config,
+		reconnectCallback: config.ReconnectCallback,
+		writeChan:         make(chan *SubscribeRequest, 100),
+		writeStopChan:     make(chan struct{}),
 	}
 }
 
@@ -272,8 +312,21 @@ func (c *Client) streamLoop(ctx context.Context) {
 			reconnectAttempts++
 
 			// If we made progress, reset attempts to 1 (this is the first attempt after progress)
-			if atomic.LoadUint64(&c.madeProgress) != 0 {
+			recovered := atomic.LoadUint64(&c.madeProgress) != 0
+			if recovered {
 				reconnectAttempts = 1
+			}
+
+			// Report every attempt to an observer that asked for them. The
+			// consumer-facing ErrorCallback stays silent until the retries are
+			// exhausted (below), so without this a stream can fail and recover
+			// hundreds of times while every signal the caller has says healthy.
+			if c.reconnectCallback != nil {
+				c.reconnectCallback(ReconnectInfo{
+					Attempt:                       reconnectAttempts,
+					MaxAttempts:                   uint32(maxAttempts),
+					RecoveredSincePreviousFailure: recovered,
+				})
 			}
 
 			// Log error internally but don't report to consumer until max attempts exhausted
