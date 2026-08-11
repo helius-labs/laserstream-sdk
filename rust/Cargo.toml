@@ -37,10 +37,8 @@ uuid = { version = "1.7.0", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde", "clock"] }
 reqwest = { version = "0.12", features = ["json", "gzip", "rustls-tls"] }
 sha2 = "0.10"
-# Pubkey type for the cuckoo CompressedAccountFilterSet API; only pulled in with the
-# `cuckoo` feature. Pinned to 3.x to match laserstream-core-proto 9.3.0's
-# `convert` feature (solana-pubkey 3.0), so the re-exported Pubkey type unifies
-# with `CompressedAccountFilterSet::contains`.
+# Pubkey type for the cuckoo CompressedAccountFilterSet API; only pulled in with
+# the `cuckoo` feature.
 solana-pubkey = { version = "3.0", optional = true }
 
 [features]
