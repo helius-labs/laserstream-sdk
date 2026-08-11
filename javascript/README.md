@@ -112,11 +112,7 @@ const request = {
     "token-program-accounts": {
       account: [],
       owner: ["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"],
-      filters: [],
-      // DEPRECATED (no-op as of Agave 4.2): notifyOn no longer has any effect.
-      // The validator now skips no-op account updates, so write-only delivery is
-      // the default and only behavior. Retained for backward compatibility.
-      notifyOn: 'write'
+      filters: []
     }
   },
   commitment: CommitmentLevel.CONFIRMED,
