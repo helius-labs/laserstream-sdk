@@ -744,7 +744,7 @@ impl StreamInner {
                             // Convert to bytes and send to JavaScript
                             match crate::subscribe_preprocessed_update_to_bytes(message) {
                                 Ok(bytes) => {
-                                    let _ = ts_callback.call(Ok(crate::SubscribePreprocessedUpdateBytes(bytes)), ThreadsafeFunctionCallMode::NonBlocking);
+                                    let _ = ts_callback.call(Ok(crate::SubscribePreprocessedUpdateBytes(bytes)), ThreadsafeFunctionCallMode::Blocking);
                                 }
                                 Err(e) => {
                                     eprintln!("Failed to encode preprocessed update: {}", e);
