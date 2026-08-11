@@ -1,6 +1,6 @@
 [package]
 name = "helius-laserstream"
-version = "0.6.0"
+version = "0.6.2"
 edition = "2021"
 authors = ["Helius <support@helius.xyz>"]
 description = "Rust client for Helius LaserStream gRPC with robust reconnection and slot tracking"
@@ -12,10 +12,10 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-laserstream-core-proto = { version = "11.0.0", default-features = false, features = ["tonic", "tonic-compression"] }
+laserstream-core-proto = { version = "11.1.0", default-features = false, features = ["tonic", "tonic-compression"] }
 # Pin proto + client together: the client bundles its own proto, so a mismatched
 # version would make `SubscribeRequest` a distinct type from the client's API.
-laserstream-core-client = "11.0.0"
+laserstream-core-client = "11.1.0"
 tonic = { version = "0.12.1", features = ["transport", "tls", "zstd", "gzip"] }
 prost = "0.12"
 prost-types = "0.12"
@@ -37,10 +37,8 @@ uuid = { version = "1.7.0", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde", "clock"] }
 reqwest = { version = "0.12", features = ["json", "gzip", "rustls-tls"] }
 sha2 = "0.10"
-# Pubkey type for the cuckoo CompressedAccountFilterSet API; only pulled in with the
-# `cuckoo` feature. Pinned to 3.x to match laserstream-core-proto 9.3.0's
-# `convert` feature (solana-pubkey 3.0), so the re-exported Pubkey type unifies
-# with `CompressedAccountFilterSet::contains`.
+# Pubkey type for the cuckoo CompressedAccountFilterSet API; only pulled in with
+# the `cuckoo` feature.
 solana-pubkey = { version = "3.0", optional = true }
 
 [features]

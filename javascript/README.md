@@ -112,10 +112,7 @@ const request = {
     "token-program-accounts": {
       account: [],
       owner: ["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"],
-      filters: [],
-      // Opt in to only-mutated delivery ('write'), dropping write-locked-but-
-      // unchanged accounts (bandwidth reduction). Default is 'lock' (all).
-      notifyOn: 'write'
+      filters: []
     }
   },
   commitment: CommitmentLevel.CONFIRMED,
