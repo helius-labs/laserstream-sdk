@@ -152,10 +152,11 @@ declare module 'laserstream-core-proto-js/generated' {
     }
     interface ISubscribeRequestFilterAccounts {
       /**
-       * Which write-locked accounts to deliver (proto field #31). `'lock'`
-       * (default) delivers all; `'write'` delivers only accounts a transaction
-       * actually mutated, dropping write-locked-but-unchanged ones. Removed once
-       * a core-proto-js release ships this field natively.
+       * @deprecated No-op as of Agave 4.2. The validator now skips updates for
+       * accounts a transaction write-locked but never wrote to, so `'write'`-only
+       * delivery is the default and only behavior. Setting this has no effect; it
+       * is accepted only for backward compatibility and will be removed in a
+       * future release. (proto field #31)
        */
       notifyOn?: ('lock' | 'write' | null);
     }

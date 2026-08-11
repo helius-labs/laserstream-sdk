@@ -22,8 +22,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         SubscribeRequestFilterAccounts {
             account: vec!["EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string()],
             nonempty_txn_signature: Some(true),
-            // Opt in to only-mutated delivery (WRITTEN), dropping write-locked-
-            // but-unchanged accounts (bandwidth reduction). Default is LOCKED (all).
+            // DEPRECATED (no-op as of Agave 4.2): notify_on no longer has any
+            // effect. The validator now skips no-op account updates, so
+            // write-only delivery is the default and only behavior. Retained
+            // for backward compatibility.
             notify_on: NotifyOn::Write as i32,
             ..Default::default()
         },

@@ -113,8 +113,9 @@ const request = {
       account: [],
       owner: ["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"],
       filters: [],
-      // Opt in to only-mutated delivery ('write'), dropping write-locked-but-
-      // unchanged accounts (bandwidth reduction). Default is 'lock' (all).
+      // DEPRECATED (no-op as of Agave 4.2): notifyOn no longer has any effect.
+      // The validator now skips no-op account updates, so write-only delivery is
+      // the default and only behavior. Retained for backward compatibility.
       notifyOn: 'write'
     }
   },
