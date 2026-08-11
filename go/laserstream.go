@@ -74,6 +74,18 @@ type ChannelOptions struct {
 	// Buffer settings
 	WriteBufferSize int // Default: 64KB
 	ReadBufferSize  int // Default: 64KB
+
+	// Compressor sets the gRPC compressor used for outbound messages
+	// and advertises supported decompressors via grpc-accept-encoding.
+	// Supported values: "zstd", "gzip". Empty disables compression.
+	Compressor string
+}
+
+// WithZstdCompression enables zstd compression on outbound messages and
+// advertises zstd support to the server. Mirrors the Rust SDK helper.
+func (o ChannelOptions) WithZstdCompression() ChannelOptions {
+	o.Compressor = "zstd"
+	return o
 }
 
 // DataCallback defines the function signature for handling received data.
@@ -668,10 +680,14 @@ func (c *Client) connect(ctx context.Context) error {
 	}
 
 	// Configure default call options
-	opts = append(opts, grpc.WithDefaultCallOptions(
+	callOpts := []grpc.CallOption{
 		grpc.MaxCallRecvMsgSize(maxRecvMsgSize),
 		grpc.MaxCallSendMsgSize(maxSendMsgSize),
-	))
+	}
+	if channelOpts.Compressor != "" {
+		callOpts = append(callOpts, grpc.UseCompressor(channelOpts.Compressor))
+	}
+	opts = append(opts, grpc.WithDefaultCallOptions(callOpts...))
 
 	// Connection parameters
 	minConnectTimeout := 10 * time.Second
