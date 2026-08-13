@@ -132,6 +132,56 @@ func (SlotStatus) EnumDescriptor() ([]byte, []int) {
 	return file_geyser_proto_rawDescGZIP(), []int{1}
 }
 
+// Helius extension: discriminator for `SubscribeRequestFilterTransactions.token_accounts`.
+type TokenAccountExpansionControlFlag int32
+
+const (
+	// Match an owner if it owns a pre OR post token balance on the tx.
+	TokenAccountExpansionControlFlag_ALL TokenAccountExpansionControlFlag = 0
+	// Match an owner whose token balance changed in amount (per
+	// `account_index`) or whose token account was closed.
+	TokenAccountExpansionControlFlag_BALANCE_CHANGED TokenAccountExpansionControlFlag = 1
+)
+
+// Enum value maps for TokenAccountExpansionControlFlag.
+var (
+	TokenAccountExpansionControlFlag_name = map[int32]string{
+		0: "ALL",
+		1: "BALANCE_CHANGED",
+	}
+	TokenAccountExpansionControlFlag_value = map[string]int32{
+		"ALL":             0,
+		"BALANCE_CHANGED": 1,
+	}
+)
+
+func (x TokenAccountExpansionControlFlag) Enum() *TokenAccountExpansionControlFlag {
+	p := new(TokenAccountExpansionControlFlag)
+	*p = x
+	return p
+}
+
+func (x TokenAccountExpansionControlFlag) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (TokenAccountExpansionControlFlag) Descriptor() protoreflect.EnumDescriptor {
+	return file_geyser_proto_enumTypes[2].Descriptor()
+}
+
+func (TokenAccountExpansionControlFlag) Type() protoreflect.EnumType {
+	return &file_geyser_proto_enumTypes[2]
+}
+
+func (x TokenAccountExpansionControlFlag) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use TokenAccountExpansionControlFlag.Descriptor instead.
+func (TokenAccountExpansionControlFlag) EnumDescriptor() ([]byte, []int) {
+	return file_geyser_proto_rawDescGZIP(), []int{2}
+}
+
 // Subscriptions to Preprocessed transactions
 type SubscribePreprocessedRequest struct {
 	state         protoimpl.MessageState                                     `protogen:"open.v1"`
@@ -1083,8 +1133,13 @@ type SubscribeRequestFilterTransactions struct {
 	AccountInclude  []string               `protobuf:"bytes,3,rep,name=account_include,json=accountInclude,proto3" json:"account_include,omitempty"`
 	AccountExclude  []string               `protobuf:"bytes,4,rep,name=account_exclude,json=accountExclude,proto3" json:"account_exclude,omitempty"`
 	AccountRequired []string               `protobuf:"bytes,6,rep,name=account_required,json=accountRequired,proto3" json:"account_required,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Helius extension: ATA / token-account expansion control. When set,
+	// account_include / account_exclude / account_required also match
+	// against owners of pre/post token balances on each transaction.
+	// Absent = no expansion.
+	TokenAccounts *TokenAccountExpansionControlFlag `protobuf:"varint,30,opt,name=token_accounts,json=tokenAccounts,proto3,enum=geyser.TokenAccountExpansionControlFlag,oneof" json:"token_accounts,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SubscribeRequestFilterTransactions) Reset() {
@@ -1157,6 +1212,13 @@ func (x *SubscribeRequestFilterTransactions) GetAccountRequired() []string {
 		return x.AccountRequired
 	}
 	return nil
+}
+
+func (x *SubscribeRequestFilterTransactions) GetTokenAccounts() TokenAccountExpansionControlFlag {
+	if x != nil && x.TokenAccounts != nil {
+		return *x.TokenAccounts
+	}
+	return TokenAccountExpansionControlFlag_ALL
 }
 
 type SubscribeRequestFilterBlocks struct {
@@ -3232,18 +3294,20 @@ const file_geyser_proto_rawDesc = "" +
 	"\x14filter_by_commitment\x18\x01 \x01(\bH\x00R\x12filterByCommitment\x88\x01\x01\x120\n" +
 	"\x11interslot_updates\x18\x02 \x01(\bH\x01R\x10interslotUpdates\x88\x01\x01B\x17\n" +
 	"\x15_filter_by_commitmentB\x14\n" +
-	"\x12_interslot_updates\"\x9c\x02\n" +
+	"\x12_interslot_updates\"\x85\x03\n" +
 	"\"SubscribeRequestFilterTransactions\x12\x17\n" +
 	"\x04vote\x18\x01 \x01(\bH\x00R\x04vote\x88\x01\x01\x12\x1b\n" +
 	"\x06failed\x18\x02 \x01(\bH\x01R\x06failed\x88\x01\x01\x12!\n" +
 	"\tsignature\x18\x05 \x01(\tH\x02R\tsignature\x88\x01\x01\x12'\n" +
 	"\x0faccount_include\x18\x03 \x03(\tR\x0eaccountInclude\x12'\n" +
 	"\x0faccount_exclude\x18\x04 \x03(\tR\x0eaccountExclude\x12)\n" +
-	"\x10account_required\x18\x06 \x03(\tR\x0faccountRequiredB\a\n" +
+	"\x10account_required\x18\x06 \x03(\tR\x0faccountRequired\x12T\n" +
+	"\x0etoken_accounts\x18\x1e \x01(\x0e2(.geyser.TokenAccountExpansionControlFlagH\x03R\rtokenAccounts\x88\x01\x01B\a\n" +
 	"\x05_voteB\t\n" +
 	"\a_failedB\f\n" +
 	"\n" +
-	"_signature\"\x9f\x02\n" +
+	"_signatureB\x11\n" +
+	"\x0f_token_accounts\"\x9f\x02\n" +
 	"\x1cSubscribeRequestFilterBlocks\x12'\n" +
 	"\x0faccount_include\x18\x01 \x03(\tR\x0eaccountInclude\x126\n" +
 	"\x14include_transactions\x18\x02 \x01(\bH\x00R\x13includeTransactions\x88\x01\x01\x12.\n" +
@@ -3413,7 +3477,10 @@ const file_geyser_proto_rawDesc = "" +
 	"\x19SLOT_FIRST_SHRED_RECEIVED\x10\x03\x12\x12\n" +
 	"\x0eSLOT_COMPLETED\x10\x04\x12\x15\n" +
 	"\x11SLOT_CREATED_BANK\x10\x05\x12\r\n" +
-	"\tSLOT_DEAD\x10\x062\xdf\x05\n" +
+	"\tSLOT_DEAD\x10\x06*@\n" +
+	" TokenAccountExpansionControlFlag\x12\a\n" +
+	"\x03ALL\x10\x00\x12\x13\n" +
+	"\x0fBALANCE_CHANGED\x10\x012\xdf\x05\n" +
 	"\x06Geyser\x12D\n" +
 	"\tSubscribe\x12\x18.geyser.SubscribeRequest\x1a\x17.geyser.SubscribeUpdate\"\x00(\x010\x01\x12h\n" +
 	"\x15SubscribePreprocessed\x12$.geyser.SubscribePreprocessedRequest\x1a#.geyser.SubscribePreprocessedUpdate\"\x00(\x010\x01\x12`\n" +
@@ -3438,154 +3505,156 @@ func file_geyser_proto_rawDescGZIP() []byte {
 	return file_geyser_proto_rawDescData
 }
 
-var file_geyser_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_geyser_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
 var file_geyser_proto_msgTypes = make([]protoimpl.MessageInfo, 52)
 var file_geyser_proto_goTypes = []any{
 	(CommitmentLevel)(0),                                   // 0: geyser.CommitmentLevel
 	(SlotStatus)(0),                                        // 1: geyser.SlotStatus
-	(*SubscribePreprocessedRequest)(nil),                   // 2: geyser.SubscribePreprocessedRequest
-	(*SubscribePreprocessedRequestFilterTransactions)(nil), // 3: geyser.SubscribePreprocessedRequestFilterTransactions
-	(*SubscribePreprocessedUpdate)(nil),                    // 4: geyser.SubscribePreprocessedUpdate
-	(*SubscribePreprocessedTransaction)(nil),               // 5: geyser.SubscribePreprocessedTransaction
-	(*SubscribePreprocessedTransactionInfo)(nil),           // 6: geyser.SubscribePreprocessedTransactionInfo
-	(*SubscribeRequest)(nil),                               // 7: geyser.SubscribeRequest
-	(*SubscribeRequestFilterAccounts)(nil),                 // 8: geyser.SubscribeRequestFilterAccounts
-	(*SubscribeRequestFilterAccountsFilter)(nil),           // 9: geyser.SubscribeRequestFilterAccountsFilter
-	(*SubscribeRequestFilterAccountsFilterMemcmp)(nil),     // 10: geyser.SubscribeRequestFilterAccountsFilterMemcmp
-	(*SubscribeRequestFilterAccountsFilterLamports)(nil),   // 11: geyser.SubscribeRequestFilterAccountsFilterLamports
-	(*SubscribeRequestFilterSlots)(nil),                    // 12: geyser.SubscribeRequestFilterSlots
-	(*SubscribeRequestFilterTransactions)(nil),             // 13: geyser.SubscribeRequestFilterTransactions
-	(*SubscribeRequestFilterBlocks)(nil),                   // 14: geyser.SubscribeRequestFilterBlocks
-	(*SubscribeRequestFilterBlocksMeta)(nil),               // 15: geyser.SubscribeRequestFilterBlocksMeta
-	(*SubscribeRequestFilterEntry)(nil),                    // 16: geyser.SubscribeRequestFilterEntry
-	(*SubscribeRequestAccountsDataSlice)(nil),              // 17: geyser.SubscribeRequestAccountsDataSlice
-	(*SubscribeRequestPing)(nil),                           // 18: geyser.SubscribeRequestPing
-	(*SubscribeUpdate)(nil),                                // 19: geyser.SubscribeUpdate
-	(*SubscribeUpdateBatch)(nil),                           // 20: geyser.SubscribeUpdateBatch
-	(*SubscribeUpdateAccount)(nil),                         // 21: geyser.SubscribeUpdateAccount
-	(*SubscribeUpdateAccountInfo)(nil),                     // 22: geyser.SubscribeUpdateAccountInfo
-	(*SubscribeUpdateSlot)(nil),                            // 23: geyser.SubscribeUpdateSlot
-	(*SubscribeUpdateTransaction)(nil),                     // 24: geyser.SubscribeUpdateTransaction
-	(*SubscribeUpdateTransactionInfo)(nil),                 // 25: geyser.SubscribeUpdateTransactionInfo
-	(*SubscribeUpdateTransactionStatus)(nil),               // 26: geyser.SubscribeUpdateTransactionStatus
-	(*SubscribeUpdateBlock)(nil),                           // 27: geyser.SubscribeUpdateBlock
-	(*SubscribeUpdateBlockMeta)(nil),                       // 28: geyser.SubscribeUpdateBlockMeta
-	(*SubscribeUpdateEntry)(nil),                           // 29: geyser.SubscribeUpdateEntry
-	(*SubscribeUpdatePing)(nil),                            // 30: geyser.SubscribeUpdatePing
-	(*SubscribeUpdatePong)(nil),                            // 31: geyser.SubscribeUpdatePong
-	(*SubscribeReplayInfoRequest)(nil),                     // 32: geyser.SubscribeReplayInfoRequest
-	(*SubscribeReplayInfoResponse)(nil),                    // 33: geyser.SubscribeReplayInfoResponse
-	(*PingRequest)(nil),                                    // 34: geyser.PingRequest
-	(*PongResponse)(nil),                                   // 35: geyser.PongResponse
-	(*GetLatestBlockhashRequest)(nil),                      // 36: geyser.GetLatestBlockhashRequest
-	(*GetLatestBlockhashResponse)(nil),                     // 37: geyser.GetLatestBlockhashResponse
-	(*GetBlockHeightRequest)(nil),                          // 38: geyser.GetBlockHeightRequest
-	(*GetBlockHeightResponse)(nil),                         // 39: geyser.GetBlockHeightResponse
-	(*GetSlotRequest)(nil),                                 // 40: geyser.GetSlotRequest
-	(*GetSlotResponse)(nil),                                // 41: geyser.GetSlotResponse
-	(*GetVersionRequest)(nil),                              // 42: geyser.GetVersionRequest
-	(*GetVersionResponse)(nil),                             // 43: geyser.GetVersionResponse
-	(*IsBlockhashValidRequest)(nil),                        // 44: geyser.IsBlockhashValidRequest
-	(*IsBlockhashValidResponse)(nil),                       // 45: geyser.IsBlockhashValidResponse
-	nil,                                                    // 46: geyser.SubscribePreprocessedRequest.TransactionsEntry
-	nil,                                                    // 47: geyser.SubscribeRequest.AccountsEntry
-	nil,                                                    // 48: geyser.SubscribeRequest.SlotsEntry
-	nil,                                                    // 49: geyser.SubscribeRequest.TransactionsEntry
-	nil,                                                    // 50: geyser.SubscribeRequest.TransactionsStatusEntry
-	nil,                                                    // 51: geyser.SubscribeRequest.BlocksEntry
-	nil,                                                    // 52: geyser.SubscribeRequest.BlocksMetaEntry
-	nil,                                                    // 53: geyser.SubscribeRequest.EntryEntry
-	(*timestamppb.Timestamp)(nil),                          // 54: google.protobuf.Timestamp
-	(*Transaction)(nil),                                    // 55: solana.storage.ConfirmedBlock.Transaction
-	(*TransactionStatusMeta)(nil),                          // 56: solana.storage.ConfirmedBlock.TransactionStatusMeta
-	(*TransactionError)(nil),                               // 57: solana.storage.ConfirmedBlock.TransactionError
-	(*Rewards)(nil),                                        // 58: solana.storage.ConfirmedBlock.Rewards
-	(*UnixTimestamp)(nil),                                  // 59: solana.storage.ConfirmedBlock.UnixTimestamp
-	(*BlockHeight)(nil),                                    // 60: solana.storage.ConfirmedBlock.BlockHeight
+	(TokenAccountExpansionControlFlag)(0),                  // 2: geyser.TokenAccountExpansionControlFlag
+	(*SubscribePreprocessedRequest)(nil),                   // 3: geyser.SubscribePreprocessedRequest
+	(*SubscribePreprocessedRequestFilterTransactions)(nil), // 4: geyser.SubscribePreprocessedRequestFilterTransactions
+	(*SubscribePreprocessedUpdate)(nil),                    // 5: geyser.SubscribePreprocessedUpdate
+	(*SubscribePreprocessedTransaction)(nil),               // 6: geyser.SubscribePreprocessedTransaction
+	(*SubscribePreprocessedTransactionInfo)(nil),           // 7: geyser.SubscribePreprocessedTransactionInfo
+	(*SubscribeRequest)(nil),                               // 8: geyser.SubscribeRequest
+	(*SubscribeRequestFilterAccounts)(nil),                 // 9: geyser.SubscribeRequestFilterAccounts
+	(*SubscribeRequestFilterAccountsFilter)(nil),           // 10: geyser.SubscribeRequestFilterAccountsFilter
+	(*SubscribeRequestFilterAccountsFilterMemcmp)(nil),     // 11: geyser.SubscribeRequestFilterAccountsFilterMemcmp
+	(*SubscribeRequestFilterAccountsFilterLamports)(nil),   // 12: geyser.SubscribeRequestFilterAccountsFilterLamports
+	(*SubscribeRequestFilterSlots)(nil),                    // 13: geyser.SubscribeRequestFilterSlots
+	(*SubscribeRequestFilterTransactions)(nil),             // 14: geyser.SubscribeRequestFilterTransactions
+	(*SubscribeRequestFilterBlocks)(nil),                   // 15: geyser.SubscribeRequestFilterBlocks
+	(*SubscribeRequestFilterBlocksMeta)(nil),               // 16: geyser.SubscribeRequestFilterBlocksMeta
+	(*SubscribeRequestFilterEntry)(nil),                    // 17: geyser.SubscribeRequestFilterEntry
+	(*SubscribeRequestAccountsDataSlice)(nil),              // 18: geyser.SubscribeRequestAccountsDataSlice
+	(*SubscribeRequestPing)(nil),                           // 19: geyser.SubscribeRequestPing
+	(*SubscribeUpdate)(nil),                                // 20: geyser.SubscribeUpdate
+	(*SubscribeUpdateBatch)(nil),                           // 21: geyser.SubscribeUpdateBatch
+	(*SubscribeUpdateAccount)(nil),                         // 22: geyser.SubscribeUpdateAccount
+	(*SubscribeUpdateAccountInfo)(nil),                     // 23: geyser.SubscribeUpdateAccountInfo
+	(*SubscribeUpdateSlot)(nil),                            // 24: geyser.SubscribeUpdateSlot
+	(*SubscribeUpdateTransaction)(nil),                     // 25: geyser.SubscribeUpdateTransaction
+	(*SubscribeUpdateTransactionInfo)(nil),                 // 26: geyser.SubscribeUpdateTransactionInfo
+	(*SubscribeUpdateTransactionStatus)(nil),               // 27: geyser.SubscribeUpdateTransactionStatus
+	(*SubscribeUpdateBlock)(nil),                           // 28: geyser.SubscribeUpdateBlock
+	(*SubscribeUpdateBlockMeta)(nil),                       // 29: geyser.SubscribeUpdateBlockMeta
+	(*SubscribeUpdateEntry)(nil),                           // 30: geyser.SubscribeUpdateEntry
+	(*SubscribeUpdatePing)(nil),                            // 31: geyser.SubscribeUpdatePing
+	(*SubscribeUpdatePong)(nil),                            // 32: geyser.SubscribeUpdatePong
+	(*SubscribeReplayInfoRequest)(nil),                     // 33: geyser.SubscribeReplayInfoRequest
+	(*SubscribeReplayInfoResponse)(nil),                    // 34: geyser.SubscribeReplayInfoResponse
+	(*PingRequest)(nil),                                    // 35: geyser.PingRequest
+	(*PongResponse)(nil),                                   // 36: geyser.PongResponse
+	(*GetLatestBlockhashRequest)(nil),                      // 37: geyser.GetLatestBlockhashRequest
+	(*GetLatestBlockhashResponse)(nil),                     // 38: geyser.GetLatestBlockhashResponse
+	(*GetBlockHeightRequest)(nil),                          // 39: geyser.GetBlockHeightRequest
+	(*GetBlockHeightResponse)(nil),                         // 40: geyser.GetBlockHeightResponse
+	(*GetSlotRequest)(nil),                                 // 41: geyser.GetSlotRequest
+	(*GetSlotResponse)(nil),                                // 42: geyser.GetSlotResponse
+	(*GetVersionRequest)(nil),                              // 43: geyser.GetVersionRequest
+	(*GetVersionResponse)(nil),                             // 44: geyser.GetVersionResponse
+	(*IsBlockhashValidRequest)(nil),                        // 45: geyser.IsBlockhashValidRequest
+	(*IsBlockhashValidResponse)(nil),                       // 46: geyser.IsBlockhashValidResponse
+	nil,                                                    // 47: geyser.SubscribePreprocessedRequest.TransactionsEntry
+	nil,                                                    // 48: geyser.SubscribeRequest.AccountsEntry
+	nil,                                                    // 49: geyser.SubscribeRequest.SlotsEntry
+	nil,                                                    // 50: geyser.SubscribeRequest.TransactionsEntry
+	nil,                                                    // 51: geyser.SubscribeRequest.TransactionsStatusEntry
+	nil,                                                    // 52: geyser.SubscribeRequest.BlocksEntry
+	nil,                                                    // 53: geyser.SubscribeRequest.BlocksMetaEntry
+	nil,                                                    // 54: geyser.SubscribeRequest.EntryEntry
+	(*timestamppb.Timestamp)(nil),                          // 55: google.protobuf.Timestamp
+	(*Transaction)(nil),                                    // 56: solana.storage.ConfirmedBlock.Transaction
+	(*TransactionStatusMeta)(nil),                          // 57: solana.storage.ConfirmedBlock.TransactionStatusMeta
+	(*TransactionError)(nil),                               // 58: solana.storage.ConfirmedBlock.TransactionError
+	(*Rewards)(nil),                                        // 59: solana.storage.ConfirmedBlock.Rewards
+	(*UnixTimestamp)(nil),                                  // 60: solana.storage.ConfirmedBlock.UnixTimestamp
+	(*BlockHeight)(nil),                                    // 61: solana.storage.ConfirmedBlock.BlockHeight
 }
 var file_geyser_proto_depIdxs = []int32{
-	46, // 0: geyser.SubscribePreprocessedRequest.transactions:type_name -> geyser.SubscribePreprocessedRequest.TransactionsEntry
-	18, // 1: geyser.SubscribePreprocessedRequest.ping:type_name -> geyser.SubscribeRequestPing
-	5,  // 2: geyser.SubscribePreprocessedUpdate.transaction:type_name -> geyser.SubscribePreprocessedTransaction
-	30, // 3: geyser.SubscribePreprocessedUpdate.ping:type_name -> geyser.SubscribeUpdatePing
-	31, // 4: geyser.SubscribePreprocessedUpdate.pong:type_name -> geyser.SubscribeUpdatePong
-	54, // 5: geyser.SubscribePreprocessedUpdate.created_at:type_name -> google.protobuf.Timestamp
-	6,  // 6: geyser.SubscribePreprocessedTransaction.transaction:type_name -> geyser.SubscribePreprocessedTransactionInfo
-	55, // 7: geyser.SubscribePreprocessedTransactionInfo.transaction:type_name -> solana.storage.ConfirmedBlock.Transaction
-	47, // 8: geyser.SubscribeRequest.accounts:type_name -> geyser.SubscribeRequest.AccountsEntry
-	48, // 9: geyser.SubscribeRequest.slots:type_name -> geyser.SubscribeRequest.SlotsEntry
-	49, // 10: geyser.SubscribeRequest.transactions:type_name -> geyser.SubscribeRequest.TransactionsEntry
-	50, // 11: geyser.SubscribeRequest.transactions_status:type_name -> geyser.SubscribeRequest.TransactionsStatusEntry
-	51, // 12: geyser.SubscribeRequest.blocks:type_name -> geyser.SubscribeRequest.BlocksEntry
-	52, // 13: geyser.SubscribeRequest.blocks_meta:type_name -> geyser.SubscribeRequest.BlocksMetaEntry
-	53, // 14: geyser.SubscribeRequest.entry:type_name -> geyser.SubscribeRequest.EntryEntry
+	47, // 0: geyser.SubscribePreprocessedRequest.transactions:type_name -> geyser.SubscribePreprocessedRequest.TransactionsEntry
+	19, // 1: geyser.SubscribePreprocessedRequest.ping:type_name -> geyser.SubscribeRequestPing
+	6,  // 2: geyser.SubscribePreprocessedUpdate.transaction:type_name -> geyser.SubscribePreprocessedTransaction
+	31, // 3: geyser.SubscribePreprocessedUpdate.ping:type_name -> geyser.SubscribeUpdatePing
+	32, // 4: geyser.SubscribePreprocessedUpdate.pong:type_name -> geyser.SubscribeUpdatePong
+	55, // 5: geyser.SubscribePreprocessedUpdate.created_at:type_name -> google.protobuf.Timestamp
+	7,  // 6: geyser.SubscribePreprocessedTransaction.transaction:type_name -> geyser.SubscribePreprocessedTransactionInfo
+	56, // 7: geyser.SubscribePreprocessedTransactionInfo.transaction:type_name -> solana.storage.ConfirmedBlock.Transaction
+	48, // 8: geyser.SubscribeRequest.accounts:type_name -> geyser.SubscribeRequest.AccountsEntry
+	49, // 9: geyser.SubscribeRequest.slots:type_name -> geyser.SubscribeRequest.SlotsEntry
+	50, // 10: geyser.SubscribeRequest.transactions:type_name -> geyser.SubscribeRequest.TransactionsEntry
+	51, // 11: geyser.SubscribeRequest.transactions_status:type_name -> geyser.SubscribeRequest.TransactionsStatusEntry
+	52, // 12: geyser.SubscribeRequest.blocks:type_name -> geyser.SubscribeRequest.BlocksEntry
+	53, // 13: geyser.SubscribeRequest.blocks_meta:type_name -> geyser.SubscribeRequest.BlocksMetaEntry
+	54, // 14: geyser.SubscribeRequest.entry:type_name -> geyser.SubscribeRequest.EntryEntry
 	0,  // 15: geyser.SubscribeRequest.commitment:type_name -> geyser.CommitmentLevel
-	17, // 16: geyser.SubscribeRequest.accounts_data_slice:type_name -> geyser.SubscribeRequestAccountsDataSlice
-	18, // 17: geyser.SubscribeRequest.ping:type_name -> geyser.SubscribeRequestPing
-	9,  // 18: geyser.SubscribeRequestFilterAccounts.filters:type_name -> geyser.SubscribeRequestFilterAccountsFilter
-	10, // 19: geyser.SubscribeRequestFilterAccountsFilter.memcmp:type_name -> geyser.SubscribeRequestFilterAccountsFilterMemcmp
-	11, // 20: geyser.SubscribeRequestFilterAccountsFilter.lamports:type_name -> geyser.SubscribeRequestFilterAccountsFilterLamports
-	21, // 21: geyser.SubscribeUpdate.account:type_name -> geyser.SubscribeUpdateAccount
-	23, // 22: geyser.SubscribeUpdate.slot:type_name -> geyser.SubscribeUpdateSlot
-	24, // 23: geyser.SubscribeUpdate.transaction:type_name -> geyser.SubscribeUpdateTransaction
-	26, // 24: geyser.SubscribeUpdate.transaction_status:type_name -> geyser.SubscribeUpdateTransactionStatus
-	27, // 25: geyser.SubscribeUpdate.block:type_name -> geyser.SubscribeUpdateBlock
-	30, // 26: geyser.SubscribeUpdate.ping:type_name -> geyser.SubscribeUpdatePing
-	31, // 27: geyser.SubscribeUpdate.pong:type_name -> geyser.SubscribeUpdatePong
-	28, // 28: geyser.SubscribeUpdate.block_meta:type_name -> geyser.SubscribeUpdateBlockMeta
-	29, // 29: geyser.SubscribeUpdate.entry:type_name -> geyser.SubscribeUpdateEntry
-	54, // 30: geyser.SubscribeUpdate.created_at:type_name -> google.protobuf.Timestamp
-	19, // 31: geyser.SubscribeUpdateBatch.updates:type_name -> geyser.SubscribeUpdate
-	22, // 32: geyser.SubscribeUpdateAccount.account:type_name -> geyser.SubscribeUpdateAccountInfo
-	1,  // 33: geyser.SubscribeUpdateSlot.status:type_name -> geyser.SlotStatus
-	25, // 34: geyser.SubscribeUpdateTransaction.transaction:type_name -> geyser.SubscribeUpdateTransactionInfo
-	55, // 35: geyser.SubscribeUpdateTransactionInfo.transaction:type_name -> solana.storage.ConfirmedBlock.Transaction
-	56, // 36: geyser.SubscribeUpdateTransactionInfo.meta:type_name -> solana.storage.ConfirmedBlock.TransactionStatusMeta
-	57, // 37: geyser.SubscribeUpdateTransactionStatus.err:type_name -> solana.storage.ConfirmedBlock.TransactionError
-	58, // 38: geyser.SubscribeUpdateBlock.rewards:type_name -> solana.storage.ConfirmedBlock.Rewards
-	59, // 39: geyser.SubscribeUpdateBlock.block_time:type_name -> solana.storage.ConfirmedBlock.UnixTimestamp
-	60, // 40: geyser.SubscribeUpdateBlock.block_height:type_name -> solana.storage.ConfirmedBlock.BlockHeight
-	25, // 41: geyser.SubscribeUpdateBlock.transactions:type_name -> geyser.SubscribeUpdateTransactionInfo
-	22, // 42: geyser.SubscribeUpdateBlock.accounts:type_name -> geyser.SubscribeUpdateAccountInfo
-	29, // 43: geyser.SubscribeUpdateBlock.entries:type_name -> geyser.SubscribeUpdateEntry
-	58, // 44: geyser.SubscribeUpdateBlockMeta.rewards:type_name -> solana.storage.ConfirmedBlock.Rewards
-	59, // 45: geyser.SubscribeUpdateBlockMeta.block_time:type_name -> solana.storage.ConfirmedBlock.UnixTimestamp
-	60, // 46: geyser.SubscribeUpdateBlockMeta.block_height:type_name -> solana.storage.ConfirmedBlock.BlockHeight
-	0,  // 47: geyser.GetLatestBlockhashRequest.commitment:type_name -> geyser.CommitmentLevel
-	0,  // 48: geyser.GetBlockHeightRequest.commitment:type_name -> geyser.CommitmentLevel
-	0,  // 49: geyser.GetSlotRequest.commitment:type_name -> geyser.CommitmentLevel
-	0,  // 50: geyser.IsBlockhashValidRequest.commitment:type_name -> geyser.CommitmentLevel
-	3,  // 51: geyser.SubscribePreprocessedRequest.TransactionsEntry.value:type_name -> geyser.SubscribePreprocessedRequestFilterTransactions
-	8,  // 52: geyser.SubscribeRequest.AccountsEntry.value:type_name -> geyser.SubscribeRequestFilterAccounts
-	12, // 53: geyser.SubscribeRequest.SlotsEntry.value:type_name -> geyser.SubscribeRequestFilterSlots
-	13, // 54: geyser.SubscribeRequest.TransactionsEntry.value:type_name -> geyser.SubscribeRequestFilterTransactions
-	13, // 55: geyser.SubscribeRequest.TransactionsStatusEntry.value:type_name -> geyser.SubscribeRequestFilterTransactions
-	14, // 56: geyser.SubscribeRequest.BlocksEntry.value:type_name -> geyser.SubscribeRequestFilterBlocks
-	15, // 57: geyser.SubscribeRequest.BlocksMetaEntry.value:type_name -> geyser.SubscribeRequestFilterBlocksMeta
-	16, // 58: geyser.SubscribeRequest.EntryEntry.value:type_name -> geyser.SubscribeRequestFilterEntry
-	7,  // 59: geyser.Geyser.Subscribe:input_type -> geyser.SubscribeRequest
-	2,  // 60: geyser.Geyser.SubscribePreprocessed:input_type -> geyser.SubscribePreprocessedRequest
-	32, // 61: geyser.Geyser.SubscribeReplayInfo:input_type -> geyser.SubscribeReplayInfoRequest
-	34, // 62: geyser.Geyser.Ping:input_type -> geyser.PingRequest
-	36, // 63: geyser.Geyser.GetLatestBlockhash:input_type -> geyser.GetLatestBlockhashRequest
-	38, // 64: geyser.Geyser.GetBlockHeight:input_type -> geyser.GetBlockHeightRequest
-	40, // 65: geyser.Geyser.GetSlot:input_type -> geyser.GetSlotRequest
-	44, // 66: geyser.Geyser.IsBlockhashValid:input_type -> geyser.IsBlockhashValidRequest
-	42, // 67: geyser.Geyser.GetVersion:input_type -> geyser.GetVersionRequest
-	19, // 68: geyser.Geyser.Subscribe:output_type -> geyser.SubscribeUpdate
-	4,  // 69: geyser.Geyser.SubscribePreprocessed:output_type -> geyser.SubscribePreprocessedUpdate
-	33, // 70: geyser.Geyser.SubscribeReplayInfo:output_type -> geyser.SubscribeReplayInfoResponse
-	35, // 71: geyser.Geyser.Ping:output_type -> geyser.PongResponse
-	37, // 72: geyser.Geyser.GetLatestBlockhash:output_type -> geyser.GetLatestBlockhashResponse
-	39, // 73: geyser.Geyser.GetBlockHeight:output_type -> geyser.GetBlockHeightResponse
-	41, // 74: geyser.Geyser.GetSlot:output_type -> geyser.GetSlotResponse
-	45, // 75: geyser.Geyser.IsBlockhashValid:output_type -> geyser.IsBlockhashValidResponse
-	43, // 76: geyser.Geyser.GetVersion:output_type -> geyser.GetVersionResponse
-	68, // [68:77] is the sub-list for method output_type
-	59, // [59:68] is the sub-list for method input_type
-	59, // [59:59] is the sub-list for extension type_name
-	59, // [59:59] is the sub-list for extension extendee
-	0,  // [0:59] is the sub-list for field type_name
+	18, // 16: geyser.SubscribeRequest.accounts_data_slice:type_name -> geyser.SubscribeRequestAccountsDataSlice
+	19, // 17: geyser.SubscribeRequest.ping:type_name -> geyser.SubscribeRequestPing
+	10, // 18: geyser.SubscribeRequestFilterAccounts.filters:type_name -> geyser.SubscribeRequestFilterAccountsFilter
+	11, // 19: geyser.SubscribeRequestFilterAccountsFilter.memcmp:type_name -> geyser.SubscribeRequestFilterAccountsFilterMemcmp
+	12, // 20: geyser.SubscribeRequestFilterAccountsFilter.lamports:type_name -> geyser.SubscribeRequestFilterAccountsFilterLamports
+	2,  // 21: geyser.SubscribeRequestFilterTransactions.token_accounts:type_name -> geyser.TokenAccountExpansionControlFlag
+	22, // 22: geyser.SubscribeUpdate.account:type_name -> geyser.SubscribeUpdateAccount
+	24, // 23: geyser.SubscribeUpdate.slot:type_name -> geyser.SubscribeUpdateSlot
+	25, // 24: geyser.SubscribeUpdate.transaction:type_name -> geyser.SubscribeUpdateTransaction
+	27, // 25: geyser.SubscribeUpdate.transaction_status:type_name -> geyser.SubscribeUpdateTransactionStatus
+	28, // 26: geyser.SubscribeUpdate.block:type_name -> geyser.SubscribeUpdateBlock
+	31, // 27: geyser.SubscribeUpdate.ping:type_name -> geyser.SubscribeUpdatePing
+	32, // 28: geyser.SubscribeUpdate.pong:type_name -> geyser.SubscribeUpdatePong
+	29, // 29: geyser.SubscribeUpdate.block_meta:type_name -> geyser.SubscribeUpdateBlockMeta
+	30, // 30: geyser.SubscribeUpdate.entry:type_name -> geyser.SubscribeUpdateEntry
+	55, // 31: geyser.SubscribeUpdate.created_at:type_name -> google.protobuf.Timestamp
+	20, // 32: geyser.SubscribeUpdateBatch.updates:type_name -> geyser.SubscribeUpdate
+	23, // 33: geyser.SubscribeUpdateAccount.account:type_name -> geyser.SubscribeUpdateAccountInfo
+	1,  // 34: geyser.SubscribeUpdateSlot.status:type_name -> geyser.SlotStatus
+	26, // 35: geyser.SubscribeUpdateTransaction.transaction:type_name -> geyser.SubscribeUpdateTransactionInfo
+	56, // 36: geyser.SubscribeUpdateTransactionInfo.transaction:type_name -> solana.storage.ConfirmedBlock.Transaction
+	57, // 37: geyser.SubscribeUpdateTransactionInfo.meta:type_name -> solana.storage.ConfirmedBlock.TransactionStatusMeta
+	58, // 38: geyser.SubscribeUpdateTransactionStatus.err:type_name -> solana.storage.ConfirmedBlock.TransactionError
+	59, // 39: geyser.SubscribeUpdateBlock.rewards:type_name -> solana.storage.ConfirmedBlock.Rewards
+	60, // 40: geyser.SubscribeUpdateBlock.block_time:type_name -> solana.storage.ConfirmedBlock.UnixTimestamp
+	61, // 41: geyser.SubscribeUpdateBlock.block_height:type_name -> solana.storage.ConfirmedBlock.BlockHeight
+	26, // 42: geyser.SubscribeUpdateBlock.transactions:type_name -> geyser.SubscribeUpdateTransactionInfo
+	23, // 43: geyser.SubscribeUpdateBlock.accounts:type_name -> geyser.SubscribeUpdateAccountInfo
+	30, // 44: geyser.SubscribeUpdateBlock.entries:type_name -> geyser.SubscribeUpdateEntry
+	59, // 45: geyser.SubscribeUpdateBlockMeta.rewards:type_name -> solana.storage.ConfirmedBlock.Rewards
+	60, // 46: geyser.SubscribeUpdateBlockMeta.block_time:type_name -> solana.storage.ConfirmedBlock.UnixTimestamp
+	61, // 47: geyser.SubscribeUpdateBlockMeta.block_height:type_name -> solana.storage.ConfirmedBlock.BlockHeight
+	0,  // 48: geyser.GetLatestBlockhashRequest.commitment:type_name -> geyser.CommitmentLevel
+	0,  // 49: geyser.GetBlockHeightRequest.commitment:type_name -> geyser.CommitmentLevel
+	0,  // 50: geyser.GetSlotRequest.commitment:type_name -> geyser.CommitmentLevel
+	0,  // 51: geyser.IsBlockhashValidRequest.commitment:type_name -> geyser.CommitmentLevel
+	4,  // 52: geyser.SubscribePreprocessedRequest.TransactionsEntry.value:type_name -> geyser.SubscribePreprocessedRequestFilterTransactions
+	9,  // 53: geyser.SubscribeRequest.AccountsEntry.value:type_name -> geyser.SubscribeRequestFilterAccounts
+	13, // 54: geyser.SubscribeRequest.SlotsEntry.value:type_name -> geyser.SubscribeRequestFilterSlots
+	14, // 55: geyser.SubscribeRequest.TransactionsEntry.value:type_name -> geyser.SubscribeRequestFilterTransactions
+	14, // 56: geyser.SubscribeRequest.TransactionsStatusEntry.value:type_name -> geyser.SubscribeRequestFilterTransactions
+	15, // 57: geyser.SubscribeRequest.BlocksEntry.value:type_name -> geyser.SubscribeRequestFilterBlocks
+	16, // 58: geyser.SubscribeRequest.BlocksMetaEntry.value:type_name -> geyser.SubscribeRequestFilterBlocksMeta
+	17, // 59: geyser.SubscribeRequest.EntryEntry.value:type_name -> geyser.SubscribeRequestFilterEntry
+	8,  // 60: geyser.Geyser.Subscribe:input_type -> geyser.SubscribeRequest
+	3,  // 61: geyser.Geyser.SubscribePreprocessed:input_type -> geyser.SubscribePreprocessedRequest
+	33, // 62: geyser.Geyser.SubscribeReplayInfo:input_type -> geyser.SubscribeReplayInfoRequest
+	35, // 63: geyser.Geyser.Ping:input_type -> geyser.PingRequest
+	37, // 64: geyser.Geyser.GetLatestBlockhash:input_type -> geyser.GetLatestBlockhashRequest
+	39, // 65: geyser.Geyser.GetBlockHeight:input_type -> geyser.GetBlockHeightRequest
+	41, // 66: geyser.Geyser.GetSlot:input_type -> geyser.GetSlotRequest
+	45, // 67: geyser.Geyser.IsBlockhashValid:input_type -> geyser.IsBlockhashValidRequest
+	43, // 68: geyser.Geyser.GetVersion:input_type -> geyser.GetVersionRequest
+	20, // 69: geyser.Geyser.Subscribe:output_type -> geyser.SubscribeUpdate
+	5,  // 70: geyser.Geyser.SubscribePreprocessed:output_type -> geyser.SubscribePreprocessedUpdate
+	34, // 71: geyser.Geyser.SubscribeReplayInfo:output_type -> geyser.SubscribeReplayInfoResponse
+	36, // 72: geyser.Geyser.Ping:output_type -> geyser.PongResponse
+	38, // 73: geyser.Geyser.GetLatestBlockhash:output_type -> geyser.GetLatestBlockhashResponse
+	40, // 74: geyser.Geyser.GetBlockHeight:output_type -> geyser.GetBlockHeightResponse
+	42, // 75: geyser.Geyser.GetSlot:output_type -> geyser.GetSlotResponse
+	46, // 76: geyser.Geyser.IsBlockhashValid:output_type -> geyser.IsBlockhashValidResponse
+	44, // 77: geyser.Geyser.GetVersion:output_type -> geyser.GetVersionResponse
+	69, // [69:78] is the sub-list for method output_type
+	60, // [60:69] is the sub-list for method input_type
+	60, // [60:60] is the sub-list for extension type_name
+	60, // [60:60] is the sub-list for extension extendee
+	0,  // [0:60] is the sub-list for field type_name
 }
 
 func init() { file_geyser_proto_init() }
@@ -3646,7 +3715,7 @@ func file_geyser_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_geyser_proto_rawDesc), len(file_geyser_proto_rawDesc)),
-			NumEnums:      2,
+			NumEnums:      3,
 			NumMessages:   52,
 			NumExtensions: 0,
 			NumServices:   1,

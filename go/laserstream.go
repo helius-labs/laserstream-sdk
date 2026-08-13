@@ -33,7 +33,7 @@ const (
 // SDK metadata constants
 const (
 	SDKName    = "laserstream-go"
-	SDKVersion = "0.1.4"
+	SDKVersion = "0.2.0"
 )
 
 // Commitment levels
@@ -766,6 +766,18 @@ const (
 
 // CommitmentLevel type
 type CommitmentLevel = pb.CommitmentLevel
+
+// Helius extension: ATA / token-account expansion control for the
+// `TokenAccounts` field on transaction / transactionsStatus filters.
+type TokenAccountExpansionControlFlag = pb.TokenAccountExpansionControlFlag
+
+const (
+	// Match an owner if it owns a pre OR post token balance on the tx.
+	TokenAccountExpansionControlFlag_ALL = pb.TokenAccountExpansionControlFlag_ALL
+	// Match an owner whose token balance changed in amount or whose token
+	// account was closed.
+	TokenAccountExpansionControlFlag_BALANCE_CHANGED = pb.TokenAccountExpansionControlFlag_BALANCE_CHANGED
+)
 
 // Filter types for different subscription types
 type (
