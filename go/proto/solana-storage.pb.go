@@ -288,8 +288,10 @@ type Message struct {
 	Instructions        []*CompiledInstruction       `protobuf:"bytes,4,rep,name=instructions,proto3" json:"instructions,omitempty"`
 	Versioned           bool                         `protobuf:"varint,5,opt,name=versioned,proto3" json:"versioned,omitempty"`
 	AddressTableLookups []*MessageAddressTableLookup `protobuf:"bytes,6,rep,name=address_table_lookups,json=addressTableLookups,proto3" json:"address_table_lookups,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// Set only for V1 transaction messages (SIMD-0385). Absent for legacy/V0.
+	Config        *TransactionConfig `protobuf:"bytes,7,opt,name=config,proto3,oneof" json:"config,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Message) Reset() {
@@ -364,6 +366,85 @@ func (x *Message) GetAddressTableLookups() []*MessageAddressTableLookup {
 	return nil
 }
 
+func (x *Message) GetConfig() *TransactionConfig {
+	if x != nil {
+		return x.Config
+	}
+	return nil
+}
+
+// Inline budget config introduced by the V1 transaction format (SIMD-0385),
+// replacing ComputeBudget instructions. Each field is optional; unset fields
+// fall back to the runtime defaults.
+// https://github.com/solana-foundation/solana-improvement-documents/blob/main/proposals/0385-transaction-v1.md
+type TransactionConfig struct {
+	state                       protoimpl.MessageState `protogen:"open.v1"`
+	PriorityFee                 *uint64                `protobuf:"varint,1,opt,name=priority_fee,json=priorityFee,proto3,oneof" json:"priority_fee,omitempty"`
+	ComputeUnitLimit            *uint32                `protobuf:"varint,2,opt,name=compute_unit_limit,json=computeUnitLimit,proto3,oneof" json:"compute_unit_limit,omitempty"`
+	LoadedAccountsDataSizeLimit *uint32                `protobuf:"varint,3,opt,name=loaded_accounts_data_size_limit,json=loadedAccountsDataSizeLimit,proto3,oneof" json:"loaded_accounts_data_size_limit,omitempty"`
+	HeapSize                    *uint32                `protobuf:"varint,4,opt,name=heap_size,json=heapSize,proto3,oneof" json:"heap_size,omitempty"`
+	unknownFields               protoimpl.UnknownFields
+	sizeCache                   protoimpl.SizeCache
+}
+
+func (x *TransactionConfig) Reset() {
+	*x = TransactionConfig{}
+	mi := &file_solana_storage_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TransactionConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TransactionConfig) ProtoMessage() {}
+
+func (x *TransactionConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_solana_storage_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TransactionConfig.ProtoReflect.Descriptor instead.
+func (*TransactionConfig) Descriptor() ([]byte, []int) {
+	return file_solana_storage_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *TransactionConfig) GetPriorityFee() uint64 {
+	if x != nil && x.PriorityFee != nil {
+		return *x.PriorityFee
+	}
+	return 0
+}
+
+func (x *TransactionConfig) GetComputeUnitLimit() uint32 {
+	if x != nil && x.ComputeUnitLimit != nil {
+		return *x.ComputeUnitLimit
+	}
+	return 0
+}
+
+func (x *TransactionConfig) GetLoadedAccountsDataSizeLimit() uint32 {
+	if x != nil && x.LoadedAccountsDataSizeLimit != nil {
+		return *x.LoadedAccountsDataSizeLimit
+	}
+	return 0
+}
+
+func (x *TransactionConfig) GetHeapSize() uint32 {
+	if x != nil && x.HeapSize != nil {
+		return *x.HeapSize
+	}
+	return 0
+}
+
 type MessageHeader struct {
 	state                       protoimpl.MessageState `protogen:"open.v1"`
 	NumRequiredSignatures       uint32                 `protobuf:"varint,1,opt,name=num_required_signatures,json=numRequiredSignatures,proto3" json:"num_required_signatures,omitempty"`
@@ -375,7 +456,7 @@ type MessageHeader struct {
 
 func (x *MessageHeader) Reset() {
 	*x = MessageHeader{}
-	mi := &file_solana_storage_proto_msgTypes[4]
+	mi := &file_solana_storage_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -387,7 +468,7 @@ func (x *MessageHeader) String() string {
 func (*MessageHeader) ProtoMessage() {}
 
 func (x *MessageHeader) ProtoReflect() protoreflect.Message {
-	mi := &file_solana_storage_proto_msgTypes[4]
+	mi := &file_solana_storage_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -400,7 +481,7 @@ func (x *MessageHeader) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessageHeader.ProtoReflect.Descriptor instead.
 func (*MessageHeader) Descriptor() ([]byte, []int) {
-	return file_solana_storage_proto_rawDescGZIP(), []int{4}
+	return file_solana_storage_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *MessageHeader) GetNumRequiredSignatures() uint32 {
@@ -435,7 +516,7 @@ type MessageAddressTableLookup struct {
 
 func (x *MessageAddressTableLookup) Reset() {
 	*x = MessageAddressTableLookup{}
-	mi := &file_solana_storage_proto_msgTypes[5]
+	mi := &file_solana_storage_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -447,7 +528,7 @@ func (x *MessageAddressTableLookup) String() string {
 func (*MessageAddressTableLookup) ProtoMessage() {}
 
 func (x *MessageAddressTableLookup) ProtoReflect() protoreflect.Message {
-	mi := &file_solana_storage_proto_msgTypes[5]
+	mi := &file_solana_storage_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -460,7 +541,7 @@ func (x *MessageAddressTableLookup) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessageAddressTableLookup.ProtoReflect.Descriptor instead.
 func (*MessageAddressTableLookup) Descriptor() ([]byte, []int) {
-	return file_solana_storage_proto_rawDescGZIP(), []int{5}
+	return file_solana_storage_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *MessageAddressTableLookup) GetAccountKey() []byte {
@@ -513,7 +594,7 @@ type TransactionStatusMeta struct {
 
 func (x *TransactionStatusMeta) Reset() {
 	*x = TransactionStatusMeta{}
-	mi := &file_solana_storage_proto_msgTypes[6]
+	mi := &file_solana_storage_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -525,7 +606,7 @@ func (x *TransactionStatusMeta) String() string {
 func (*TransactionStatusMeta) ProtoMessage() {}
 
 func (x *TransactionStatusMeta) ProtoReflect() protoreflect.Message {
-	mi := &file_solana_storage_proto_msgTypes[6]
+	mi := &file_solana_storage_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -538,7 +619,7 @@ func (x *TransactionStatusMeta) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransactionStatusMeta.ProtoReflect.Descriptor instead.
 func (*TransactionStatusMeta) Descriptor() ([]byte, []int) {
-	return file_solana_storage_proto_rawDescGZIP(), []int{6}
+	return file_solana_storage_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *TransactionStatusMeta) GetErr() *TransactionError {
@@ -669,7 +750,7 @@ type TransactionError struct {
 
 func (x *TransactionError) Reset() {
 	*x = TransactionError{}
-	mi := &file_solana_storage_proto_msgTypes[7]
+	mi := &file_solana_storage_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -681,7 +762,7 @@ func (x *TransactionError) String() string {
 func (*TransactionError) ProtoMessage() {}
 
 func (x *TransactionError) ProtoReflect() protoreflect.Message {
-	mi := &file_solana_storage_proto_msgTypes[7]
+	mi := &file_solana_storage_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -694,7 +775,7 @@ func (x *TransactionError) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransactionError.ProtoReflect.Descriptor instead.
 func (*TransactionError) Descriptor() ([]byte, []int) {
-	return file_solana_storage_proto_rawDescGZIP(), []int{7}
+	return file_solana_storage_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *TransactionError) GetErr() []byte {
@@ -714,7 +795,7 @@ type InnerInstructions struct {
 
 func (x *InnerInstructions) Reset() {
 	*x = InnerInstructions{}
-	mi := &file_solana_storage_proto_msgTypes[8]
+	mi := &file_solana_storage_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -726,7 +807,7 @@ func (x *InnerInstructions) String() string {
 func (*InnerInstructions) ProtoMessage() {}
 
 func (x *InnerInstructions) ProtoReflect() protoreflect.Message {
-	mi := &file_solana_storage_proto_msgTypes[8]
+	mi := &file_solana_storage_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -739,7 +820,7 @@ func (x *InnerInstructions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InnerInstructions.ProtoReflect.Descriptor instead.
 func (*InnerInstructions) Descriptor() ([]byte, []int) {
-	return file_solana_storage_proto_rawDescGZIP(), []int{8}
+	return file_solana_storage_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *InnerInstructions) GetIndex() uint32 {
@@ -771,7 +852,7 @@ type InnerInstruction struct {
 
 func (x *InnerInstruction) Reset() {
 	*x = InnerInstruction{}
-	mi := &file_solana_storage_proto_msgTypes[9]
+	mi := &file_solana_storage_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -783,7 +864,7 @@ func (x *InnerInstruction) String() string {
 func (*InnerInstruction) ProtoMessage() {}
 
 func (x *InnerInstruction) ProtoReflect() protoreflect.Message {
-	mi := &file_solana_storage_proto_msgTypes[9]
+	mi := &file_solana_storage_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -796,7 +877,7 @@ func (x *InnerInstruction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InnerInstruction.ProtoReflect.Descriptor instead.
 func (*InnerInstruction) Descriptor() ([]byte, []int) {
-	return file_solana_storage_proto_rawDescGZIP(), []int{9}
+	return file_solana_storage_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *InnerInstruction) GetProgramIdIndex() uint32 {
@@ -838,7 +919,7 @@ type CompiledInstruction struct {
 
 func (x *CompiledInstruction) Reset() {
 	*x = CompiledInstruction{}
-	mi := &file_solana_storage_proto_msgTypes[10]
+	mi := &file_solana_storage_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -850,7 +931,7 @@ func (x *CompiledInstruction) String() string {
 func (*CompiledInstruction) ProtoMessage() {}
 
 func (x *CompiledInstruction) ProtoReflect() protoreflect.Message {
-	mi := &file_solana_storage_proto_msgTypes[10]
+	mi := &file_solana_storage_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -863,7 +944,7 @@ func (x *CompiledInstruction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompiledInstruction.ProtoReflect.Descriptor instead.
 func (*CompiledInstruction) Descriptor() ([]byte, []int) {
-	return file_solana_storage_proto_rawDescGZIP(), []int{10}
+	return file_solana_storage_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *CompiledInstruction) GetProgramIdIndex() uint32 {
@@ -900,7 +981,7 @@ type TokenBalance struct {
 
 func (x *TokenBalance) Reset() {
 	*x = TokenBalance{}
-	mi := &file_solana_storage_proto_msgTypes[11]
+	mi := &file_solana_storage_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -912,7 +993,7 @@ func (x *TokenBalance) String() string {
 func (*TokenBalance) ProtoMessage() {}
 
 func (x *TokenBalance) ProtoReflect() protoreflect.Message {
-	mi := &file_solana_storage_proto_msgTypes[11]
+	mi := &file_solana_storage_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -925,7 +1006,7 @@ func (x *TokenBalance) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TokenBalance.ProtoReflect.Descriptor instead.
 func (*TokenBalance) Descriptor() ([]byte, []int) {
-	return file_solana_storage_proto_rawDescGZIP(), []int{11}
+	return file_solana_storage_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *TokenBalance) GetAccountIndex() uint32 {
@@ -975,7 +1056,7 @@ type UiTokenAmount struct {
 
 func (x *UiTokenAmount) Reset() {
 	*x = UiTokenAmount{}
-	mi := &file_solana_storage_proto_msgTypes[12]
+	mi := &file_solana_storage_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -987,7 +1068,7 @@ func (x *UiTokenAmount) String() string {
 func (*UiTokenAmount) ProtoMessage() {}
 
 func (x *UiTokenAmount) ProtoReflect() protoreflect.Message {
-	mi := &file_solana_storage_proto_msgTypes[12]
+	mi := &file_solana_storage_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1000,7 +1081,7 @@ func (x *UiTokenAmount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UiTokenAmount.ProtoReflect.Descriptor instead.
 func (*UiTokenAmount) Descriptor() ([]byte, []int) {
-	return file_solana_storage_proto_rawDescGZIP(), []int{12}
+	return file_solana_storage_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *UiTokenAmount) GetUiAmount() float64 {
@@ -1041,7 +1122,7 @@ type ReturnData struct {
 
 func (x *ReturnData) Reset() {
 	*x = ReturnData{}
-	mi := &file_solana_storage_proto_msgTypes[13]
+	mi := &file_solana_storage_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1053,7 +1134,7 @@ func (x *ReturnData) String() string {
 func (*ReturnData) ProtoMessage() {}
 
 func (x *ReturnData) ProtoReflect() protoreflect.Message {
-	mi := &file_solana_storage_proto_msgTypes[13]
+	mi := &file_solana_storage_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1066,7 +1147,7 @@ func (x *ReturnData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReturnData.ProtoReflect.Descriptor instead.
 func (*ReturnData) Descriptor() ([]byte, []int) {
-	return file_solana_storage_proto_rawDescGZIP(), []int{13}
+	return file_solana_storage_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ReturnData) GetProgramId() []byte {
@@ -1084,19 +1165,21 @@ func (x *ReturnData) GetData() []byte {
 }
 
 type Reward struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Pubkey        string                 `protobuf:"bytes,1,opt,name=pubkey,proto3" json:"pubkey,omitempty"`
-	Lamports      int64                  `protobuf:"varint,2,opt,name=lamports,proto3" json:"lamports,omitempty"`
-	PostBalance   uint64                 `protobuf:"varint,3,opt,name=post_balance,json=postBalance,proto3" json:"post_balance,omitempty"`
-	RewardType    RewardType             `protobuf:"varint,4,opt,name=reward_type,json=rewardType,proto3,enum=solana.storage.ConfirmedBlock.RewardType" json:"reward_type,omitempty"`
-	Commission    string                 `protobuf:"bytes,5,opt,name=commission,proto3" json:"commission,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Pubkey      string                 `protobuf:"bytes,1,opt,name=pubkey,proto3" json:"pubkey,omitempty"`
+	Lamports    int64                  `protobuf:"varint,2,opt,name=lamports,proto3" json:"lamports,omitempty"`
+	PostBalance uint64                 `protobuf:"varint,3,opt,name=post_balance,json=postBalance,proto3" json:"post_balance,omitempty"`
+	RewardType  RewardType             `protobuf:"varint,4,opt,name=reward_type,json=rewardType,proto3,enum=solana.storage.ConfirmedBlock.RewardType" json:"reward_type,omitempty"`
+	Commission  string                 `protobuf:"bytes,5,opt,name=commission,proto3" json:"commission,omitempty"`
+	// Vote account commission in basis points (SIMD-0291). Empty when absent.
+	CommissionBps string `protobuf:"bytes,6,opt,name=commission_bps,json=commissionBps,proto3" json:"commission_bps,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Reward) Reset() {
 	*x = Reward{}
-	mi := &file_solana_storage_proto_msgTypes[14]
+	mi := &file_solana_storage_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1108,7 +1191,7 @@ func (x *Reward) String() string {
 func (*Reward) ProtoMessage() {}
 
 func (x *Reward) ProtoReflect() protoreflect.Message {
-	mi := &file_solana_storage_proto_msgTypes[14]
+	mi := &file_solana_storage_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1121,7 +1204,7 @@ func (x *Reward) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Reward.ProtoReflect.Descriptor instead.
 func (*Reward) Descriptor() ([]byte, []int) {
-	return file_solana_storage_proto_rawDescGZIP(), []int{14}
+	return file_solana_storage_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *Reward) GetPubkey() string {
@@ -1159,6 +1242,13 @@ func (x *Reward) GetCommission() string {
 	return ""
 }
 
+func (x *Reward) GetCommissionBps() string {
+	if x != nil {
+		return x.CommissionBps
+	}
+	return ""
+}
+
 type Rewards struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Rewards       []*Reward              `protobuf:"bytes,1,rep,name=rewards,proto3" json:"rewards,omitempty"`
@@ -1169,7 +1259,7 @@ type Rewards struct {
 
 func (x *Rewards) Reset() {
 	*x = Rewards{}
-	mi := &file_solana_storage_proto_msgTypes[15]
+	mi := &file_solana_storage_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1181,7 +1271,7 @@ func (x *Rewards) String() string {
 func (*Rewards) ProtoMessage() {}
 
 func (x *Rewards) ProtoReflect() protoreflect.Message {
-	mi := &file_solana_storage_proto_msgTypes[15]
+	mi := &file_solana_storage_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1194,7 +1284,7 @@ func (x *Rewards) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Rewards.ProtoReflect.Descriptor instead.
 func (*Rewards) Descriptor() ([]byte, []int) {
-	return file_solana_storage_proto_rawDescGZIP(), []int{15}
+	return file_solana_storage_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *Rewards) GetRewards() []*Reward {
@@ -1220,7 +1310,7 @@ type UnixTimestamp struct {
 
 func (x *UnixTimestamp) Reset() {
 	*x = UnixTimestamp{}
-	mi := &file_solana_storage_proto_msgTypes[16]
+	mi := &file_solana_storage_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1232,7 +1322,7 @@ func (x *UnixTimestamp) String() string {
 func (*UnixTimestamp) ProtoMessage() {}
 
 func (x *UnixTimestamp) ProtoReflect() protoreflect.Message {
-	mi := &file_solana_storage_proto_msgTypes[16]
+	mi := &file_solana_storage_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1245,7 +1335,7 @@ func (x *UnixTimestamp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnixTimestamp.ProtoReflect.Descriptor instead.
 func (*UnixTimestamp) Descriptor() ([]byte, []int) {
-	return file_solana_storage_proto_rawDescGZIP(), []int{16}
+	return file_solana_storage_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *UnixTimestamp) GetTimestamp() int64 {
@@ -1264,7 +1354,7 @@ type BlockHeight struct {
 
 func (x *BlockHeight) Reset() {
 	*x = BlockHeight{}
-	mi := &file_solana_storage_proto_msgTypes[17]
+	mi := &file_solana_storage_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1276,7 +1366,7 @@ func (x *BlockHeight) String() string {
 func (*BlockHeight) ProtoMessage() {}
 
 func (x *BlockHeight) ProtoReflect() protoreflect.Message {
-	mi := &file_solana_storage_proto_msgTypes[17]
+	mi := &file_solana_storage_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1289,7 +1379,7 @@ func (x *BlockHeight) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockHeight.ProtoReflect.Descriptor instead.
 func (*BlockHeight) Descriptor() ([]byte, []int) {
-	return file_solana_storage_proto_rawDescGZIP(), []int{17}
+	return file_solana_storage_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *BlockHeight) GetBlockHeight() uint64 {
@@ -1308,7 +1398,7 @@ type NumPartitions struct {
 
 func (x *NumPartitions) Reset() {
 	*x = NumPartitions{}
-	mi := &file_solana_storage_proto_msgTypes[18]
+	mi := &file_solana_storage_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1320,7 +1410,7 @@ func (x *NumPartitions) String() string {
 func (*NumPartitions) ProtoMessage() {}
 
 func (x *NumPartitions) ProtoReflect() protoreflect.Message {
-	mi := &file_solana_storage_proto_msgTypes[18]
+	mi := &file_solana_storage_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1333,7 +1423,7 @@ func (x *NumPartitions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NumPartitions.ProtoReflect.Descriptor instead.
 func (*NumPartitions) Descriptor() ([]byte, []int) {
-	return file_solana_storage_proto_rawDescGZIP(), []int{18}
+	return file_solana_storage_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *NumPartitions) GetNumPartitions() uint64 {
@@ -1366,14 +1456,26 @@ const file_solana_storage_proto_rawDesc = "" +
 	"\n" +
 	"signatures\x18\x01 \x03(\fR\n" +
 	"signatures\x12@\n" +
-	"\amessage\x18\x02 \x01(\v2&.solana.storage.ConfirmedBlock.MessageR\amessage\"\x81\x03\n" +
+	"\amessage\x18\x02 \x01(\v2&.solana.storage.ConfirmedBlock.MessageR\amessage\"\xdb\x03\n" +
 	"\aMessage\x12D\n" +
 	"\x06header\x18\x01 \x01(\v2,.solana.storage.ConfirmedBlock.MessageHeaderR\x06header\x12!\n" +
 	"\faccount_keys\x18\x02 \x03(\fR\vaccountKeys\x12)\n" +
 	"\x10recent_blockhash\x18\x03 \x01(\fR\x0frecentBlockhash\x12V\n" +
 	"\finstructions\x18\x04 \x03(\v22.solana.storage.ConfirmedBlock.CompiledInstructionR\finstructions\x12\x1c\n" +
 	"\tversioned\x18\x05 \x01(\bR\tversioned\x12l\n" +
-	"\x15address_table_lookups\x18\x06 \x03(\v28.solana.storage.ConfirmedBlock.MessageAddressTableLookupR\x13addressTableLookups\"\xcd\x01\n" +
+	"\x15address_table_lookups\x18\x06 \x03(\v28.solana.storage.ConfirmedBlock.MessageAddressTableLookupR\x13addressTableLookups\x12M\n" +
+	"\x06config\x18\a \x01(\v20.solana.storage.ConfirmedBlock.TransactionConfigH\x00R\x06config\x88\x01\x01B\t\n" +
+	"\a_config\"\xb5\x02\n" +
+	"\x11TransactionConfig\x12&\n" +
+	"\fpriority_fee\x18\x01 \x01(\x04H\x00R\vpriorityFee\x88\x01\x01\x121\n" +
+	"\x12compute_unit_limit\x18\x02 \x01(\rH\x01R\x10computeUnitLimit\x88\x01\x01\x12I\n" +
+	"\x1floaded_accounts_data_size_limit\x18\x03 \x01(\rH\x02R\x1bloadedAccountsDataSizeLimit\x88\x01\x01\x12 \n" +
+	"\theap_size\x18\x04 \x01(\rH\x03R\bheapSize\x88\x01\x01B\x0f\n" +
+	"\r_priority_feeB\x15\n" +
+	"\x13_compute_unit_limitB\"\n" +
+	" _loaded_accounts_data_size_limitB\f\n" +
+	"\n" +
+	"_heap_size\"\xcd\x01\n" +
 	"\rMessageHeader\x126\n" +
 	"\x17num_required_signatures\x18\x01 \x01(\rR\x15numRequiredSignatures\x12?\n" +
 	"\x1cnum_readonly_signed_accounts\x18\x02 \x01(\rR\x19numReadonlySignedAccounts\x12C\n" +
@@ -1437,7 +1539,7 @@ const file_solana_storage_proto_rawDesc = "" +
 	"ReturnData\x12\x1d\n" +
 	"\n" +
 	"program_id\x18\x01 \x01(\fR\tprogramId\x12\x12\n" +
-	"\x04data\x18\x02 \x01(\fR\x04data\"\xcb\x01\n" +
+	"\x04data\x18\x02 \x01(\fR\x04data\"\xf2\x01\n" +
 	"\x06Reward\x12\x16\n" +
 	"\x06pubkey\x18\x01 \x01(\tR\x06pubkey\x12\x1a\n" +
 	"\blamports\x18\x02 \x01(\x03R\blamports\x12!\n" +
@@ -1446,7 +1548,8 @@ const file_solana_storage_proto_rawDesc = "" +
 	"rewardType\x12\x1e\n" +
 	"\n" +
 	"commission\x18\x05 \x01(\tR\n" +
-	"commission\"\x9f\x01\n" +
+	"commission\x12%\n" +
+	"\x0ecommission_bps\x18\x06 \x01(\tR\rcommissionBps\"\x9f\x01\n" +
 	"\aRewards\x12?\n" +
 	"\arewards\x18\x01 \x03(\v2%.solana.storage.ConfirmedBlock.RewardR\arewards\x12S\n" +
 	"\x0enum_partitions\x18\x02 \x01(\v2,.solana.storage.ConfirmedBlock.NumPartitionsR\rnumPartitions\"-\n" +
@@ -1478,57 +1581,59 @@ func file_solana_storage_proto_rawDescGZIP() []byte {
 }
 
 var file_solana_storage_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_solana_storage_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_solana_storage_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_solana_storage_proto_goTypes = []any{
 	(RewardType)(0),                   // 0: solana.storage.ConfirmedBlock.RewardType
 	(*ConfirmedBlock)(nil),            // 1: solana.storage.ConfirmedBlock.ConfirmedBlock
 	(*ConfirmedTransaction)(nil),      // 2: solana.storage.ConfirmedBlock.ConfirmedTransaction
 	(*Transaction)(nil),               // 3: solana.storage.ConfirmedBlock.Transaction
 	(*Message)(nil),                   // 4: solana.storage.ConfirmedBlock.Message
-	(*MessageHeader)(nil),             // 5: solana.storage.ConfirmedBlock.MessageHeader
-	(*MessageAddressTableLookup)(nil), // 6: solana.storage.ConfirmedBlock.MessageAddressTableLookup
-	(*TransactionStatusMeta)(nil),     // 7: solana.storage.ConfirmedBlock.TransactionStatusMeta
-	(*TransactionError)(nil),          // 8: solana.storage.ConfirmedBlock.TransactionError
-	(*InnerInstructions)(nil),         // 9: solana.storage.ConfirmedBlock.InnerInstructions
-	(*InnerInstruction)(nil),          // 10: solana.storage.ConfirmedBlock.InnerInstruction
-	(*CompiledInstruction)(nil),       // 11: solana.storage.ConfirmedBlock.CompiledInstruction
-	(*TokenBalance)(nil),              // 12: solana.storage.ConfirmedBlock.TokenBalance
-	(*UiTokenAmount)(nil),             // 13: solana.storage.ConfirmedBlock.UiTokenAmount
-	(*ReturnData)(nil),                // 14: solana.storage.ConfirmedBlock.ReturnData
-	(*Reward)(nil),                    // 15: solana.storage.ConfirmedBlock.Reward
-	(*Rewards)(nil),                   // 16: solana.storage.ConfirmedBlock.Rewards
-	(*UnixTimestamp)(nil),             // 17: solana.storage.ConfirmedBlock.UnixTimestamp
-	(*BlockHeight)(nil),               // 18: solana.storage.ConfirmedBlock.BlockHeight
-	(*NumPartitions)(nil),             // 19: solana.storage.ConfirmedBlock.NumPartitions
+	(*TransactionConfig)(nil),         // 5: solana.storage.ConfirmedBlock.TransactionConfig
+	(*MessageHeader)(nil),             // 6: solana.storage.ConfirmedBlock.MessageHeader
+	(*MessageAddressTableLookup)(nil), // 7: solana.storage.ConfirmedBlock.MessageAddressTableLookup
+	(*TransactionStatusMeta)(nil),     // 8: solana.storage.ConfirmedBlock.TransactionStatusMeta
+	(*TransactionError)(nil),          // 9: solana.storage.ConfirmedBlock.TransactionError
+	(*InnerInstructions)(nil),         // 10: solana.storage.ConfirmedBlock.InnerInstructions
+	(*InnerInstruction)(nil),          // 11: solana.storage.ConfirmedBlock.InnerInstruction
+	(*CompiledInstruction)(nil),       // 12: solana.storage.ConfirmedBlock.CompiledInstruction
+	(*TokenBalance)(nil),              // 13: solana.storage.ConfirmedBlock.TokenBalance
+	(*UiTokenAmount)(nil),             // 14: solana.storage.ConfirmedBlock.UiTokenAmount
+	(*ReturnData)(nil),                // 15: solana.storage.ConfirmedBlock.ReturnData
+	(*Reward)(nil),                    // 16: solana.storage.ConfirmedBlock.Reward
+	(*Rewards)(nil),                   // 17: solana.storage.ConfirmedBlock.Rewards
+	(*UnixTimestamp)(nil),             // 18: solana.storage.ConfirmedBlock.UnixTimestamp
+	(*BlockHeight)(nil),               // 19: solana.storage.ConfirmedBlock.BlockHeight
+	(*NumPartitions)(nil),             // 20: solana.storage.ConfirmedBlock.NumPartitions
 }
 var file_solana_storage_proto_depIdxs = []int32{
 	2,  // 0: solana.storage.ConfirmedBlock.ConfirmedBlock.transactions:type_name -> solana.storage.ConfirmedBlock.ConfirmedTransaction
-	15, // 1: solana.storage.ConfirmedBlock.ConfirmedBlock.rewards:type_name -> solana.storage.ConfirmedBlock.Reward
-	17, // 2: solana.storage.ConfirmedBlock.ConfirmedBlock.block_time:type_name -> solana.storage.ConfirmedBlock.UnixTimestamp
-	18, // 3: solana.storage.ConfirmedBlock.ConfirmedBlock.block_height:type_name -> solana.storage.ConfirmedBlock.BlockHeight
-	19, // 4: solana.storage.ConfirmedBlock.ConfirmedBlock.num_partitions:type_name -> solana.storage.ConfirmedBlock.NumPartitions
+	16, // 1: solana.storage.ConfirmedBlock.ConfirmedBlock.rewards:type_name -> solana.storage.ConfirmedBlock.Reward
+	18, // 2: solana.storage.ConfirmedBlock.ConfirmedBlock.block_time:type_name -> solana.storage.ConfirmedBlock.UnixTimestamp
+	19, // 3: solana.storage.ConfirmedBlock.ConfirmedBlock.block_height:type_name -> solana.storage.ConfirmedBlock.BlockHeight
+	20, // 4: solana.storage.ConfirmedBlock.ConfirmedBlock.num_partitions:type_name -> solana.storage.ConfirmedBlock.NumPartitions
 	3,  // 5: solana.storage.ConfirmedBlock.ConfirmedTransaction.transaction:type_name -> solana.storage.ConfirmedBlock.Transaction
-	7,  // 6: solana.storage.ConfirmedBlock.ConfirmedTransaction.meta:type_name -> solana.storage.ConfirmedBlock.TransactionStatusMeta
+	8,  // 6: solana.storage.ConfirmedBlock.ConfirmedTransaction.meta:type_name -> solana.storage.ConfirmedBlock.TransactionStatusMeta
 	4,  // 7: solana.storage.ConfirmedBlock.Transaction.message:type_name -> solana.storage.ConfirmedBlock.Message
-	5,  // 8: solana.storage.ConfirmedBlock.Message.header:type_name -> solana.storage.ConfirmedBlock.MessageHeader
-	11, // 9: solana.storage.ConfirmedBlock.Message.instructions:type_name -> solana.storage.ConfirmedBlock.CompiledInstruction
-	6,  // 10: solana.storage.ConfirmedBlock.Message.address_table_lookups:type_name -> solana.storage.ConfirmedBlock.MessageAddressTableLookup
-	8,  // 11: solana.storage.ConfirmedBlock.TransactionStatusMeta.err:type_name -> solana.storage.ConfirmedBlock.TransactionError
-	9,  // 12: solana.storage.ConfirmedBlock.TransactionStatusMeta.inner_instructions:type_name -> solana.storage.ConfirmedBlock.InnerInstructions
-	12, // 13: solana.storage.ConfirmedBlock.TransactionStatusMeta.pre_token_balances:type_name -> solana.storage.ConfirmedBlock.TokenBalance
-	12, // 14: solana.storage.ConfirmedBlock.TransactionStatusMeta.post_token_balances:type_name -> solana.storage.ConfirmedBlock.TokenBalance
-	15, // 15: solana.storage.ConfirmedBlock.TransactionStatusMeta.rewards:type_name -> solana.storage.ConfirmedBlock.Reward
-	14, // 16: solana.storage.ConfirmedBlock.TransactionStatusMeta.return_data:type_name -> solana.storage.ConfirmedBlock.ReturnData
-	10, // 17: solana.storage.ConfirmedBlock.InnerInstructions.instructions:type_name -> solana.storage.ConfirmedBlock.InnerInstruction
-	13, // 18: solana.storage.ConfirmedBlock.TokenBalance.ui_token_amount:type_name -> solana.storage.ConfirmedBlock.UiTokenAmount
-	0,  // 19: solana.storage.ConfirmedBlock.Reward.reward_type:type_name -> solana.storage.ConfirmedBlock.RewardType
-	15, // 20: solana.storage.ConfirmedBlock.Rewards.rewards:type_name -> solana.storage.ConfirmedBlock.Reward
-	19, // 21: solana.storage.ConfirmedBlock.Rewards.num_partitions:type_name -> solana.storage.ConfirmedBlock.NumPartitions
-	22, // [22:22] is the sub-list for method output_type
-	22, // [22:22] is the sub-list for method input_type
-	22, // [22:22] is the sub-list for extension type_name
-	22, // [22:22] is the sub-list for extension extendee
-	0,  // [0:22] is the sub-list for field type_name
+	6,  // 8: solana.storage.ConfirmedBlock.Message.header:type_name -> solana.storage.ConfirmedBlock.MessageHeader
+	12, // 9: solana.storage.ConfirmedBlock.Message.instructions:type_name -> solana.storage.ConfirmedBlock.CompiledInstruction
+	7,  // 10: solana.storage.ConfirmedBlock.Message.address_table_lookups:type_name -> solana.storage.ConfirmedBlock.MessageAddressTableLookup
+	5,  // 11: solana.storage.ConfirmedBlock.Message.config:type_name -> solana.storage.ConfirmedBlock.TransactionConfig
+	9,  // 12: solana.storage.ConfirmedBlock.TransactionStatusMeta.err:type_name -> solana.storage.ConfirmedBlock.TransactionError
+	10, // 13: solana.storage.ConfirmedBlock.TransactionStatusMeta.inner_instructions:type_name -> solana.storage.ConfirmedBlock.InnerInstructions
+	13, // 14: solana.storage.ConfirmedBlock.TransactionStatusMeta.pre_token_balances:type_name -> solana.storage.ConfirmedBlock.TokenBalance
+	13, // 15: solana.storage.ConfirmedBlock.TransactionStatusMeta.post_token_balances:type_name -> solana.storage.ConfirmedBlock.TokenBalance
+	16, // 16: solana.storage.ConfirmedBlock.TransactionStatusMeta.rewards:type_name -> solana.storage.ConfirmedBlock.Reward
+	15, // 17: solana.storage.ConfirmedBlock.TransactionStatusMeta.return_data:type_name -> solana.storage.ConfirmedBlock.ReturnData
+	11, // 18: solana.storage.ConfirmedBlock.InnerInstructions.instructions:type_name -> solana.storage.ConfirmedBlock.InnerInstruction
+	14, // 19: solana.storage.ConfirmedBlock.TokenBalance.ui_token_amount:type_name -> solana.storage.ConfirmedBlock.UiTokenAmount
+	0,  // 20: solana.storage.ConfirmedBlock.Reward.reward_type:type_name -> solana.storage.ConfirmedBlock.RewardType
+	16, // 21: solana.storage.ConfirmedBlock.Rewards.rewards:type_name -> solana.storage.ConfirmedBlock.Reward
+	20, // 22: solana.storage.ConfirmedBlock.Rewards.num_partitions:type_name -> solana.storage.ConfirmedBlock.NumPartitions
+	23, // [23:23] is the sub-list for method output_type
+	23, // [23:23] is the sub-list for method input_type
+	23, // [23:23] is the sub-list for extension type_name
+	23, // [23:23] is the sub-list for extension extendee
+	0,  // [0:23] is the sub-list for field type_name
 }
 
 func init() { file_solana_storage_proto_init() }
@@ -1536,15 +1641,17 @@ func file_solana_storage_proto_init() {
 	if File_solana_storage_proto != nil {
 		return
 	}
-	file_solana_storage_proto_msgTypes[6].OneofWrappers = []any{}
-	file_solana_storage_proto_msgTypes[9].OneofWrappers = []any{}
+	file_solana_storage_proto_msgTypes[3].OneofWrappers = []any{}
+	file_solana_storage_proto_msgTypes[4].OneofWrappers = []any{}
+	file_solana_storage_proto_msgTypes[7].OneofWrappers = []any{}
+	file_solana_storage_proto_msgTypes[10].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_solana_storage_proto_rawDesc), len(file_solana_storage_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   19,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

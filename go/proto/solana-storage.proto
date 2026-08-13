@@ -32,6 +32,19 @@ message Message {
     repeated CompiledInstruction instructions = 4;
     bool versioned = 5;
     repeated MessageAddressTableLookup address_table_lookups = 6;
+    // Set only for V1 transaction messages (SIMD-0385). Absent for legacy/V0.
+    optional TransactionConfig config = 7;
+}
+
+// Inline budget config introduced by the V1 transaction format (SIMD-0385),
+// replacing ComputeBudget instructions. Each field is optional; unset fields
+// fall back to the runtime defaults.
+// https://github.com/solana-foundation/solana-improvement-documents/blob/main/proposals/0385-transaction-v1.md
+message TransactionConfig {
+    optional uint64 priority_fee = 1;
+    optional uint32 compute_unit_limit = 2;
+    optional uint32 loaded_accounts_data_size_limit = 3;
+    optional uint32 heap_size = 4;
 }
 
 message MessageHeader {
@@ -131,6 +144,8 @@ message Reward {
     uint64 post_balance = 3;
     RewardType reward_type = 4;
     string commission = 5;
+    // Vote account commission in basis points (SIMD-0291). Empty when absent.
+    string commission_bps = 6;
 }
 
 message Rewards {
