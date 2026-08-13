@@ -793,9 +793,9 @@ dependencies = [
 
 [[package]]
 name = "laserstream-core-proto"
-version = "11.1.0"
+version = "11.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18ac4a3743baa7a34a548a990b838d0db7c3e50bb614e7aedbd18443617cfc59"
+checksum = "3cc5910f46e50b538e6d9ae5eb573bbf83861fe223a5ce30c914f1822a60602d"
 dependencies = [
  "anyhow",
  "prost 0.14.4",
@@ -810,7 +810,7 @@ dependencies = [
 
 [[package]]
 name = "laserstream-napi"
-version = "0.8.3"
+version = "0.8.4"
 dependencies = [
  "base64 0.21.7",
  "bs58",
