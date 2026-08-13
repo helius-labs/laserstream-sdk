@@ -145,6 +145,37 @@ req := &laserstream.SubscribeRequest{
 }
 ```
 
+#### tokenAccounts (ATA) Expansion
+
+Set `TokenAccounts` on a transaction filter to also match transactions that
+touch an **Associated Token Account (ATA)** owned by one of the
+`AccountInclude` wallets, not just transactions naming the wallet directly.
+Modes:
+
+- unset (`nil`) — no expansion (default).
+- `TokenAccountExpansionControlFlag_BALANCE_CHANGED` — also match txs touching
+  an ATA owned by an `AccountInclude` wallet whose token balance changed.
+- `TokenAccountExpansionControlFlag_ALL` — match any tx touching an ATA owned
+  by an `AccountInclude` wallet.
+
+```go
+vote := false
+failed := false
+req := &laserstream.SubscribeRequest{
+    Transactions: map[string]*laserstream.SubscribeRequestFilterTransactions{
+        "wallet-and-atas": {
+            AccountInclude: []string{"vines1vzrYbzLMRdu58ou5XTby4qAqVRLmqo36NKPTg"},
+            Vote:           &vote,
+            Failed:         &failed,
+            TokenAccounts:  laserstream.TokenAccountExpansionControlFlag_BALANCE_CHANGED.Enum(),
+        },
+    },
+    Commitment: &commitmentLevel,
+}
+```
+
+See [`examples/token-accounts-sub.go`](./examples/token-accounts-sub.go).
+
 ### Block Subscriptions
 ```go
 includeTransactions := true
