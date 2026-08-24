@@ -1138,9 +1138,7 @@ type SubscribeRequestFilterTransactions struct {
 	// against owners of pre/post token balances on each transaction.
 	// Absent = no expansion.
 	TokenAccounts *TokenAccountExpansionControlFlag `protobuf:"varint,30,opt,name=token_accounts,json=tokenAccounts,proto3,enum=geyser.TokenAccountExpansionControlFlag,oneof" json:"token_accounts,omitempty"`
-	// Helius extension: when true, account_include / account_exclude /
-	// account_required also match against the mints of pre/post token balances.
-	// Catches classic SPL `Transfer`s, whose keys never contain the mint.
+	// Helius extension: also match the account lists against pre/post token-balance mints.
 	MatchMints    bool `protobuf:"varint,32,opt,name=match_mints,json=matchMints,proto3" json:"match_mints,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
