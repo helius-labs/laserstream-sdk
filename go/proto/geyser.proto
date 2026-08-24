@@ -136,6 +136,10 @@ message SubscribeRequestFilterTransactions {
   // against owners of pre/post token balances on each transaction.
   // Absent = no expansion.
   optional TokenAccountExpansionControlFlag token_accounts = 30;
+  // Helius extension: when true, account_include / account_exclude /
+  // account_required also match against the mints of pre/post token balances.
+  // Catches classic SPL `Transfer`s, whose keys never contain the mint.
+  bool match_mints = 32;
 }
 
 // Helius extension: discriminator for `SubscribeRequestFilterTransactions.token_accounts`.
