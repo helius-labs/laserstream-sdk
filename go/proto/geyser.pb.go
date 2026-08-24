@@ -1138,7 +1138,7 @@ type SubscribeRequestFilterTransactions struct {
 	// against owners of pre/post token balances on each transaction.
 	// Absent = no expansion.
 	TokenAccounts *TokenAccountExpansionControlFlag `protobuf:"varint,30,opt,name=token_accounts,json=tokenAccounts,proto3,enum=geyser.TokenAccountExpansionControlFlag,oneof" json:"token_accounts,omitempty"`
-	// Helius extension: also match the account lists against pre/post token-balance mints.
+	// Also match the account lists against pre/post token-balance mints.
 	MatchMints    bool `protobuf:"varint,32,opt,name=match_mints,json=matchMints,proto3" json:"match_mints,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

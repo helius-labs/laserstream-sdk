@@ -147,7 +147,7 @@ message SubscribeRequestFilterTransactions {
   // against owners of pre/post token balances on each transaction.
   // Absent = no expansion.
   optional TokenAccountExpansionControlFlag token_accounts = 30;
-  // Helius extension: also match the account lists against pre/post token-balance mints.
+  // Also match the account lists against pre/post token-balance mints.
   bool match_mints = 32;
 }
 
