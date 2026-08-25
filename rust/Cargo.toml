@@ -1,6 +1,6 @@
 [package]
 name = "helius-laserstream"
-version = "0.6.3"
+version = "0.6.4"
 edition = "2021"
 authors = ["Helius <support@helius.xyz>"]
 description = "Rust client for Helius LaserStream gRPC with robust reconnection and slot tracking"
@@ -17,6 +17,9 @@ laserstream-core-proto = { version = "11.2.0", default-features = false, feature
 # version would make `SubscribeRequest` a distinct type from the client's API.
 laserstream-core-client = "11.1.0"
 tonic = { version = "0.12.1", features = ["transport", "tls", "zstd", "gzip"] }
+# RUSTSEC-2026-0258: floor h2 at the 0.4.19 fix so both the tonic 0.12 graph and
+# the core client's tonic 0.14 graph unify on a patched release.
+h2 = ">=0.4.19,<0.5"
 prost = "0.12"
 prost-types = "0.12"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
