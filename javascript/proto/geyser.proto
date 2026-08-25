@@ -93,6 +93,7 @@ message SubscribeRequestFilterAccounts {
   // Tag 31 was the deprecated no-op notify_on opt-in; removed once Agave 4.2
   // made write-only delivery the default at the source.
   reserved 31;
+  reserved "notify_on";
 }
 
 message SubscribeRequestFilterAccountsFilter {
