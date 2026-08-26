@@ -136,6 +136,8 @@ message SubscribeRequestFilterTransactions {
   // against owners of pre/post token balances on each transaction.
   // Absent = no expansion.
   optional TokenAccountExpansionControlFlag token_accounts = 30;
+  // Also match the account lists against pre/post token-balance mints.
+  bool match_mints = 32;
 }
 
 // Helius extension: discriminator for `SubscribeRequestFilterTransactions.token_accounts`.
