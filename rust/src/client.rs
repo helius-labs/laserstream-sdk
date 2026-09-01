@@ -239,9 +239,7 @@ pub fn subscribe(
                                 // tracker) instead of the raw write_request. Yellowstone gRPC replaces
                                 // all subscriptions on each write, so the raw request would drop the
                                 // internal slot tracker and cause tracked_slot to go stale.
-                                let mut send_req = current_request.clone();
-                                send_req.from_slot = None;
-                                send_req.ping = None;
+                                let send_req = live_write_request(&current_request, &write_request, replay_enabled);
 
                                 if let Err(e) = sender.send(send_req).await {
                                     warn!(error = %e, "Failed to send write request");
@@ -536,3 +534,94 @@ fn merge_subscribe_requests(
     // Note: from_slot and ping are not replaced as they are connection-specific
 }
 
+
+/// Builds the request sent for a live `write()`: the merged subscription state
+/// (so the internal slot tracker survives Yellowstone's replace-on-write), with
+/// the caller's `from_slot` passed through when replay is enabled.
+///
+/// Yellowstone replaces the whole subscription set on write, so a `from_slot`
+/// replays that range for every filter on the stream, not only the newly added
+/// ones. Callers should pass a recent slot: replayed internal slot updates
+/// rewind the reconnect cursor to the replay position while it runs.
+/// A write without `from_slot` keeps the previous behavior (no replay).
+fn live_write_request(
+    current: &SubscribeRequest,
+    write_request: &SubscribeRequest,
+    replay_enabled: bool,
+) -> SubscribeRequest {
+    let mut request = current.clone();
+    // With replay disabled the SDK strips from_slot everywhere else too.
+    request.from_slot = if replay_enabled {
+        write_request.from_slot
+    } else {
+        None
+    };
+    request.ping = None;
+    request
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use laserstream_core_proto::geyser::SubscribeRequestFilterAccounts;
+
+    use super::*;
+
+    #[test]
+    fn live_write_keeps_caller_from_slot_and_internal_tracker() {
+        let internal_slot_sub_id = "internal-test";
+        let mut current = SubscribeRequest {
+            accounts: HashMap::from([(
+                "old".to_string(),
+                SubscribeRequestFilterAccounts::default(),
+            )]),
+            slots: HashMap::from([(
+                internal_slot_sub_id.to_string(),
+                SubscribeRequestFilterSlots {
+                    filter_by_commitment: Some(true),
+                    ..Default::default()
+                },
+            )]),
+            commitment: Some(0),
+            from_slot: Some(123),
+            ping: Some(SubscribeRequestPing { id: 7 }),
+            ..Default::default()
+        };
+        let write_request = SubscribeRequest {
+            accounts: HashMap::from([(
+                "new".to_string(),
+                SubscribeRequestFilterAccounts::default(),
+            )]),
+            from_slot: Some(999),
+            ping: Some(SubscribeRequestPing { id: 9 }),
+            ..Default::default()
+        };
+
+        merge_subscribe_requests(&mut current, &write_request, internal_slot_sub_id);
+        let live_request = live_write_request(&current, &write_request, true);
+
+        // The live request carries the caller's replay slot, drops ping, and
+        // keeps the internal slot tracker.
+        assert_eq!(live_request.from_slot, Some(999));
+        assert!(live_request.ping.is_none());
+        assert!(live_request.slots.contains_key(internal_slot_sub_id));
+        assert!(live_request.accounts.contains_key("new"));
+
+        // The retained replay request stays free of write-specific fields.
+        assert_eq!(current.from_slot, Some(123));
+
+        // A write without from_slot keeps the previous behavior.
+        let plain_write = SubscribeRequest::default();
+        assert_eq!(
+            live_write_request(&current, &plain_write, true).from_slot,
+            None
+        );
+
+        // With replay disabled, from_slot is stripped like everywhere else.
+        assert_eq!(
+            live_write_request(&current, &write_request, false).from_slot,
+            None
+        );
+    }
+}
