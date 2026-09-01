@@ -182,6 +182,10 @@ pub struct JsTransactionFilter {
     // Cuckoo filter over accountInclude (proto field #31), built client-side.
     #[serde(alias = "cuckooAccountInclude")]
     pub cuckoo_account_include: Option<JsCuckooFilter>,
+    // Helius mint matching (proto field #32): when true, the account lists
+    // also match against the mints of pre/post token balances.
+    #[serde(alias = "matchMints")]
+    pub match_mints: Option<bool>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -432,6 +436,8 @@ impl ClientInner {
                 yellowstone_filter.token_accounts = parse_token_accounts_mode(filter.token_accounts)
                     .map_err(Error::from_reason)?;
 
+                yellowstone_filter.match_mints = filter.match_mints.unwrap_or(false);
+
                 // Handle compressed account (cuckoo) filter — pass through bytes built client-side.
                 if let Some(cuckoo) = filter.cuckoo_account_include {
                     let data = general_purpose::STANDARD.decode(&cuckoo.data)
@@ -477,6 +483,8 @@ impl ClientInner {
 
                 yellowstone_filter.token_accounts = parse_token_accounts_mode(filter.token_accounts)
                     .map_err(Error::from_reason)?;
+
+                yellowstone_filter.match_mints = filter.match_mints.unwrap_or(false);
 
                 transactions_status_map.insert(key, yellowstone_filter);
             }

@@ -149,6 +149,14 @@ declare module 'laserstream-core-proto-js/generated' {
        * Built client-side via {@link CompressedAccountFilterSet.toTransactionFilter}.
        */
       cuckooAccountInclude?: (import('./cuckoo').CuckooFilterProto | null);
+      /**
+       * Helius mint matching (proto field #32). When true, `accountInclude` /
+       * `accountExclude` / `accountRequired` also match against the mints of
+       * pre/post token balances — catches classic SPL `Transfer`s, whose
+       * account keys never contain the mint. Put mints in `accountInclude`
+       * to stream every transaction touching those tokens.
+       */
+      matchMints?: (boolean | null);
     }
     interface ISubscribeRequestFilterAccounts {
       /**

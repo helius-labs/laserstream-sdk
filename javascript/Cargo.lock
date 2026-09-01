@@ -611,9 +611,9 @@ dependencies = [
 
 [[package]]
 name = "laserstream-core-proto"
-version = "11.2.0"
+version = "11.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3cc5910f46e50b538e6d9ae5eb573bbf83861fe223a5ce30c914f1822a60602d"
+checksum = "90653632d67d7784b62c59fa941f34e130d92598c8fbaeb028bff22143f5a16b"
 dependencies = [
  "anyhow",
  "prost",

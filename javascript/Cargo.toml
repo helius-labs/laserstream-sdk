@@ -23,7 +23,7 @@ futures-channel = "0.3"
 parking_lot = "0.12"
 uuid = { version = "1", features = ["v4"] }
 laserstream-core-client = "11.1.0"
-laserstream-core-proto = { version = "11.2.0", default-features = false, features = ["tonic", "tonic-compression"] }
+laserstream-core-proto = { version = "11.3.0", default-features = false, features = ["tonic", "tonic-compression"] }
 # RUSTSEC-2026-0258: floor the core client's tonic 0.14 graph at the 0.4.19 fix.
 h2 = ">=0.4.19,<0.5"
 prost = "0.14"
