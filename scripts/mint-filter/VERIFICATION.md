@@ -78,8 +78,10 @@ JavaScript strings, numbers, arrays, and objects were rejected.
    `npm ci --ignore-scripts` now succeeds.
 4. **GNU CI package mirror failures.** Both GNU build jobs failed before
    compilation because `deb.debian.org/debian-security` returned 404 for
-   required Bullseye packages. Use Debian's security mirror, which serves the
-   same package URLs, while retaining the glibc 2.31 build environment.
+   required Bullseye packages. The security mirror served those URLs but
+   returned 404s for other packages. Retain successfully downloaded packages
+   and retry once using the security mirror, preserving normal APT verification
+   and the glibc 2.31 build environment.
 
 The TypeScript regression test runs in the existing SDK CI workflow. The
 transport/live harness is available alongside this report for the next release
