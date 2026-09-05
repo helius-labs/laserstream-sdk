@@ -76,6 +76,10 @@ JavaScript strings, numbers, arrays, and objects were rejected.
 3. **Stale npm lockfile.** Package metadata says 0.8.5 while the lockfile still
    describes 0.8.4 and lacks the matching optional native packages. Refresh it;
    `npm ci --ignore-scripts` now succeeds.
+4. **GNU CI package mirror failures.** Both GNU build jobs failed before
+   compilation because `deb.debian.org/debian-security` returned 404 for
+   required Bullseye packages. Use Debian's security mirror, which serves the
+   same package URLs, while retaining the glibc 2.31 build environment.
 
 The TypeScript regression test runs in the existing SDK CI workflow. The
 transport/live harness is available alongside this report for the next release
@@ -97,6 +101,8 @@ candidate; see [README.md](README.md).
 - Live traffic was tested against one region. This does not certify every
   deployment, sustained throughput, or a long-running soak. Archive unit tests
   cover filter semantics; recent-slot replay does not prove cold archive I/O.
+- Mint membership tests used explicit account lists. The existing cuckoo
+  vectors passed, but mint membership inside cuckoo sets was not exercised.
 - No package was published and no production configuration was changed.
 
 Raw JSON summaries and the reference capture remain in the ignored `results/`
