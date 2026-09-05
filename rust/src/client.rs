@@ -4,7 +4,7 @@ use futures::StreamExt;
 use futures_channel::mpsc as futures_mpsc;
 use futures_util::{sink::SinkExt, Stream};
 use std::{pin::Pin, time::Duration};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 use tokio::time::sleep;
 use laserstream_core_proto::tonic::{
     Status, Request, metadata::MetadataValue, transport::Endpoint, codec::CompressionEncoding,
@@ -62,6 +62,7 @@ impl Interceptor for SdkMetadataInterceptor {
 #[derive(Clone)]
 pub struct StreamHandle {
     write_tx: mpsc::UnboundedSender<SubscribeRequest>,
+    close_tx: watch::Sender<bool>,
 }
 
 impl StreamHandle {
@@ -70,6 +71,16 @@ impl StreamHandle {
         self.write_tx
             .send(request)
             .map_err(|_| LaserstreamError::ConnectionError("Write channel closed".to_string()))
+    }
+
+    /// Signals the background stream to shut down. The stream ends at its next
+    /// await point (an in-flight connection attempt is not interrupted, so
+    /// shutdown can take up to the connect timeout while reconnecting).
+    ///
+    /// Any clone of the handle may call this; dropping handles without calling
+    /// `close()` leaves the stream running, as before.
+    pub fn close(&self) {
+        let _ = self.close_tx.send(true);
     }
 }
 
@@ -84,8 +95,15 @@ pub fn subscribe(
     StreamHandle,
 ) {
     let (write_tx, mut write_rx) = mpsc::unbounded_channel::<SubscribeRequest>();
-    let handle = StreamHandle { write_tx };
+    let (close_tx, mut close_rx) = watch::channel(false);
+    let handle = StreamHandle {
+        write_tx,
+        close_tx: close_tx.clone(),
+    };
     let update_stream = stream! {
+        // Hold a sender so `close_rx.changed()` can only fire on an explicit
+        // `close()` — dropping every handle must not end the stream.
+        let _close_guard = close_tx;
         let mut reconnect_attempts = 0;
         let mut tracked_slot: u64 = 0;
 
@@ -121,6 +139,11 @@ pub fn subscribe(
         let api_key_string = config.api_key.clone();
 
         loop {
+            // Don't dial (or handle a finished attempt) after an explicit close.
+            if *close_rx.borrow() {
+                return;
+            }
+
             // Drain any pending write requests that arrived during reconnection delay.
             // This ensures writes sent while disconnected are included in the next connection.
             while let Ok(write_request) = write_rx.try_recv() {
@@ -160,7 +183,19 @@ pub fn subscribe(
                     let mut ping_id = 0i32;
 
                     loop {
+                        // `select!` is unbiased, so a ready stream could win over
+                        // the close arm; this check bounds post-close delivery to
+                        // at most one already-selected arm.
+                        if *close_rx.borrow() {
+                            return;
+                        }
+
                         tokio::select! {
+                            // Explicit close via StreamHandle::close()
+                            _ = close_rx.changed() => {
+                                return;
+                            }
+
                             // Send periodic ping
                             _ = ping_interval.tick() => {
                                 ping_id = ping_id.wrapping_add(1);
@@ -258,6 +293,12 @@ pub fn subscribe(
                     // Log error internally but don't yield to consumer until max attempts exhausted
                     error!(error = %err, attempt = reconnect_attempts, max_attempts = effective_max_attempts, "Connection failed, will retry after 5s delay");
 
+                    // A close during the in-flight attempt outranks reporting
+                    // its failure.
+                    if *close_rx.borrow() {
+                        return;
+                    }
+
                     // Check if exceeded max reconnect attempts
                     if reconnect_attempts >= effective_max_attempts {
                         error!(attempts = effective_max_attempts, "Max reconnection attempts reached");
@@ -270,12 +311,15 @@ pub fn subscribe(
                 }
             }
 
-            // Wait 5s before retry
+            // Wait 5s before retry, ending early on an explicit close
             let delay = Duration::from_millis(FIXED_RECONNECT_INTERVAL_MS);
-            sleep(delay).await;
+            tokio::select! {
+                _ = sleep(delay) => {}
+                _ = close_rx.changed() => { return; }
+            }
         }
     };
-    
+
     (update_stream, handle)
 }
 
@@ -536,3 +580,93 @@ fn merge_subscribe_requests(
     // Note: from_slot and ping are not replaced as they are connection-specific
 }
 
+
+#[cfg(test)]
+mod tests {
+    use futures::StreamExt;
+    use tokio::time::timeout;
+
+    use super::*;
+
+    /// Uses an endpoint that refuses connections, so the stream sits in its
+    /// retry loop without needing a server. Binding then dropping a listener
+    /// yields a port with nothing listening (deterministic refusal, unlike a
+    /// well-known port that could host a service in CI).
+    fn refused_subscribe() -> (
+        impl Stream<Item = Result<SubscribeUpdate, LaserstreamError>>,
+        StreamHandle,
+    ) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        drop(listener);
+
+        let config = LaserstreamConfig::new(
+            format!("http://127.0.0.1:{port}"),
+            String::new(),
+        );
+        subscribe(config, SubscribeRequest::default())
+    }
+
+    #[tokio::test]
+    async fn close_ends_stream() {
+        let (stream, handle) = refused_subscribe();
+        tokio::pin!(stream);
+
+        handle.close();
+
+        // The stream must end (yield None) shortly after close, without
+        // surfacing an error first.
+        let end = timeout(Duration::from_secs(30), async {
+            while let Some(item) = stream.next().await {
+                if item.is_err() {
+                    panic!("unexpected terminal error after close: {:?}", item);
+                }
+            }
+        })
+        .await;
+        assert!(end.is_ok(), "stream did not end after close()");
+    }
+
+    #[tokio::test]
+    async fn close_before_first_poll_ends_cleanly_with_attempts_exhausted() {
+        // With a budget of 1, a close that races the (failing) first attempt
+        // must still end with None, not MaxReconnectAttempts.
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        drop(listener);
+        let config = LaserstreamConfig::new(
+            format!("http://127.0.0.1:{port}"),
+            String::new(),
+        )
+        .with_max_reconnect_attempts(1);
+        let (stream, handle) = subscribe(config, SubscribeRequest::default());
+        tokio::pin!(stream);
+
+        handle.close();
+
+        let first = timeout(Duration::from_secs(30), stream.next()).await;
+        assert!(
+            matches!(first, Ok(None)),
+            "expected clean end after close(), got {:?}",
+            first
+        );
+    }
+
+    #[tokio::test]
+    async fn dropping_handles_does_not_end_stream() {
+        let (stream, handle) = refused_subscribe();
+        tokio::pin!(stream);
+
+        drop(handle.clone());
+        drop(handle);
+
+        // With every handle dropped and no close(), the stream keeps running
+        // (its retry loop yields nothing yet), so next() stays pending.
+        let pending = timeout(Duration::from_millis(500), stream.next()).await;
+        assert!(
+            pending.is_err(),
+            "stream ended after handle drop without close(): {:?}",
+            pending
+        );
+    }
+}
