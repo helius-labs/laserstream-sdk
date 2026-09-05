@@ -56,6 +56,9 @@ jobs:
       - name: Install dependencies
         run: npm install --ignore-scripts
         working-directory: javascript
+      - name: Check public TypeScript declarations
+        run: npm run test:types
+        working-directory: javascript
       - name: Install cross-compilation toolchains
         if: matrix.settings.host == 'ubuntu-latest'
         run: |
@@ -375,4 +378,4 @@ jobs:
             verify_package "$package"
           done
           
-          echo "🎉 All packages successfully published and verified!" 
+          echo "🎉 All packages successfully published and verified!"

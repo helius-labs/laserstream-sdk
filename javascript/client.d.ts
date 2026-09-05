@@ -1,44 +1,44 @@
 // TypeScript declarations for Laserstream client
 
-// Re-export gRPC types
-export { ChannelOptions } from '@grpc/grpc-js';
+import type { ChannelOptions as GrpcChannelOptions } from '@grpc/grpc-js';
+import { geyser, solana } from 'laserstream-core-proto-js/generated';
 
-// Re-export all proto types from laserstream-core-proto-js
-export {
-  // Preprocessed subscription types
-  SubscribePreprocessedRequest,
-  SubscribePreprocessedRequestFilterTransactions,
-  SubscribePreprocessedUpdate,
-  SubscribePreprocessedTransaction,
-  SubscribePreprocessedTransactionInfo,
-  // Regular subscription types
-  SubscribeUpdate,
-  SubscribeUpdateAccount,
-  SubscribeUpdateAccountInfo,
-  SubscribeUpdateSlot,
-  SubscribeUpdateTransaction,
-  SubscribeUpdateTransactionInfo,
-  SubscribeUpdateTransactionStatus,
-  SubscribeUpdateBlock,
-  SubscribeUpdateBlockMeta,
-  SubscribeUpdateEntry,
-  SubscribeUpdatePing,
-  SubscribeUpdatePong,
-  // Request types
-  SubscribeRequest,
-  SubscribeRequestFilterAccounts,
-  SubscribeRequestFilterAccountsFilter,
-  SubscribeRequestFilterSlots,
-  SubscribeRequestFilterTransactions,
-  SubscribeRequestFilterBlocks,
-  SubscribeRequestFilterBlocksMeta,
-  SubscribeRequestFilterEntry,
-  SubscribeRequestAccountsDataSlice,
-  SubscribeRequestPing,
-  // Enums
-  CommitmentLevel,
-  SlotStatus,
-} from 'laserstream-core-proto-js/generated';
+// protobufjs exposes messages in the geyser namespace. Export the interfaces
+// so callers can pass plain subscription objects without constructing messages.
+export type SubscribePreprocessedRequest = geyser.ISubscribePreprocessedRequest;
+export type SubscribePreprocessedRequestFilterTransactions = geyser.ISubscribePreprocessedRequestFilterTransactions;
+export type SubscribePreprocessedUpdate = geyser.ISubscribePreprocessedUpdate;
+export type SubscribePreprocessedTransaction = geyser.ISubscribePreprocessedTransaction;
+export type SubscribePreprocessedTransactionInfo = geyser.ISubscribePreprocessedTransactionInfo;
+export type SubscribeUpdate = geyser.ISubscribeUpdate;
+export type SubscribeUpdateAccount = geyser.ISubscribeUpdateAccount;
+export type SubscribeUpdateAccountInfo = geyser.ISubscribeUpdateAccountInfo;
+export type SubscribeUpdateSlot = geyser.ISubscribeUpdateSlot;
+export type SubscribeUpdateTransaction = geyser.ISubscribeUpdateTransaction;
+export type SubscribeUpdateTransactionInfo = geyser.ISubscribeUpdateTransactionInfo;
+export type SubscribeUpdateTransactionStatus = geyser.ISubscribeUpdateTransactionStatus;
+export type SubscribeUpdateBlock = geyser.ISubscribeUpdateBlock;
+export type SubscribeUpdateBlockMeta = geyser.ISubscribeUpdateBlockMeta;
+export type SubscribeUpdateEntry = geyser.ISubscribeUpdateEntry;
+export type SubscribeUpdatePing = geyser.ISubscribeUpdatePing;
+export type SubscribeUpdatePong = geyser.ISubscribeUpdatePong;
+export type SubscribeRequest = geyser.ISubscribeRequest;
+export type SubscribeRequestFilterAccounts = geyser.ISubscribeRequestFilterAccounts;
+export type SubscribeRequestFilterAccountsFilter = geyser.ISubscribeRequestFilterAccountsFilter;
+export type SubscribeRequestFilterSlots = geyser.ISubscribeRequestFilterSlots;
+export type SubscribeRequestFilterTransactions = geyser.ISubscribeRequestFilterTransactions;
+export type SubscribeRequestFilterBlocks = geyser.ISubscribeRequestFilterBlocks;
+export type SubscribeRequestFilterBlocksMeta = geyser.ISubscribeRequestFilterBlocksMeta;
+export type SubscribeRequestFilterEntry = geyser.ISubscribeRequestFilterEntry;
+export type SubscribeRequestAccountsDataSlice = geyser.ISubscribeRequestAccountsDataSlice;
+export type SubscribeRequestPing = geyser.ISubscribeRequestPing;
+export import CommitmentLevel = geyser.CommitmentLevel;
+export type SlotStatus = geyser.SlotStatus;
+export type Transaction = solana.storage.ConfirmedBlock.ITransaction;
+export type Message = solana.storage.ConfirmedBlock.IMessage;
+export type MessageAddressTableLookup = solana.storage.ConfirmedBlock.IMessageAddressTableLookup;
+export type TransactionStatusMeta = solana.storage.ConfirmedBlock.ITransactionStatusMeta;
+export type TransactionError = solana.storage.ConfirmedBlock.ITransactionError;
 
 // ============================================================================
 // Compression and Configuration
@@ -51,6 +51,11 @@ export declare enum CompressionAlgorithms {
   gzip = 2,
   zstd = 3
 }
+
+// The native transport also supports zstd, which grpc-js does not expose.
+export type ChannelOptions = Omit<GrpcChannelOptions, 'grpc.default_compression_algorithm'> & {
+  'grpc.default_compression_algorithm'?: GrpcChannelOptions['grpc.default_compression_algorithm'] | CompressionAlgorithms;
+};
 
 // Configuration interface
 export interface LaserstreamConfig {

@@ -45,7 +45,8 @@
     "perf:vote": "ts-node performance/vote-performance-test.ts",
     "perf:napi": "ts-node performance/napi-grpc-performance-test.ts",
     "perf:compare": "ts-node performance/napi-vs-yellowstone-bandwidth.ts",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test:types": "tsc --noEmit --strict --target ES2020 --module commonjs --moduleResolution node test/match-mints-types.ts"
   },
   "keywords": [
     "solana",
@@ -101,6 +102,7 @@
     "helius-laserstream-linux-x64-musl": "0.8.5"
   },
   "dependencies": {
+    "@grpc/grpc-js": "^1.14.4",
     "laserstream-core-proto-js": "^9.0.2",
     "lz4js": "^0.2.0",
     "protobufjs": "^7.5.3"

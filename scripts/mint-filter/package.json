@@ -1,0 +1,14 @@
+{
+  "name": "laserstream-mint-filter-verification",
+  "private": true,
+  "scripts": { "test": "node verify.js" },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.14.0",
+    "@grpc/proto-loader": "^0.8.0",
+    "bs58": "^5.0.0",
+    "helius-laserstream": "0.8.5",
+    "protobufjs": "^7.5.3",
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0"
+  }
+}
