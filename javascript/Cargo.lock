@@ -597,9 +597,9 @@ dependencies = [
 
 [[package]]
 name = "laserstream-core-client"
-version = "11.1.0"
+version = "12.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fa8ce6192955baeeff32a77cbc2a39c91967861735d443ef893c7e2403f7817"
+checksum = "ab08da2d30af18da75e41c56af175154ba5af346a3251ac3d094fffd788718f8"
 dependencies = [
  "bytes",
  "futures",
@@ -611,9 +611,9 @@ dependencies = [
 
 [[package]]
 name = "laserstream-core-proto"
-version = "11.3.0"
+version = "12.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90653632d67d7784b62c59fa941f34e130d92598c8fbaeb028bff22143f5a16b"
+checksum = "e0c12bc1245cb4bb984ecec00b087651017943a8474c2a97cc7d73396f3f5eae"
 dependencies = [
  "anyhow",
  "prost",
@@ -628,7 +628,7 @@ dependencies = [
 
 [[package]]
 name = "laserstream-napi"
-version = "0.8.5"
+version = "0.9.0"
 dependencies = [
  "base64 0.21.7",
  "bs58",

@@ -109,13 +109,13 @@ jobs:
               ls -la *.node
             "
         working-directory: javascript
-      - name: Build in Docker (gnu - older glibc 2.31 for compatibility)
+      - name: Build in Docker (gnu - older glibc 2.36 for compatibility)
         if: matrix.settings.docker == 'gnu'
         run: |
           docker run --rm \
             -v $(pwd):/workspace \
             --platform ${{ startsWith(matrix.settings.target, 'aarch64') && 'linux/arm64' || 'linux/amd64' }} \
-            debian:bullseye sh -c "
+            debian:bookworm sh -c "
               apt-get update && \
               apt-get install -y curl build-essential pkg-config libssl-dev perl make ca-certificates gnupg && \
               mkdir -p /etc/apt/keyrings && \

@@ -1,6 +1,6 @@
 [package]
 name = "laserstream-napi"
-version = "0.8.5"
+version = "0.9.0"
 edition = "2021"
 
 [lib]
@@ -22,8 +22,8 @@ futures-util = "0.3"
 futures-channel = "0.3"
 parking_lot = "0.12"
 uuid = { version = "1", features = ["v4"] }
-laserstream-core-client = "11.1.0"
-laserstream-core-proto = { version = "11.3.0", default-features = false, features = ["tonic", "tonic-compression"] }
+laserstream-core-client = "12.0.0"
+laserstream-core-proto = { version = "12.0.0", default-features = false, features = ["tonic", "tonic-compression"] }
 # RUSTSEC-2026-0258: floor the core client's tonic 0.14 graph at the 0.4.19 fix.
 h2 = ">=0.4.19,<0.5"
 prost = "0.14"

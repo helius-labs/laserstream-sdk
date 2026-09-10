@@ -158,15 +158,5 @@ declare module 'laserstream-core-proto-js/generated' {
        */
       matchMints?: (boolean | null);
     }
-    interface ISubscribeRequestFilterAccounts {
-      /**
-       * @deprecated No-op as of Agave 4.2. The validator now skips updates for
-       * accounts a transaction write-locked but never wrote to, so `'write'`-only
-       * delivery is the default and only behavior. Setting this has no effect; it
-       * is accepted only for backward compatibility and will be removed in a
-       * future release. (proto field #31)
-       */
-      notifyOn?: ('lock' | 'write' | null);
-    }
   }
 }
