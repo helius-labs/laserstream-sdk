@@ -8,6 +8,9 @@ license = "MIT"
 repository = "https://github.com/helius-labs/laserstream"
 keywords = ["solana", "laserstream", "yellowstone", "grpc", "blockchain"]
 readme = "README.md"
+# A library should not ship its Cargo.lock — consumers ignore it and it only
+# goes stale in the published artifact.
+exclude = ["/Cargo.lock"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
