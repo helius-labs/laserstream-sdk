@@ -12,13 +12,10 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# TEMP git-pin to the field-removed fork branch (yellowstone-grpc PR #51). The
-# published core-proto still defines notify_on; move to the republished 12.0.0
-# crate once it ships. package= keeps the laserstream_core_proto:: import path.
-laserstream-core-proto = { git = "https://github.com/helius-labs/yellowstone-grpc", branch = "cameron/remove-notify-on", package = "yellowstone-grpc-proto", default-features = false, features = ["tonic", "tonic-compression"] }
+laserstream-core-proto = { version = "12.0.0", default-features = false, features = ["tonic", "tonic-compression"] }
 # Pin proto + client together: the client bundles its own proto, so a mismatched
 # version would make `SubscribeRequest` a distinct type from the client's API.
-laserstream-core-client = { git = "https://github.com/helius-labs/yellowstone-grpc", branch = "cameron/remove-notify-on", package = "yellowstone-grpc-client" }
+laserstream-core-client = "12.0.0"
 tonic = { version = "0.12.1", features = ["transport", "tls", "zstd", "gzip"] }
 # RUSTSEC-2026-0258: floor h2 at the 0.4.19 fix so both the tonic 0.12 graph and
 # the core client's tonic 0.14 graph unify on a patched release.
