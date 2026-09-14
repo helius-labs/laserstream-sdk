@@ -14,15 +14,35 @@ use uuid;
 use laserstream_core_client::{ClientTlsConfig, Interceptor};
 use laserstream_core_proto::prelude::{geyser_client::GeyserClient};
 use laserstream_core_proto::geyser::{
-    subscribe_update::UpdateOneof, SubscribeRequest, SubscribeRequestFilterSlots,
-    SubscribeRequestPing, SubscribeUpdate,
-    SubscribePreprocessedRequest, SubscribePreprocessedUpdate,
+    subscribe_update::UpdateOneof, SubscribePreprocessedRequest, SubscribePreprocessedUpdate,
+    SubscribeRequest, SubscribeRequestFilterSlots, SubscribeRequestPing, SubscribeUpdate,
+    SubscribeUpdateBlock, SubscribeUpdateSlot,
 };
 
 const HARD_CAP_RECONNECT_ATTEMPTS: u32 = (20 * 60) / 5; // 20 mins / 5 sec interval
 const FIXED_RECONNECT_INTERVAL_MS: u64 = 5000; // 5 seconds fixed interval
 const SDK_NAME: &str = "laserstream-rust";
 const SDK_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+fn replay_cursor_slot(update: &SubscribeUpdate, internal_slot_sub_id: &str) -> Option<u64> {
+    // The hidden slot tracker can run at live head while a historical payload
+    // subscription is still replaying. Advancing from_slot from that internal-only
+    // update skips the undelivered historical range on reconnect.
+    if update.filters.len() == 1 && update.filters[0] == internal_slot_sub_id {
+        return None;
+    }
+
+    match &update.update_oneof {
+        Some(UpdateOneof::Account(value)) => Some(value.slot),
+        Some(UpdateOneof::Slot(value)) => Some(value.slot),
+        Some(UpdateOneof::Transaction(value)) => Some(value.slot),
+        Some(UpdateOneof::TransactionStatus(value)) => Some(value.slot),
+        Some(UpdateOneof::Block(value)) => Some(value.slot),
+        Some(UpdateOneof::BlockMeta(value)) => Some(value.slot),
+        Some(UpdateOneof::Entry(value)) => Some(value.slot),
+        _ => None,
+    }
+}
 
 /// Custom interceptor that adds SDK metadata headers to all gRPC requests
 #[derive(Clone)]
@@ -191,12 +211,13 @@ pub fn subscribe(
                                                 continue;
                                             }
 
-                                // Track the latest slot from any slot update (including internal subscription)
-                                if let Some(UpdateOneof::Slot(s)) = &update.update_oneof {
-                                    if replay_enabled {
-                                        tracked_slot = s.slot;
+                                if replay_enabled {
+                                    if let Some(slot) = replay_cursor_slot(&update, &internal_slot_sub_id) {
+                                        tracked_slot = tracked_slot.max(slot);
                                     }
-                                    
+                                }
+
+                                if let Some(UpdateOneof::Slot(_)) = &update.update_oneof {
                                     // Skip if this slot update is EXCLUSIVELY from our internal subscription
                                     if update.filters.len() == 1 && update.filters.contains(&internal_slot_sub_id) {
                                         continue;
@@ -534,5 +555,40 @@ fn merge_subscribe_requests(
     }
 
     // Note: from_slot and ping are not replaced as they are connection-specific
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn internal_slot_update_does_not_advance_replay_cursor() {
+        let internal_id = "internal-test";
+        let mut slot = SubscribeUpdateSlot::default();
+        slot.slot = 440_353_574;
+        let update = SubscribeUpdate {
+            filters: vec![internal_id.to_string()],
+            update_oneof: Some(UpdateOneof::Slot(slot)),
+            ..Default::default()
+        };
+
+        assert_eq!(replay_cursor_slot(&update, internal_id), None);
+    }
+
+    #[test]
+    fn delivered_block_advances_replay_cursor() {
+        let mut block = SubscribeUpdateBlock::default();
+        block.slot = 440_337_997;
+        let update = SubscribeUpdate {
+            filters: vec!["blocks".to_string()],
+            update_oneof: Some(UpdateOneof::Block(block)),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            replay_cursor_slot(&update, "internal-test"),
+            Some(440_337_997)
+        );
+    }
 }
 
