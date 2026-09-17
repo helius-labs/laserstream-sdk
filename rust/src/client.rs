@@ -23,14 +23,16 @@ const HARD_CAP_RECONNECT_ATTEMPTS: u32 = (20 * 60) / 5; // 20 mins / 5 sec inter
 const FIXED_RECONNECT_INTERVAL_MS: u64 = 5000; // 5 seconds fixed interval
 const SDK_NAME: &str = "laserstream-rust";
 const SDK_VERSION: &str = env!("CARGO_PKG_VERSION");
+#[cfg(feature = "internal")]
 const DISABLE_GEYSER_ARCHIVE_HEADER: &str = "x-disable-geyser-archive";
 
+#[cfg(feature = "internal")]
 fn is_terminal_archive_policy_error(config: &LaserstreamConfig, status: &Status) -> bool {
     config.internal_disable_geyser_archive_fallback
         && status.code() == laserstream_core_proto::tonic::Code::OutOfRange
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "internal"))]
 mod archive_policy_tests;
 
 /// Custom interceptor that adds SDK metadata headers to all gRPC requests
@@ -227,6 +229,7 @@ pub fn subscribe(
                                             }
                                         }
                                         Err(status) => {
+                                            #[cfg(feature = "internal")]
                                             if is_terminal_archive_policy_error(&config, &status) {
                                                 yield Err(LaserstreamError::Status(status));
                                                 return;
@@ -265,6 +268,7 @@ pub fn subscribe(
                     }
                 }
                 Err(err) => {
+                    #[cfg(feature = "internal")]
                     if is_terminal_archive_policy_error(&config, &err) {
                         yield Err(LaserstreamError::Status(err));
                         return;
@@ -377,22 +381,26 @@ async fn connect_and_subscribe_once(
         .await
         .map_err(|e| Status::internal(format!("Failed to send initial request: {}", e)))?;
 
-    let mut subscribe_request = Request::new(subscribe_rx);
-    if config.internal_disable_geyser_archive_fallback {
-        subscribe_request.metadata_mut().insert(
-            DISABLE_GEYSER_ARCHIVE_HEADER,
-            MetadataValue::from_static("true"),
-        );
-    }
+    #[cfg(feature = "internal")]
+    let subscribe_rx = {
+        let mut request = Request::new(subscribe_rx);
+        if config.internal_disable_geyser_archive_fallback {
+            request.metadata_mut().insert(
+                DISABLE_GEYSER_ARCHIVE_HEADER,
+                MetadataValue::from_static("true"),
+            );
+        }
+        request
+    };
     let response = geyser_client
-        .subscribe(subscribe_request)
+        .subscribe(subscribe_rx)
         .await
         .map_err(|status| {
+            #[cfg(feature = "internal")]
             if config.internal_disable_geyser_archive_fallback {
-                status
-            } else {
-                Status::internal(format!("Subscription failed: {}", status))
+                return status;
             }
+            Status::internal(format!("Subscription failed: {}", status))
         })?;
 
     Ok((subscribe_tx, response.into_inner()))

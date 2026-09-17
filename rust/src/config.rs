@@ -27,6 +27,7 @@ pub struct LaserstreamConfig {
     pub replay: bool,
     /// Internal-use replay policy. Default: false (Geyser Archive fallback allowed).
     /// Kept public for struct-update construction; use the internal builder.
+    #[cfg(feature = "internal")]
     #[doc(hidden)]
     pub internal_disable_geyser_archive_fallback: bool,
 }
@@ -90,6 +91,7 @@ impl Default for LaserstreamConfig {
             max_reconnect_attempts: None, // Default to None
             channel_options: ChannelOptions::default(),
             replay: true, // Default to true
+            #[cfg(feature = "internal")]
             internal_disable_geyser_archive_fallback: false,
         }
     }
@@ -103,6 +105,7 @@ impl LaserstreamConfig {
             max_reconnect_attempts: None, // Default to None
             channel_options: ChannelOptions::default(),
             replay: true, // Default to true
+            #[cfg(feature = "internal")]
             internal_disable_geyser_archive_fallback: false,
         }
     }
@@ -124,6 +127,7 @@ impl LaserstreamConfig {
     /// Requires server support; older servers may ignore the flag.
     /// In-memory replay and reconnects after transient failures remain enabled.
     /// This does not change the subscription's commitment or enable replay.
+    #[cfg(feature = "internal")]
     #[doc(hidden)]
     pub fn internal_disable_geyser_archive_fallback(mut self) -> Self {
         self.internal_disable_geyser_archive_fallback = true;

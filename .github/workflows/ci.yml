@@ -39,6 +39,8 @@ jobs:
           key: rust-sdk-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock') }}
       - run: cargo test --locked --lib
       - run: cargo test --locked --lib --no-default-features
+      - run: cargo test --locked --lib --features internal
+      - run: cargo test --locked --lib --no-default-features --features internal
 
   build:
     strategy:
