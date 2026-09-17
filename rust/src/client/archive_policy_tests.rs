@@ -5,6 +5,8 @@ use laserstream_core_proto::{
 };
 use std::sync::{Arc, Mutex};
 
+const SLOT_TOO_OLD_MESSAGE: &str = "Requested slot 95 is older than the oldest available slot 100. Please request a more recent slot.";
+
 #[derive(Clone, Copy, Debug)]
 enum Reply {
     StreamOutOfRange,
@@ -51,16 +53,12 @@ impl geyser_server::Geyser for TestGeyser {
             requests.len()
         };
         if matches!(self.reply, Reply::InitialOutOfRange) {
-            return Err(Status::out_of_range("requested slot is no longer retained"));
+            return Err(Status::out_of_range(SLOT_TOO_OLD_MESSAGE));
         }
         let update = match self.reply {
-            Reply::StreamOutOfRange => {
-                Err(Status::out_of_range("requested slot is no longer retained"))
-            }
+            Reply::StreamOutOfRange => Err(Status::out_of_range(SLOT_TOO_OLD_MESSAGE)),
             Reply::TransientThenOutOfRange if attempt == 1 => Err(Status::unavailable("restart")),
-            Reply::TransientThenOutOfRange => {
-                Err(Status::out_of_range("requested slot is no longer retained"))
-            }
+            Reply::TransientThenOutOfRange => Err(Status::out_of_range(SLOT_TOO_OLD_MESSAGE)),
             _ => Ok(SubscribeUpdate {
                 filters: vec!["accounts".into()],
                 update_oneof: Some(UpdateOneof::Account(SubscribeUpdateAccount {
@@ -187,7 +185,11 @@ async fn assert_terminal(reply: Reply, code: Code, attempts: usize) {
         .await
         .expect("policy errors must surface without endless retries");
     match next {
-        Some(Err(LaserstreamError::Status(status))) => assert_eq!(status.code(), code),
+        Some(Err(LaserstreamError::Status(status))) => {
+            assert_eq!(status.code(), code);
+            assert_eq!(status.message(), SLOT_TOO_OLD_MESSAGE);
+            assert!(status.details().is_empty());
+        }
         other => panic!("expected terminal {code:?}, got {other:?}"),
     }
     assert!(stream.next().await.is_none());
