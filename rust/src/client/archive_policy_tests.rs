@@ -9,7 +9,6 @@ use std::sync::{Arc, Mutex};
 enum Reply {
     StreamOutOfRange,
     InitialOutOfRange,
-    Unsupported,
     Data,
     TransientThenOutOfRange,
 }
@@ -42,7 +41,6 @@ impl geyser_server::Geyser for TestGeyser {
             .metadata()
             .get("x-disable-geyser-archive")
             .map(|value| value.to_str().unwrap().to_owned());
-        let policy_requested = disable_archive.as_deref() == Some("true");
         let first = request.into_inner().message().await?.unwrap();
         let attempt = {
             let mut requests = self.requests.lock().unwrap();
@@ -72,14 +70,9 @@ impl geyser_server::Geyser for TestGeyser {
                 ..Default::default()
             }),
         };
-        let mut response = Response::new(Box::pin(futures::stream::iter([update])) as Updates);
-        if policy_requested && !matches!(self.reply, Reply::Unsupported) {
-            response.metadata_mut().insert(
-                "x-disable-geyser-archive",
-                MetadataValue::from_static("true"),
-            );
-        }
-        Ok(response)
+        Ok(Response::new(
+            Box::pin(futures::stream::iter([update])) as Updates
+        ))
     }
 
     async fn subscribe_preprocessed(
@@ -232,16 +225,12 @@ async fn initial_out_of_range_preserves_status() {
     assert_terminal(Reply::InitialOutOfRange, Code::OutOfRange, 1).await;
 }
 #[tokio::test]
-async fn unsupported_server_fails_before_delivering_data() {
-    assert_terminal(Reply::Unsupported, Code::FailedPrecondition, 1).await;
-}
-#[tokio::test]
 async fn reconnect_retains_policy_and_requested_slot() {
     assert_terminal(Reply::TransientThenOutOfRange, Code::OutOfRange, 2).await;
 }
 
 #[tokio::test]
-async fn default_client_still_accepts_old_server_without_policy_ack() {
+async fn default_client_omits_internal_header() {
     let server = TestServer::start(Reply::Data).await;
     let (stream, _handle) = subscribe(server.config(), request());
     futures::pin_mut!(stream);
@@ -255,7 +244,7 @@ async fn default_client_still_accepts_old_server_without_policy_ack() {
 }
 
 #[tokio::test]
-async fn disabled_client_delivers_data_when_server_acknowledges() {
+async fn disabled_client_delivers_data_without_acknowledgement() {
     let server = TestServer::start(Reply::Data).await;
     let (stream, _handle) = subscribe(
         server.config().internal_disable_geyser_archive_fallback(),

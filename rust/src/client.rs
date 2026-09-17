@@ -27,11 +27,7 @@ const DISABLE_GEYSER_ARCHIVE_HEADER: &str = "x-disable-geyser-archive";
 
 fn is_terminal_archive_policy_error(config: &LaserstreamConfig, status: &Status) -> bool {
     config.internal_disable_geyser_archive_fallback
-        && matches!(
-            status.code(),
-            laserstream_core_proto::tonic::Code::OutOfRange
-                | laserstream_core_proto::tonic::Code::FailedPrecondition
-        )
+        && status.code() == laserstream_core_proto::tonic::Code::OutOfRange
 }
 
 #[cfg(test)]
@@ -398,18 +394,6 @@ async fn connect_and_subscribe_once(
                 Status::internal(format!("Subscription failed: {}", status))
             }
         })?;
-    // Old servers (or proxies stripping the flag) must not silently supply GA data.
-    if config.internal_disable_geyser_archive_fallback
-        && response
-            .metadata()
-            .get(DISABLE_GEYSER_ARCHIVE_HEADER)
-            .and_then(|value| value.to_str().ok())
-            != Some("true")
-    {
-        return Err(Status::failed_precondition(
-            "Server did not acknowledge disabled Geyser Archive fallback",
-        ));
-    }
 
     Ok((subscribe_tx, response.into_inner()))
 }

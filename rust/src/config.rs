@@ -120,8 +120,8 @@ impl LaserstreamConfig {
     }
 
     /// Internal use: disable Geyser Archive fallback for standard subscriptions.
-    /// OUT_OF_RANGE is returned to the caller without retrying;
-    /// FAILED_PRECONDITION is returned if the server does not support the policy.
+    /// OUT_OF_RANGE is returned to the caller without retrying.
+    /// Requires server support; older servers may ignore the flag.
     /// In-memory replay and reconnects after transient failures remain enabled.
     /// This does not change the subscription's commitment or enable replay.
     #[doc(hidden)]
