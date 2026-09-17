@@ -26,8 +26,10 @@ const SDK_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[cfg(feature = "internal")]
 const DISABLE_GEYSER_ARCHIVE_HEADER: &str = "x-disable-geyser-archive";
 
-fn is_retryable_error(status: &Status) -> bool {
-    status.code() != laserstream_core_proto::tonic::Code::OutOfRange
+#[cfg(feature = "internal")]
+fn is_terminal_error(config: &LaserstreamConfig, status: &Status) -> bool {
+    config.internal_disable_geyser_archive_fallback
+        && status.code() == laserstream_core_proto::tonic::Code::OutOfRange
 }
 
 #[cfg(test)]
@@ -227,7 +229,8 @@ pub fn subscribe(
                                             }
                                         }
                                         Err(status) => {
-                                            if !is_retryable_error(&status) {
+                                            #[cfg(feature = "internal")]
+                                            if is_terminal_error(&config, &status) {
                                                 yield Err(LaserstreamError::Status(status));
                                                 return;
                                             }
@@ -265,7 +268,8 @@ pub fn subscribe(
                     }
                 }
                 Err(err) => {
-                    if !is_retryable_error(&err) {
+                    #[cfg(feature = "internal")]
+                    if is_terminal_error(&config, &err) {
                         yield Err(LaserstreamError::Status(err));
                         return;
                     }
@@ -392,7 +396,8 @@ async fn connect_and_subscribe_once(
         .subscribe(subscribe_rx)
         .await
         .map_err(|status| {
-            if !is_retryable_error(&status) {
+            #[cfg(feature = "internal")]
+            if config.internal_disable_geyser_archive_fallback {
                 return status;
             }
             Status::internal(format!("Subscription failed: {}", status))

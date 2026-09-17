@@ -1,21 +1,29 @@
 use super::*;
+#[cfg(feature = "internal")]
+use laserstream_core_proto::tonic::Code;
 use laserstream_core_proto::{
     geyser::*,
-    tonic::{self, Code, Response, Streaming},
+    tonic::{self, Response, Streaming},
 };
 use std::sync::{Arc, Mutex};
 
 const SLOT_TOO_OLD_MESSAGE: &str = "Requested slot 95 is older than the oldest available slot 100. Please request a more recent slot.";
 
+#[cfg(feature = "internal")]
 #[test]
-fn only_out_of_range_changes_retry_behavior() {
-    for value in 1..=16 {
-        let code = Code::from_i32(value);
-        assert_eq!(
-            is_retryable_error(&Status::new(code, "test")),
-            code != Code::OutOfRange,
-            "{code:?}"
-        );
+fn only_opted_in_out_of_range_is_terminal() {
+    for config in [
+        LaserstreamConfig::default(),
+        LaserstreamConfig::default().internal_disable_geyser_archive_fallback(),
+    ] {
+        for value in 1..=16 {
+            let code = Code::from_i32(value);
+            assert_eq!(
+                is_terminal_error(&config, &Status::new(code, "test")),
+                config.internal_disable_geyser_archive_fallback && code == Code::OutOfRange,
+                "{code:?}"
+            );
+        }
     }
 }
 
@@ -37,14 +45,17 @@ fn fallback_is_enabled_by_default_and_independent_of_replay() {
     );
 }
 
+#[cfg(feature = "internal")]
 #[tokio::test]
 async fn stream_out_of_range_is_terminal() {
     assert_terminal(Reply::StreamOutOfRange, Code::OutOfRange, 1).await;
 }
+#[cfg(feature = "internal")]
 #[tokio::test]
 async fn initial_out_of_range_preserves_status() {
     assert_terminal(Reply::InitialOutOfRange, Code::OutOfRange, 1).await;
 }
+#[cfg(feature = "internal")]
 #[tokio::test]
 async fn retryable_error_reconnects_and_retains_requested_slot() {
     assert_terminal(Reply::TransientThenOutOfRange, Code::OutOfRange, 2).await;
@@ -87,23 +98,20 @@ async fn disabled_client_delivers_data_without_acknowledgement() {
     );
 }
 
-#[cfg(feature = "internal")]
 #[tokio::test]
-async fn disabled_client_surfaces_out_of_range_and_retains_policy_on_reconnect() {
-    for (reply, attempts) in [
-        (Reply::InitialOutOfRange, 1),
-        (Reply::StreamOutOfRange, 1),
-        (Reply::TransientThenOutOfRange, 2),
-    ] {
+async fn default_client_still_retries_out_of_range() {
+    for reply in [Reply::InitialOutOfRange, Reply::StreamOutOfRange] {
         let server = TestServer::start(reply).await;
-        assert_terminal_with_config(
-            &server,
-            server.config().internal_disable_geyser_archive_fallback(),
-            Code::OutOfRange,
-            attempts,
-            Some("true"),
-        )
-        .await;
+        let (stream, _handle) = subscribe(server.config(), request());
+        futures::pin_mut!(stream);
+        assert!(tokio::time::timeout(Duration::from_secs(6), stream.next())
+            .await
+            .is_err());
+        let requests = server.requests.lock().unwrap();
+        assert_eq!(requests.len(), 2);
+        assert!(requests
+            .iter()
+            .all(|request| request.from_slot == Some(95) && request.disable_archive.is_none()));
     }
 }
 
@@ -112,6 +120,7 @@ enum Reply {
     StreamOutOfRange,
     InitialOutOfRange,
     Data,
+    #[cfg(feature = "internal")]
     TransientThenOutOfRange,
 }
 
@@ -144,7 +153,7 @@ impl geyser_server::Geyser for TestGeyser {
             .get("x-disable-geyser-archive")
             .map(|value| value.to_str().unwrap().to_owned());
         let first = request.into_inner().message().await?.unwrap();
-        let attempt = {
+        let _attempt = {
             let mut requests = self.requests.lock().unwrap();
             requests.push(ObservedRequest {
                 disable_archive,
@@ -157,7 +166,9 @@ impl geyser_server::Geyser for TestGeyser {
         }
         let update = match self.reply {
             Reply::StreamOutOfRange => Err(Status::out_of_range(SLOT_TOO_OLD_MESSAGE)),
-            Reply::TransientThenOutOfRange if attempt == 1 => Err(Status::unavailable("restart")),
+            #[cfg(feature = "internal")]
+            Reply::TransientThenOutOfRange if _attempt == 1 => Err(Status::unavailable("restart")),
+            #[cfg(feature = "internal")]
             Reply::TransientThenOutOfRange => Err(Status::out_of_range(SLOT_TOO_OLD_MESSAGE)),
             _ => Ok(SubscribeUpdate {
                 filters: vec!["accounts".into()],
@@ -274,11 +285,20 @@ fn request() -> SubscribeRequest {
     }
 }
 
+#[cfg(feature = "internal")]
 async fn assert_terminal(reply: Reply, code: Code, attempts: usize) {
     let server = TestServer::start(reply).await;
-    assert_terminal_with_config(&server, server.config(), code, attempts, None).await;
+    assert_terminal_with_config(
+        &server,
+        server.config().internal_disable_geyser_archive_fallback(),
+        code,
+        attempts,
+        Some("true"),
+    )
+    .await;
 }
 
+#[cfg(feature = "internal")]
 async fn assert_terminal_with_config(
     server: &TestServer,
     config: LaserstreamConfig,
