@@ -26,8 +26,16 @@ const SDK_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[cfg(feature = "internal")]
 const DISABLE_GEYSER_ARCHIVE_HEADER: &str = "x-disable-geyser-archive";
 
+fn is_terminal_error(_config: &LaserstreamConfig, _status: &Status) -> bool {
+    #[cfg(feature = "internal")]
+    if is_out_of_range_with_ga_disabled(_config, _status) {
+        return true;
+    }
+    false
+}
+
 #[cfg(feature = "internal")]
-fn is_terminal_error(config: &LaserstreamConfig, status: &Status) -> bool {
+fn is_out_of_range_with_ga_disabled(config: &LaserstreamConfig, status: &Status) -> bool {
     config.internal_disable_geyser_archive_fallback
         && status.code() == laserstream_core_proto::tonic::Code::OutOfRange
 }
@@ -229,7 +237,6 @@ pub fn subscribe(
                                             }
                                         }
                                         Err(status) => {
-                                            #[cfg(feature = "internal")]
                                             if is_terminal_error(&config, &status) {
                                                 yield Err(LaserstreamError::Status(status));
                                                 return;
@@ -268,7 +275,6 @@ pub fn subscribe(
                     }
                 }
                 Err(err) => {
-                    #[cfg(feature = "internal")]
                     if is_terminal_error(&config, &err) {
                         yield Err(LaserstreamError::Status(err));
                         return;

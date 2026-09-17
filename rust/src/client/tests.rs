@@ -1,5 +1,4 @@
 use super::*;
-#[cfg(feature = "internal")]
 use laserstream_core_proto::tonic::Code;
 use laserstream_core_proto::{
     geyser::*,
@@ -8,6 +7,18 @@ use laserstream_core_proto::{
 use std::sync::{Arc, Mutex};
 
 const SLOT_TOO_OLD_MESSAGE: &str = "Requested slot 95 is older than the oldest available slot 100. Please request a more recent slot.";
+
+#[test]
+fn default_config_has_no_terminal_errors() {
+    let config = LaserstreamConfig::default();
+    for value in 1..=16 {
+        let code = Code::from_i32(value);
+        assert!(
+            !is_terminal_error(&config, &Status::new(code, "test")),
+            "{code:?}"
+        );
+    }
+}
 
 #[cfg(feature = "internal")]
 #[test]
