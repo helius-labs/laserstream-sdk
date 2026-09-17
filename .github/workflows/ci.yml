@@ -18,6 +18,29 @@ permissions:
   id-token: write
 
 jobs:
+  rust-tests:
+    name: Rust SDK tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache Rust SDK build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/
+            ~/.cargo/git/db/
+            rust/target/
+          key: rust-sdk-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock') }}
+      - run: cargo test --locked --lib
+      - run: cargo test --locked --lib --no-default-features
+      - run: cargo build --locked --example no_geyser_archive
+
   build:
     strategy:
       fail-fast: false

@@ -25,6 +25,11 @@ pub struct LaserstreamConfig {
     /// When false, no replay - start from current slot on reconnects.
     /// Default: true
     pub replay: bool,
+    /// Allow replay to fall back to Geyser Archive when the requested slot is no
+    /// longer retained by LaserStream. Default: true.
+    /// Disable for consumers requiring intra-slot account updates. Requires a
+    /// server that acknowledges this policy; unsupported servers fail closed.
+    pub geyser_archive_fallback: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -86,6 +91,7 @@ impl Default for LaserstreamConfig {
             max_reconnect_attempts: None, // Default to None
             channel_options: ChannelOptions::default(),
             replay: true, // Default to true
+            geyser_archive_fallback: true,
         }
     }
 }
@@ -98,6 +104,7 @@ impl LaserstreamConfig {
             max_reconnect_attempts: None, // Default to None
             channel_options: ChannelOptions::default(),
             replay: true, // Default to true
+            geyser_archive_fallback: true,
         }
     }
 
@@ -110,6 +117,16 @@ impl LaserstreamConfig {
     /// Sets custom channel options.
     pub fn with_channel_options(mut self, options: ChannelOptions) -> Self {
         self.channel_options = options;
+        self
+    }
+
+    /// Set whether standard subscriptions may fall back to Geyser Archive.
+    /// With false, OUT_OF_RANGE is returned to the caller without retrying;
+    /// FAILED_PRECONDITION is returned if the server does not support the policy.
+    /// In-memory replay and reconnects after transient failures remain enabled.
+    /// This does not change the subscription's commitment or enable replay.
+    pub fn with_geyser_archive_fallback(mut self, enabled: bool) -> Self {
+        self.geyser_archive_fallback = enabled;
         self
     }
 

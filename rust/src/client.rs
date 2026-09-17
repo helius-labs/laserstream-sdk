@@ -23,6 +23,19 @@ const HARD_CAP_RECONNECT_ATTEMPTS: u32 = (20 * 60) / 5; // 20 mins / 5 sec inter
 const FIXED_RECONNECT_INTERVAL_MS: u64 = 5000; // 5 seconds fixed interval
 const SDK_NAME: &str = "laserstream-rust";
 const SDK_VERSION: &str = env!("CARGO_PKG_VERSION");
+const DISABLE_GEYSER_ARCHIVE_HEADER: &str = "x-disable-geyser-archive";
+
+fn is_terminal_archive_policy_error(config: &LaserstreamConfig, status: &Status) -> bool {
+    !config.geyser_archive_fallback
+        && matches!(
+            status.code(),
+            laserstream_core_proto::tonic::Code::OutOfRange
+                | laserstream_core_proto::tonic::Code::FailedPrecondition
+        )
+}
+
+#[cfg(test)]
+mod archive_policy_tests;
 
 /// Custom interceptor that adds SDK metadata headers to all gRPC requests
 #[derive(Clone)]
@@ -218,6 +231,10 @@ pub fn subscribe(
                                             }
                                         }
                                         Err(status) => {
+                                            if is_terminal_archive_policy_error(&config, &status) {
+                                                yield Err(LaserstreamError::Status(status));
+                                                return;
+                                            }
                                             // Transient error: reconnect silently. Surfaced to the consumer
                                             // only on terminal failure (max attempts) — see the Err arm below.
                                             warn!(error = %status, "Stream error, will reconnect after 5s delay");
@@ -252,6 +269,10 @@ pub fn subscribe(
                     }
                 }
                 Err(err) => {
+                    if is_terminal_archive_policy_error(&config, &err) {
+                        yield Err(LaserstreamError::Status(err));
+                        return;
+                    }
                     // Increment reconnect attempts
                     reconnect_attempts += 1;
 
@@ -360,10 +381,35 @@ async fn connect_and_subscribe_once(
         .await
         .map_err(|e| Status::internal(format!("Failed to send initial request: {}", e)))?;
 
+    let mut subscribe_request = Request::new(subscribe_rx);
+    if !config.geyser_archive_fallback {
+        subscribe_request.metadata_mut().insert(
+            DISABLE_GEYSER_ARCHIVE_HEADER,
+            MetadataValue::from_static("true"),
+        );
+    }
     let response = geyser_client
-        .subscribe(subscribe_rx)
+        .subscribe(subscribe_request)
         .await
-        .map_err(|e| Status::internal(format!("Subscription failed: {}", e)))?;
+        .map_err(|status| {
+            if !config.geyser_archive_fallback {
+                status
+            } else {
+                Status::internal(format!("Subscription failed: {}", status))
+            }
+        })?;
+    // Old servers (or proxies stripping the flag) must not silently supply GA data.
+    if !config.geyser_archive_fallback
+        && response
+            .metadata()
+            .get(DISABLE_GEYSER_ARCHIVE_HEADER)
+            .and_then(|value| value.to_str().ok())
+            != Some("true")
+    {
+        return Err(Status::failed_precondition(
+            "Server did not acknowledge disabled Geyser Archive fallback",
+        ));
+    }
 
     Ok((subscribe_tx, response.into_inner()))
 }
