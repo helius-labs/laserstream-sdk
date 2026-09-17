@@ -26,14 +26,12 @@ const SDK_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[cfg(feature = "internal")]
 const DISABLE_GEYSER_ARCHIVE_HEADER: &str = "x-disable-geyser-archive";
 
-#[cfg(feature = "internal")]
-fn is_terminal_archive_policy_error(config: &LaserstreamConfig, status: &Status) -> bool {
-    config.internal_disable_geyser_archive_fallback
-        && status.code() == laserstream_core_proto::tonic::Code::OutOfRange
+fn is_retryable_error(status: &Status) -> bool {
+    status.code() != laserstream_core_proto::tonic::Code::OutOfRange
 }
 
-#[cfg(all(test, feature = "internal"))]
-mod archive_policy_tests;
+#[cfg(test)]
+mod tests;
 
 /// Custom interceptor that adds SDK metadata headers to all gRPC requests
 #[derive(Clone)]
@@ -229,8 +227,7 @@ pub fn subscribe(
                                             }
                                         }
                                         Err(status) => {
-                                            #[cfg(feature = "internal")]
-                                            if is_terminal_archive_policy_error(&config, &status) {
+                                            if !is_retryable_error(&status) {
                                                 yield Err(LaserstreamError::Status(status));
                                                 return;
                                             }
@@ -268,8 +265,7 @@ pub fn subscribe(
                     }
                 }
                 Err(err) => {
-                    #[cfg(feature = "internal")]
-                    if is_terminal_archive_policy_error(&config, &err) {
+                    if !is_retryable_error(&err) {
                         yield Err(LaserstreamError::Status(err));
                         return;
                     }
@@ -396,8 +392,7 @@ async fn connect_and_subscribe_once(
         .subscribe(subscribe_rx)
         .await
         .map_err(|status| {
-            #[cfg(feature = "internal")]
-            if config.internal_disable_geyser_archive_fallback {
+            if !is_retryable_error(&status) {
                 return status;
             }
             Status::internal(format!("Subscription failed: {}", status))

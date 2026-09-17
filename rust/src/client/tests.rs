@@ -8,6 +8,19 @@ use std::sync::{Arc, Mutex};
 const SLOT_TOO_OLD_MESSAGE: &str = "Requested slot 95 is older than the oldest available slot 100. Please request a more recent slot.";
 
 #[test]
+fn only_out_of_range_changes_retry_behavior() {
+    for value in 1..=16 {
+        let code = Code::from_i32(value);
+        assert_eq!(
+            is_retryable_error(&Status::new(code, "test")),
+            code != Code::OutOfRange,
+            "{code:?}"
+        );
+    }
+}
+
+#[cfg(feature = "internal")]
+#[test]
 fn fallback_is_enabled_by_default_and_independent_of_replay() {
     assert!(!LaserstreamConfig::default().internal_disable_geyser_archive_fallback);
     assert!(
@@ -33,7 +46,7 @@ async fn initial_out_of_range_preserves_status() {
     assert_terminal(Reply::InitialOutOfRange, Code::OutOfRange, 1).await;
 }
 #[tokio::test]
-async fn reconnect_retains_policy_and_requested_slot() {
+async fn retryable_error_reconnects_and_retains_requested_slot() {
     assert_terminal(Reply::TransientThenOutOfRange, Code::OutOfRange, 2).await;
 }
 
@@ -51,6 +64,7 @@ async fn default_client_omits_internal_header() {
     assert!(server.requests.lock().unwrap()[0].disable_archive.is_none());
 }
 
+#[cfg(feature = "internal")]
 #[tokio::test]
 async fn disabled_client_delivers_data_without_acknowledgement() {
     let server = TestServer::start(Reply::Data).await;
@@ -73,15 +87,24 @@ async fn disabled_client_delivers_data_without_acknowledgement() {
     );
 }
 
+#[cfg(feature = "internal")]
 #[tokio::test]
-async fn default_client_still_retries_out_of_range() {
-    let server = TestServer::start(Reply::StreamOutOfRange).await;
-    let (stream, _handle) = subscribe(server.config(), request());
-    futures::pin_mut!(stream);
-    assert!(tokio::time::timeout(Duration::from_secs(6), stream.next())
-        .await
-        .is_err());
-    assert_eq!(server.requests.lock().unwrap().len(), 2);
+async fn disabled_client_surfaces_out_of_range_and_retains_policy_on_reconnect() {
+    for (reply, attempts) in [
+        (Reply::InitialOutOfRange, 1),
+        (Reply::StreamOutOfRange, 1),
+        (Reply::TransientThenOutOfRange, 2),
+    ] {
+        let server = TestServer::start(reply).await;
+        assert_terminal_with_config(
+            &server,
+            server.config().internal_disable_geyser_archive_fallback(),
+            Code::OutOfRange,
+            attempts,
+            Some("true"),
+        )
+        .await;
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -253,14 +276,21 @@ fn request() -> SubscribeRequest {
 
 async fn assert_terminal(reply: Reply, code: Code, attempts: usize) {
     let server = TestServer::start(reply).await;
-    let (stream, _handle) = subscribe(
-        server.config().internal_disable_geyser_archive_fallback(),
-        request(),
-    );
+    assert_terminal_with_config(&server, server.config(), code, attempts, None).await;
+}
+
+async fn assert_terminal_with_config(
+    server: &TestServer,
+    config: LaserstreamConfig,
+    code: Code,
+    attempts: usize,
+    expected_header: Option<&str>,
+) {
+    let (stream, _handle) = subscribe(config, request());
     futures::pin_mut!(stream);
     let next = tokio::time::timeout(Duration::from_secs(8), stream.next())
         .await
-        .expect("policy errors must surface without endless retries");
+        .expect("non-retryable errors must surface without endless retries");
     match next {
         Some(Err(LaserstreamError::Status(status))) => {
             assert_eq!(status.code(), code);
@@ -273,7 +303,7 @@ async fn assert_terminal(reply: Reply, code: Code, attempts: usize) {
     let requests = server.requests.lock().unwrap();
     assert_eq!(requests.len(), attempts);
     for request in requests.iter() {
-        assert_eq!(request.disable_archive.as_deref(), Some("true"));
+        assert_eq!(request.disable_archive.as_deref(), expected_header);
         assert_eq!(request.from_slot, Some(95));
     }
 }
