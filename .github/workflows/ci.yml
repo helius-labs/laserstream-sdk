@@ -18,6 +18,25 @@ permissions:
   id-token: write
 
 jobs:
+  decoder-tests:
+    name: JavaScript and Go decoder vectors
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --ignore-scripts
+        working-directory: javascript
+      - run: npm run test:account-index
+        working-directory: javascript
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - run: go test . ./proto
+        working-directory: go
+
   rust-tests:
     name: Rust SDK tests
     runs-on: ubuntu-latest
@@ -41,6 +60,9 @@ jobs:
       - run: cargo test --locked --lib --no-default-features
       - run: cargo test --locked --lib --features internal
       - run: cargo test --locked --lib --no-default-features --features internal
+      - name: Native JavaScript decoder vectors
+        run: cargo test --locked --lib account_index
+        working-directory: javascript
 
   build:
     strategy:

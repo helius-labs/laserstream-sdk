@@ -126,8 +126,30 @@ async fn default_client_still_retries_out_of_range() {
     }
 }
 
+#[tokio::test]
+async fn account_transaction_indexes_survive_reconnect() {
+    let server = TestServer::start(Reply::AccountIndexesAfterRestart).await;
+    let (stream, _handle) = subscribe(server.config(), request());
+    futures::pin_mut!(stream);
+    for expected in [None, Some(0), Some(42), Some(u64::MAX)] {
+        let update = tokio::time::timeout(Duration::from_secs(8), stream.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        let Some(UpdateOneof::Account(update)) = update.update_oneof else {
+            panic!("account expected")
+        };
+        assert_eq!(update.account.unwrap().transaction_index, expected);
+    }
+    let requests = server.requests.lock().unwrap();
+    assert_eq!(requests.len(), 2);
+    assert!(requests.iter().all(|request| request.from_slot == Some(95)));
+}
+
 #[derive(Clone, Copy, Debug)]
 enum Reply {
+    AccountIndexesAfterRestart,
     StreamOutOfRange,
     InitialOutOfRange,
     Data,
@@ -175,7 +197,31 @@ impl geyser_server::Geyser for TestGeyser {
         if matches!(self.reply, Reply::InitialOutOfRange) {
             return Err(Status::out_of_range(SLOT_TOO_OLD_MESSAGE));
         }
+        if matches!(self.reply, Reply::AccountIndexesAfterRestart) && _attempt > 1 {
+            let updates = [None, Some(0), Some(42), Some(u64::MAX)]
+                .into_iter()
+                .enumerate()
+                .map(|(ordinal, transaction_index)| {
+                    Ok(SubscribeUpdate {
+                        filters: vec!["accounts".into()],
+                        update_oneof: Some(UpdateOneof::Account(SubscribeUpdateAccount {
+                            slot: 100,
+                            account: Some(SubscribeUpdateAccountInfo {
+                                pubkey: vec![ordinal as u8; 32],
+                                transaction_index,
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        })),
+                        ..Default::default()
+                    })
+                });
+            return Ok(Response::new(
+                Box::pin(futures::stream::iter(updates)) as Updates
+            ));
+        }
         let update = match self.reply {
+            Reply::AccountIndexesAfterRestart => Err(Status::unavailable("restart")),
             Reply::StreamOutOfRange => Err(Status::out_of_range(SLOT_TOO_OLD_MESSAGE)),
             #[cfg(feature = "internal")]
             Reply::TransientThenOutOfRange if _attempt == 1 => Err(Status::unavailable("restart")),

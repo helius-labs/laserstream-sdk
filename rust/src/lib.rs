@@ -5,6 +5,9 @@ pub mod client;
 pub mod config;
 pub mod error;
 
+#[cfg(test)]
+mod account_index_tests;
+
 pub use client::{subscribe, subscribe_preprocessed, StreamHandle, PreprocessedStreamHandle};
 pub use config::{ChannelOptions, LaserstreamConfig, CompressionEncoding};
 pub use error::LaserstreamError;

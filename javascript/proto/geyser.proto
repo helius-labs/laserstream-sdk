@@ -208,6 +208,9 @@ message SubscribeUpdateAccountInfo {
   bytes data = 6;
   uint64 write_version = 7;
   optional bytes txn_signature = 8;
+  // Zero-based index of the originating transaction in this slot's block.
+  // Absent for startup/non-transaction updates and legacy/unavailable metadata.
+  optional uint64 transaction_index = 9;
 }
 
 message SubscribeUpdateSlot {

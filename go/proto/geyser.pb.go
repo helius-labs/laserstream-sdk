@@ -1781,17 +1781,20 @@ func (x *SubscribeUpdateAccount) GetIsStartup() bool {
 }
 
 type SubscribeUpdateAccountInfo struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Pubkey        []byte                 `protobuf:"bytes,1,opt,name=pubkey,proto3" json:"pubkey,omitempty"`
-	Lamports      uint64                 `protobuf:"varint,2,opt,name=lamports,proto3" json:"lamports,omitempty"`
-	Owner         []byte                 `protobuf:"bytes,3,opt,name=owner,proto3" json:"owner,omitempty"`
-	Executable    bool                   `protobuf:"varint,4,opt,name=executable,proto3" json:"executable,omitempty"`
-	RentEpoch     uint64                 `protobuf:"varint,5,opt,name=rent_epoch,json=rentEpoch,proto3" json:"rent_epoch,omitempty"`
-	Data          []byte                 `protobuf:"bytes,6,opt,name=data,proto3" json:"data,omitempty"`
-	WriteVersion  uint64                 `protobuf:"varint,7,opt,name=write_version,json=writeVersion,proto3" json:"write_version,omitempty"`
-	TxnSignature  []byte                 `protobuf:"bytes,8,opt,name=txn_signature,json=txnSignature,proto3,oneof" json:"txn_signature,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Pubkey       []byte                 `protobuf:"bytes,1,opt,name=pubkey,proto3" json:"pubkey,omitempty"`
+	Lamports     uint64                 `protobuf:"varint,2,opt,name=lamports,proto3" json:"lamports,omitempty"`
+	Owner        []byte                 `protobuf:"bytes,3,opt,name=owner,proto3" json:"owner,omitempty"`
+	Executable   bool                   `protobuf:"varint,4,opt,name=executable,proto3" json:"executable,omitempty"`
+	RentEpoch    uint64                 `protobuf:"varint,5,opt,name=rent_epoch,json=rentEpoch,proto3" json:"rent_epoch,omitempty"`
+	Data         []byte                 `protobuf:"bytes,6,opt,name=data,proto3" json:"data,omitempty"`
+	WriteVersion uint64                 `protobuf:"varint,7,opt,name=write_version,json=writeVersion,proto3" json:"write_version,omitempty"`
+	TxnSignature []byte                 `protobuf:"bytes,8,opt,name=txn_signature,json=txnSignature,proto3,oneof" json:"txn_signature,omitempty"`
+	// Zero-based index of the originating transaction in this slot's block.
+	// Absent for startup/non-transaction updates and legacy/unavailable metadata.
+	TransactionIndex *uint64 `protobuf:"varint,9,opt,name=transaction_index,json=transactionIndex,proto3,oneof" json:"transaction_index,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *SubscribeUpdateAccountInfo) Reset() {
@@ -1878,6 +1881,13 @@ func (x *SubscribeUpdateAccountInfo) GetTxnSignature() []byte {
 		return x.TxnSignature
 	}
 	return nil
+}
+
+func (x *SubscribeUpdateAccountInfo) GetTransactionIndex() uint64 {
+	if x != nil && x.TransactionIndex != nil {
+		return *x.TransactionIndex
+	}
+	return 0
 }
 
 type SubscribeUpdateSlot struct {
@@ -3356,7 +3366,7 @@ const file_geyser_proto_rawDesc = "" +
 	"\aaccount\x18\x01 \x01(\v2\".geyser.SubscribeUpdateAccountInfoR\aaccount\x12\x12\n" +
 	"\x04slot\x18\x02 \x01(\x04R\x04slot\x12\x1d\n" +
 	"\n" +
-	"is_startup\x18\x03 \x01(\bR\tisStartup\"\x9a\x02\n" +
+	"is_startup\x18\x03 \x01(\bR\tisStartup\"\xe2\x02\n" +
 	"\x1aSubscribeUpdateAccountInfo\x12\x16\n" +
 	"\x06pubkey\x18\x01 \x01(\fR\x06pubkey\x12\x1a\n" +
 	"\blamports\x18\x02 \x01(\x04R\blamports\x12\x14\n" +
@@ -3368,8 +3378,10 @@ const file_geyser_proto_rawDesc = "" +
 	"rent_epoch\x18\x05 \x01(\x04R\trentEpoch\x12\x12\n" +
 	"\x04data\x18\x06 \x01(\fR\x04data\x12#\n" +
 	"\rwrite_version\x18\a \x01(\x04R\fwriteVersion\x12(\n" +
-	"\rtxn_signature\x18\b \x01(\fH\x00R\ftxnSignature\x88\x01\x01B\x10\n" +
-	"\x0e_txn_signature\"\xb0\x01\n" +
+	"\rtxn_signature\x18\b \x01(\fH\x00R\ftxnSignature\x88\x01\x01\x120\n" +
+	"\x11transaction_index\x18\t \x01(\x04H\x01R\x10transactionIndex\x88\x01\x01B\x10\n" +
+	"\x0e_txn_signatureB\x14\n" +
+	"\x12_transaction_index\"\xb0\x01\n" +
 	"\x13SubscribeUpdateSlot\x12\x12\n" +
 	"\x04slot\x18\x01 \x01(\x04R\x04slot\x12\x1b\n" +
 	"\x06parent\x18\x02 \x01(\x04H\x00R\x06parent\x88\x01\x01\x12*\n" +

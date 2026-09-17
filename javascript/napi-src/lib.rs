@@ -5,6 +5,9 @@ mod client;
 mod proto;
 mod stream;
 
+#[cfg(test)]
+mod account_index_tests;
+
 use std::sync::Once;
 
 static INIT_RUSTLS: Once = Once::new();
