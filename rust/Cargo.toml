@@ -1,6 +1,6 @@
 [package]
 name = "helius-laserstream"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2021"
 authors = ["Helius <support@helius.xyz>"]
 description = "Rust client for Helius LaserStream gRPC with robust reconnection and slot tracking"
@@ -53,6 +53,8 @@ solana-pubkey = { version = "3.0", optional = true }
 # `default-features = false` if you don't need the filter builder.
 default = ["cuckoo"]
 cuckoo = ["laserstream-core-proto/convert", "dep:solana-pubkey"]
+# Internal-use controls; disabled by default.
+internal = []
 
 [dev-dependencies]
 dotenv = "0.15"
