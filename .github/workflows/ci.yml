@@ -39,7 +39,6 @@ jobs:
           key: rust-sdk-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock') }}
       - run: cargo test --locked --lib
       - run: cargo test --locked --lib --no-default-features
-      - run: cargo build --locked --example no_geyser_archive
 
   build:
     strategy:

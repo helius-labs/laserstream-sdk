@@ -26,7 +26,7 @@ const SDK_VERSION: &str = env!("CARGO_PKG_VERSION");
 const DISABLE_GEYSER_ARCHIVE_HEADER: &str = "x-disable-geyser-archive";
 
 fn is_terminal_archive_policy_error(config: &LaserstreamConfig, status: &Status) -> bool {
-    !config.geyser_archive_fallback
+    config.internal_disable_geyser_archive_fallback
         && matches!(
             status.code(),
             laserstream_core_proto::tonic::Code::OutOfRange
@@ -382,7 +382,7 @@ async fn connect_and_subscribe_once(
         .map_err(|e| Status::internal(format!("Failed to send initial request: {}", e)))?;
 
     let mut subscribe_request = Request::new(subscribe_rx);
-    if !config.geyser_archive_fallback {
+    if config.internal_disable_geyser_archive_fallback {
         subscribe_request.metadata_mut().insert(
             DISABLE_GEYSER_ARCHIVE_HEADER,
             MetadataValue::from_static("true"),
@@ -392,14 +392,14 @@ async fn connect_and_subscribe_once(
         .subscribe(subscribe_request)
         .await
         .map_err(|status| {
-            if !config.geyser_archive_fallback {
+            if config.internal_disable_geyser_archive_fallback {
                 status
             } else {
                 Status::internal(format!("Subscription failed: {}", status))
             }
         })?;
     // Old servers (or proxies stripping the flag) must not silently supply GA data.
-    if !config.geyser_archive_fallback
+    if config.internal_disable_geyser_archive_fallback
         && response
             .metadata()
             .get(DISABLE_GEYSER_ARCHIVE_HEADER)

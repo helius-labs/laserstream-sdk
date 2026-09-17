@@ -186,7 +186,7 @@ fn request() -> SubscribeRequest {
 async fn assert_terminal(reply: Reply, code: Code, attempts: usize) {
     let server = TestServer::start(reply).await;
     let (stream, _handle) = subscribe(
-        server.config().with_geyser_archive_fallback(false),
+        server.config().internal_disable_geyser_archive_fallback(),
         request(),
     );
     futures::pin_mut!(stream);
@@ -208,15 +208,18 @@ async fn assert_terminal(reply: Reply, code: Code, attempts: usize) {
 
 #[test]
 fn fallback_is_enabled_by_default_and_independent_of_replay() {
-    assert!(LaserstreamConfig::default().geyser_archive_fallback);
-    assert!(LaserstreamConfig::new(String::new(), String::new()).geyser_archive_fallback);
-    let config = LaserstreamConfig::default().with_geyser_archive_fallback(false);
+    assert!(!LaserstreamConfig::default().internal_disable_geyser_archive_fallback);
+    assert!(
+        !LaserstreamConfig::new(String::new(), String::new())
+            .internal_disable_geyser_archive_fallback
+    );
+    let config = LaserstreamConfig::default().internal_disable_geyser_archive_fallback();
     assert!(config.replay);
-    assert!(!config.geyser_archive_fallback);
+    assert!(config.internal_disable_geyser_archive_fallback);
     assert!(
         config
-            .with_geyser_archive_fallback(true)
-            .geyser_archive_fallback
+            .internal_disable_geyser_archive_fallback()
+            .internal_disable_geyser_archive_fallback
     );
 }
 
@@ -255,7 +258,7 @@ async fn default_client_still_accepts_old_server_without_policy_ack() {
 async fn disabled_client_delivers_data_when_server_acknowledges() {
     let server = TestServer::start(Reply::Data).await;
     let (stream, _handle) = subscribe(
-        server.config().with_geyser_archive_fallback(false),
+        server.config().internal_disable_geyser_archive_fallback(),
         request(),
     );
     futures::pin_mut!(stream);
