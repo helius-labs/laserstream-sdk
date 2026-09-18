@@ -32,10 +32,13 @@ fn account_index_native_reencoding_preserves_scalar32() {
                 UpdateOneof::Block(b) => b.accounts[0].clone(),
                 _ => panic!("account expected"),
             };
-            assert_eq!(
-                account.account_transaction_index(),
-                AccountTransactionIndex::from_wire(expected)
-            );
+            let typed = if expected == u64::MAX {
+                AccountTransactionIndex::NoTransaction
+            } else {
+                AccountTransactionIndex::Transaction(expected)
+            };
+            assert_eq!(account.account_transaction_index(), typed);
+            assert_eq!(account.transaction_index, expected);
             // Proto3 canonical encoding omits explicit scalar zero.
             if expected != 0 {
                 assert_eq!(encoded, wire);

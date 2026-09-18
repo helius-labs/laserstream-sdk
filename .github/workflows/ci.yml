@@ -63,6 +63,8 @@ jobs:
       - run: cargo test --locked --lib --no-default-features
       - run: cargo test --locked --lib --features internal
       - run: cargo test --locked --lib --no-default-features --features internal
+      - name: Getter-only public API doctests
+        run: cargo test --locked --doc grpc
       - name: Native JavaScript decoder vectors
         run: cargo test --locked --lib account_index
         working-directory: javascript

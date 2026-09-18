@@ -12,7 +12,29 @@ pub use client::{subscribe, subscribe_preprocessed, StreamHandle, PreprocessedSt
 pub use config::{ChannelOptions, LaserstreamConfig, CompressionEncoding};
 pub use error::LaserstreamError;
 
-// Re-export commonly used types from laserstream-core-proto
+/// Protobuf types with a getter-only typed account transaction index view.
+/// Generated raw fields remain available for wire compatibility.
+///
+/// ```
+/// use helius_laserstream::grpc::{AccountTransactionIndex, SubscribeUpdateAccountInfo};
+/// let account = SubscribeUpdateAccountInfo::default();
+/// assert_eq!(account.account_transaction_index(), AccountTransactionIndex::Transaction(0));
+/// ```
+///
+/// ```compile_fail,E0599
+/// use helius_laserstream::grpc::{AccountTransactionIndex, SubscribeUpdateAccountInfo};
+/// let mut account = SubscribeUpdateAccountInfo::default();
+/// account.set_account_transaction_index(AccountTransactionIndex::Transaction(42));
+/// ```
+///
+/// ```compile_fail,E0599
+/// use helius_laserstream::grpc::AccountTransactionIndex;
+/// AccountTransactionIndex::NoTransaction.to_wire();
+/// ```
+///
+/// ```compile_fail,E0432
+/// use helius_laserstream::grpc::ReservedTransactionIndex;
+/// ```
 pub use laserstream_core_proto::geyser as grpc;
 pub use laserstream_core_proto::solana;
 

@@ -25,14 +25,14 @@ fn scalar32_independent_wire_and_legacy_schema() {
         ),
     ] {
         let info = [old.clone(), suffix].concat();
-        let expected = AccountTransactionIndex::from_wire(value);
-        let mut raw = SubscribeUpdateAccountInfo::decode(info.as_slice()).unwrap();
+        let expected = if value == u64::MAX {
+            AccountTransactionIndex::NoTransaction
+        } else {
+            AccountTransactionIndex::Transaction(value)
+        };
+        assert_eq!(AccountTransactionIndex::from_wire(value), expected);
+        let raw = SubscribeUpdateAccountInfo::decode(info.as_slice()).unwrap();
         assert_eq!(raw.account_transaction_index(), expected);
-        raw.set_account_transaction_index(expected).unwrap();
-        assert_eq!(raw.transaction_index, value);
-        assert!(raw
-            .set_account_transaction_index(AccountTransactionIndex::Transaction(u64::MAX))
-            .is_err());
         assert_eq!(raw.transaction_index, value);
         for block in [false, true] {
             let inner = [

@@ -6,6 +6,9 @@ const { once } = require('node:events');
 const client = require('../client');
 
 (async () => {
+  for (const name of ['AccountTransactionIndex', 'setAccountTransactionIndex', 'encodeAccountTransactionIndex']) {
+    assert.equal(name in client, false, `unexpected public export: ${name}`);
+  }
   const suffixes = ['', '800200', '80022a', '8002ffffffffffffffffff01', '8002feffffffffffffffff01'];
   const expected = ['0', '0', '42', '18446744073709551615', '18446744073709551614'];
   const sessions = new Set();
@@ -40,7 +43,11 @@ const client = require('../client');
       try {
         const account = update.account ? update.account.account : update.block.accounts[0];
         const typed = client.getAccountTransactionIndex(account);
-        assert.equal(client.encodeAccountTransactionIndex(typed), expected[Math.floor(delivered / 2)]);
+        const value = expected[Math.floor(delivered / 2)];
+        assert.deepEqual(typed, value === '18446744073709551615'
+          ? { kind: 'NoTransaction' } : { kind: 'Transaction', index: value });
+        assert.deepEqual(client.decodeAccountTransactionIndex(value), typed);
+        assert.equal(account.transactionIndex, value);
         assert.equal(account.writeVersion, '0');
         if (++delivered === 10) resolve();
       } catch (error) { reject(error); }

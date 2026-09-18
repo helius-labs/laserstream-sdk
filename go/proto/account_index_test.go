@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"google.golang.org/protobuf/encoding/protojson"
@@ -62,21 +63,18 @@ func TestAccountTransactionIndex(t *testing.T) {
 			} else {
 				account = update.GetAccount().Account
 			}
-			want := DecodeAccountTransactionIndex(tc.value)
+			want := AccountTransactionIndex{Kind: TransactionWrite, Index: tc.value}
+			if tc.value == ^uint64(0) {
+				want = AccountTransactionIndex{Kind: NoTransaction}
+			}
+			if DecodeAccountTransactionIndex(tc.value) != want {
+				t.Fatalf("decode mismatch for %d", tc.value)
+			}
 			if account.AccountTransactionIndex() != want {
 				t.Fatalf("typed mismatch: %v", account)
 			}
-			if err := account.SetAccountTransactionIndex(want); err != nil {
-				t.Fatal(err)
-			}
 			if account.TransactionIndex != tc.value {
 				t.Fatal("shifted scalar")
-			}
-			if err := account.SetAccountTransactionIndex(AccountTransactionIndex{Kind: TransactionWrite, Index: ^uint64(0)}); err == nil {
-				t.Fatal("reserved transaction accepted")
-			}
-			if account.TransactionIndex != tc.value {
-				t.Fatal("failed setter mutated account")
 			}
 			encoded, err := proto.Marshal(&update)
 			if err != nil {
@@ -130,11 +128,20 @@ func TestAccountTransactionIndex(t *testing.T) {
 			}
 		}
 	}
-	for _, invalid := range []AccountTransactionIndex{
-		{Kind: TransactionWrite, Index: ^uint64(0)}, {Kind: 99}, {Kind: NoTransaction, Index: 1},
+}
+
+func TestAccountTransactionIndexGetterOnlyAPI(t *testing.T) {
+	for _, typ := range []reflect.Type{
+		reflect.TypeOf(SubscribeUpdateAccountInfo{}), reflect.TypeOf(&SubscribeUpdateAccountInfo{}),
+		reflect.TypeOf(AccountTransactionIndex{}), reflect.TypeOf(&AccountTransactionIndex{}),
 	} {
-		if _, err := invalid.ToWire(); err == nil {
-			t.Fatalf("accepted invalid value %v", invalid)
+		for _, name := range []string{"SetAccountTransactionIndex", "ToWire"} {
+			if _, exists := typ.MethodByName(name); exists {
+				t.Fatalf("unexpected write method %s on %v", name, typ)
+			}
 		}
+	}
+	if _, exists := reflect.TypeOf(&SubscribeUpdateAccountInfo{}).MethodByName("AccountTransactionIndex"); !exists {
+		t.Fatal("missing typed getter")
 	}
 }
