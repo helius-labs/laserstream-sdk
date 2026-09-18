@@ -1,11 +1,8 @@
-/** Read-only view of an unshifted, zero-based index.
- * Exact decimal strings avoid uint64 precision loss. Match on `kind` to read `index`.
- * MAX decodes as NoTransaction; legacy omission decodes as Transaction("0"). */
+/** Getter-only view: zero-based integer index, or a runtime-generated write. */
 export type AccountTransactionIndex =
-  | { readonly kind: 'Transaction'; readonly index: string }
+  | { readonly kind: 'Transaction'; readonly index: number }
   | { readonly kind: 'NoTransaction' };
-/** Throws unless value is an exact, canonical uint64 decimal string. */
+/** Decode the uint64 wire value; rejects transaction indices outside JS's safe integer range. */
 export declare function decodeAccountTransactionIndex(value: string): AccountTransactionIndex;
-/** Use on both subscribe callback and decodeSubscribeUpdate account/block outputs.
- * Raw generated transactionIndex remains available for protobuf compatibility. */
+/** Works on account updates and nested block accounts. Omitted legacy metadata means index 0. */
 export declare function getAccountTransactionIndex(account: { transactionIndex?: string }): AccountTransactionIndex;
