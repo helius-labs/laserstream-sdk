@@ -1446,7 +1446,7 @@ dependencies = [
 [[package]]
 name = "laserstream-core-client"
 version = "12.0.0"
-source = "git+https://github.com/helius-labs/yellowstone-grpc?rev=59d9a57ca74e356b8a121b64aa452a295fd372a9#59d9a57ca74e356b8a121b64aa452a295fd372a9"
+source = "git+https://github.com/helius-labs/yellowstone-grpc?rev=f981b117344d93c7c7bdf1a2e5954cdd672fef94#f981b117344d93c7c7bdf1a2e5954cdd672fef94"
 dependencies = [
  "bytes",
  "futures",
@@ -1459,7 +1459,7 @@ dependencies = [
 [[package]]
 name = "laserstream-core-proto"
 version = "12.0.0"
-source = "git+https://github.com/helius-labs/yellowstone-grpc?rev=59d9a57ca74e356b8a121b64aa452a295fd372a9#59d9a57ca74e356b8a121b64aa452a295fd372a9"
+source = "git+https://github.com/helius-labs/yellowstone-grpc?rev=f981b117344d93c7c7bdf1a2e5954cdd672fef94#f981b117344d93c7c7bdf1a2e5954cdd672fef94"
 dependencies = [
  "anyhow",
  "bincode",

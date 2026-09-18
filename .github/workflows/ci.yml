@@ -10,6 +10,7 @@ on:
 
 env:
   DEBUG: napi:*
+  CARGO_BUILD_JOBS: 4
   APP_NAME: laserstream-napi
   MACOSX_DEPLOYMENT_TARGET: '10.13'
 
@@ -29,6 +30,8 @@ jobs:
       - run: npm install --ignore-scripts
         working-directory: javascript
       - run: npm run test:account-index
+        working-directory: javascript
+      - run: npm run test:account-index-pack
         working-directory: javascript
       - uses: actions/setup-go@v5
         with:
@@ -63,6 +66,17 @@ jobs:
       - name: Native JavaScript decoder vectors
         run: cargo test --locked --lib account_index
         working-directory: javascript
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Actual native callback and packed artifact regression
+        working-directory: javascript
+        run: |
+          npm install --ignore-scripts
+          cargo build --locked
+          cp target/debug/liblaserstream_napi.so laserstream-napi.linux-x64-gnu.node
+          npm run test:account-index-subscribe
+          ACCOUNT_INDEX_NATIVE="$PWD/laserstream-napi.linux-x64-gnu.node" npm run test:account-index-pack
 
   build:
     strategy:

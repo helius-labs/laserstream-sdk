@@ -1,6 +1,7 @@
 const { LaserstreamClient: NapiClient, CommitmentLevel, shutdownAllStreams, getActiveStreamCount } = require('./index');
 const { initProtobuf, decodeSubscribeUpdate, decodeSubscribePreprocessedUpdate } = require('./proto-decoder');
 const { CompressedAccountFilterSet, TableFullError, DEFAULT_HASH_SEED } = require('./cuckoo');
+const accountIndex = require('./account-index');
 
 // Compression algorithms enum
 const CompressionAlgorithms = {
@@ -118,6 +119,7 @@ async function subscribePreprocessed(config, request, onData, onError) {
 
 // Export clean API with only NAPI-based subscribe
 module.exports = {
+  ...accountIndex,
   subscribe,
   subscribePreprocessed,
   CommitmentLevel,
