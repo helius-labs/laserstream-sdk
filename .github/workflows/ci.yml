@@ -31,7 +31,7 @@ jobs:
         with:
           go-version-file: go/go.mod
           cache-dependency-path: go/go.sum
-      - run: go test ./proto -run TestAccountTransactionIndex
+      - run: go test ./proto -run '^TestAccountIndex$' -count=1 -v
         working-directory: go
 
   rust-tests:
