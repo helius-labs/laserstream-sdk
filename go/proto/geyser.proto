@@ -204,6 +204,11 @@ message SubscribeUpdateAccountInfo {
   bytes data = 6;
   uint64 write_version = 7;
   optional bytes txn_signature = 8;
+  // Unshifted zero-based transaction index; UINT64_MAX means NoTransaction.
+  // Legacy omission decodes as Transaction(0).
+  uint64 transaction_index = 32;
+  reserved 33;
+  reserved "native_operation_count";
 }
 
 message SubscribeUpdateSlot {

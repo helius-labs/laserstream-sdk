@@ -598,8 +598,7 @@ dependencies = [
 [[package]]
 name = "laserstream-core-client"
 version = "12.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab08da2d30af18da75e41c56af175154ba5af346a3251ac3d094fffd788718f8"
+source = "git+https://github.com/helius-labs/yellowstone-grpc?rev=c81314cd760dd73580e8f7b6542d4dc1711c329f#c81314cd760dd73580e8f7b6542d4dc1711c329f"
 dependencies = [
  "bytes",
  "futures",
@@ -612,8 +611,7 @@ dependencies = [
 [[package]]
 name = "laserstream-core-proto"
 version = "12.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0c12bc1245cb4bb984ecec00b087651017943a8474c2a97cc7d73396f3f5eae"
+source = "git+https://github.com/helius-labs/yellowstone-grpc?rev=c81314cd760dd73580e8f7b6542d4dc1711c329f#c81314cd760dd73580e8f7b6542d4dc1711c329f"
 dependencies = [
  "anyhow",
  "prost",

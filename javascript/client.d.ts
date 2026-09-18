@@ -1,5 +1,16 @@
 // TypeScript declarations for Laserstream client
 
+import type { geyser } from 'laserstream-core-proto-js/generated';
+
+// The generated package exports a namespace, not these top-level aliases.
+// Bind account-bearing outputs locally so callback/decoder types carry tags 32 and 33.
+export type { AccountIndex } from './account-index';
+export { getAccountIndex, decodeAccountIndex } from './account-index';
+export type SubscribeUpdate = geyser.ISubscribeUpdate;
+export type SubscribeUpdateAccount = geyser.ISubscribeUpdateAccount;
+export type SubscribeUpdateAccountInfo = geyser.ISubscribeUpdateAccountInfo;
+export type SubscribeUpdateBlock = geyser.ISubscribeUpdateBlock;
+
 // Re-export gRPC types
 export { ChannelOptions } from '@grpc/grpc-js';
 
@@ -12,14 +23,10 @@ export {
   SubscribePreprocessedTransaction,
   SubscribePreprocessedTransactionInfo,
   // Regular subscription types
-  SubscribeUpdate,
-  SubscribeUpdateAccount,
-  SubscribeUpdateAccountInfo,
   SubscribeUpdateSlot,
   SubscribeUpdateTransaction,
   SubscribeUpdateTransactionInfo,
   SubscribeUpdateTransactionStatus,
-  SubscribeUpdateBlock,
   SubscribeUpdateBlockMeta,
   SubscribeUpdateEntry,
   SubscribeUpdatePing,
@@ -141,6 +148,15 @@ export type TokenAccountsFilterMode = 'none' | 'balanceChanged' | 'all';
 // core-proto-js release ships field #30 natively.
 declare module 'laserstream-core-proto-js/generated' {
   namespace geyser {
+    interface ISubscribeUpdateAccountInfo {
+      /** Raw uint64 decimal strings; use getAccountIndex for the typed view.
+       * Legacy omission means Transaction(0); UINT64_MAX means NoTransaction.
+       */
+      transactionIndex?: string;
+    }
+    interface SubscribeUpdateAccountInfo {
+      transactionIndex?: string;
+    }
     interface ISubscribeRequestFilterTransactions {
       /** Helius ATA expansion control (proto field #30). */
       tokenAccounts?: (TokenAccountsFilterMode | string | null);
