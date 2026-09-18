@@ -1,8 +1,8 @@
-/** Getter-only view: zero-based integer index, or a runtime-generated write. */
-export type AccountTransactionIndex =
-  | { readonly kind: 'Transaction'; readonly index: number }
-  | { readonly kind: 'NoTransaction' };
-/** Decode the uint64 wire value; rejects transaction indices outside JS's safe integer range. */
-export declare function decodeAccountTransactionIndex(value: string): AccountTransactionIndex;
-/** Works on account updates and nested block accounts. Omitted legacy metadata means index 0. */
-export declare function getAccountTransactionIndex(account: { transactionIndex?: string }): AccountTransactionIndex;
+/** Getter-only view: zero-based transaction index or native operation count per pubkey/bank. */
+export type AccountIndex =
+  | { readonly kind: 'NativeOperation'; readonly operationCount: number }
+  | { readonly kind: 'TransactionIndex'; readonly index: number };
+/** Decode raw uint64 strings; rejects the selected payload outside JS's safe nonnegative integer range. */
+export declare function decodeAccountIndex(transactionIndex: string, nativeOperationCount?: string): AccountIndex;
+/** Works on account updates and nested block accounts. Omitted legacy metadata means TransactionIndex(0). */
+export declare function getAccountIndex(account: { transactionIndex?: string; nativeOperationCount?: string }): AccountIndex;

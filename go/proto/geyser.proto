@@ -204,9 +204,12 @@ message SubscribeUpdateAccountInfo {
   bytes data = 6;
   uint64 write_version = 7;
   optional bytes txn_signature = 8;
-  // Unshifted zero-based transaction index; UINT64_MAX means NoTransaction.
-  // Legacy omission decodes as Transaction(0), not unknown.
+  // Unshifted zero-based transaction index; UINT64_MAX selects NativeOperation.
+  // Legacy omission decodes as TransactionIndex(0).
   uint64 transaction_index = 32;
+  // Zero-based native operation count per pubkey/bank; used only when transaction_index is UINT64_MAX.
+  // Legacy omission with UINT64_MAX decodes as NativeOperation(0).
+  uint64 native_operation_count = 33;
 }
 
 message SubscribeUpdateSlot {

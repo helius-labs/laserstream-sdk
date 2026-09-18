@@ -3,9 +3,9 @@
 import type { geyser } from 'laserstream-core-proto-js/generated';
 
 // The generated package exports a namespace, not these top-level aliases.
-// Bind account-bearing outputs locally so callback/decoder types carry tag 32.
-export type { AccountTransactionIndex } from './account-index';
-export { getAccountTransactionIndex, decodeAccountTransactionIndex } from './account-index';
+// Bind account-bearing outputs locally so callback/decoder types carry tags 32 and 33.
+export type { AccountIndex } from './account-index';
+export { getAccountIndex, decodeAccountIndex } from './account-index';
 export type SubscribeUpdate = geyser.ISubscribeUpdate;
 export type SubscribeUpdateAccount = geyser.ISubscribeUpdateAccount;
 export type SubscribeUpdateAccountInfo = geyser.ISubscribeUpdateAccountInfo;
@@ -149,13 +149,15 @@ export type TokenAccountsFilterMode = 'none' | 'balanceChanged' | 'all';
 declare module 'laserstream-core-proto-js/generated' {
   namespace geyser {
     interface ISubscribeUpdateAccountInfo {
-      /** Raw scalar32 as an exact uint64 decimal string; use getAccountTransactionIndex
-       * for Transaction / NoTransaction. Legacy omission means Transaction("0").
+      /** Raw uint64 decimal strings; use getAccountIndex for the typed view.
+       * Legacy omission means TransactionIndex(0); MAX without a count means NativeOperation(0).
        */
       transactionIndex?: string;
+      nativeOperationCount?: string;
     }
     interface SubscribeUpdateAccountInfo {
       transactionIndex?: string;
+      nativeOperationCount?: string;
     }
     interface ISubscribeRequestFilterTransactions {
       /** Helius ATA expansion control (proto field #30). */

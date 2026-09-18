@@ -1,17 +1,22 @@
 const MAX = '18446744073709551615';
-const NoTransaction = Object.freeze({ kind: 'NoTransaction' });
 
-function decodeAccountTransactionIndex(value) {
-  if (value === MAX) return NoTransaction;
-  const index = Number(value);
-  if (typeof value !== 'string' || !/^(0|[1-9][0-9]*)$/.test(value) || !Number.isSafeInteger(index)) {
-    throw new RangeError('transaction index must be a safe nonnegative integer');
+function safeInteger(value, field) {
+  const number = Number(value);
+  if (typeof value !== 'string' || !/^(0|[1-9][0-9]*)$/.test(value) || !Number.isSafeInteger(number)) {
+    throw new RangeError(`${field} must be a safe nonnegative integer`);
   }
-  return { kind: 'Transaction', index };
+  return number;
 }
 
-function getAccountTransactionIndex(account) {
-  return decodeAccountTransactionIndex(account.transactionIndex === undefined ? '0' : account.transactionIndex);
+function decodeAccountIndex(transactionIndex, nativeOperationCount = '0') {
+  if (transactionIndex === MAX) {
+    return { kind: 'NativeOperation', operationCount: safeInteger(nativeOperationCount, 'native operation count') };
+  }
+  return { kind: 'TransactionIndex', index: safeInteger(transactionIndex, 'transaction index') };
 }
 
-module.exports = { decodeAccountTransactionIndex, getAccountTransactionIndex };
+function getAccountIndex(account) {
+  return decodeAccountIndex(account.transactionIndex === undefined ? '0' : account.transactionIndex, account.nativeOperationCount);
+}
+
+module.exports = { decodeAccountIndex, getAccountIndex };

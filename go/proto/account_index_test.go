@@ -1,19 +1,28 @@
 package proto
 
-import "testing"
+import (
+	"testing"
 
-func TestAccountTransactionIndex(t *testing.T) {
+	"google.golang.org/protobuf/proto"
+)
+
+func TestAccountIndex(t *testing.T) {
 	for _, tc := range []struct {
-		wire uint64
-		want AccountTransactionIndex
+		wire []byte
+		want AccountIndex
 	}{
-		{0, AccountTransactionIndex{Kind: TransactionWrite, Index: 0}},
-		{42, AccountTransactionIndex{Kind: TransactionWrite, Index: 42}},
-		{^uint64(0), AccountTransactionIndex{Kind: NoTransaction}},
+		{nil, AccountIndex{Kind: TransactionIndex, Index: 0}},
+		{[]byte{0x80, 2, 0}, AccountIndex{Kind: TransactionIndex, Index: 0}},
+		{[]byte{0x80, 2, 42, 0x88, 2, 9}, AccountIndex{Kind: TransactionIndex, Index: 42}},
+		{[]byte{0x80, 2, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1}, AccountIndex{Kind: NativeOperation, OperationCount: 0}},
+		{[]byte{0x80, 2, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 0x88, 2, 7}, AccountIndex{Kind: NativeOperation, OperationCount: 7}},
 	} {
-		account := SubscribeUpdateAccountInfo{TransactionIndex: tc.wire}
-		if got := account.AccountTransactionIndex(); got != tc.want {
-			t.Fatalf("index %d: got %+v, want %+v", tc.wire, got, tc.want)
+		var account SubscribeUpdateAccountInfo
+		if err := proto.Unmarshal(tc.wire, &account); err != nil {
+			t.Fatal(err)
+		}
+		if got := account.AccountIndex(); got != tc.want {
+			t.Fatalf("wire %x: got %+v, want %+v", tc.wire, got, tc.want)
 		}
 	}
 }

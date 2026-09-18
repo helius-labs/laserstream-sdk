@@ -1,30 +1,31 @@
 package proto
 
-// AccountTransactionIndexKind distinguishes transaction writes from native writes.
-type AccountTransactionIndexKind uint8
+// AccountIndexKind distinguishes transaction writes from native operations.
+type AccountIndexKind uint8
 
 const (
-	TransactionWrite AccountTransactionIndexKind = iota
-	NoTransaction
+	TransactionIndex AccountIndexKind = iota
+	NativeOperation
 )
 
-// AccountTransactionIndex is a read-only typed view of the raw protobuf uint64.
-// Index is zero-based and is meaningful only for Kind == TransactionWrite.
-// The decoder maps MAX to NoTransaction. Generated raw fields remain available
-// for protobuf compatibility; this view provides no setter or encoder.
-type AccountTransactionIndex struct {
-	Kind  AccountTransactionIndexKind
-	Index uint64
+// AccountIndex is a getter-only view of the raw protobuf fields.
+// Index is zero-based and meaningful only for Kind == TransactionIndex.
+// OperationCount is zero-based per pubkey/bank and meaningful only for Kind == NativeOperation.
+type AccountIndex struct {
+	Kind           AccountIndexKind
+	Index          uint64
+	OperationCount uint64
 }
 
-func DecodeAccountTransactionIndex(value uint64) AccountTransactionIndex {
-	if value == ^uint64(0) {
-		return AccountTransactionIndex{Kind: NoTransaction}
+func DecodeAccountIndex(transactionIndex, nativeOperationCount uint64) AccountIndex {
+	if transactionIndex == ^uint64(0) {
+		return AccountIndex{Kind: NativeOperation, OperationCount: nativeOperationCount}
 	}
-	return AccountTransactionIndex{Kind: TransactionWrite, Index: value}
+	return AccountIndex{Kind: TransactionIndex, Index: transactionIndex}
 }
 
-// AccountTransactionIndex returns TransactionWrite(0) for legacy omitted field 32.
-func (account *SubscribeUpdateAccountInfo) AccountTransactionIndex() AccountTransactionIndex {
-	return DecodeAccountTransactionIndex(account.GetTransactionIndex())
+// AccountIndex returns TransactionIndex(0) for legacy omission and NativeOperation(0)
+// for legacy MAX without a native operation count.
+func (account *SubscribeUpdateAccountInfo) AccountIndex() AccountIndex {
+	return DecodeAccountIndex(account.GetTransactionIndex(), account.GetNativeOperationCount())
 }
