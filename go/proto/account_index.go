@@ -1,31 +1,28 @@
 package proto
 
-// AccountIndexKind distinguishes transaction writes from native operations.
+// AccountIndexKind distinguishes transaction writes from writes without a transaction.
 type AccountIndexKind uint8
 
 const (
-	TransactionIndex AccountIndexKind = iota
-	NativeOperation
+	AccountIndexTransaction AccountIndexKind = iota
+	AccountIndexNoTransaction
 )
 
-// AccountIndex is a getter-only view of the raw protobuf fields.
-// Index is zero-based and meaningful only for Kind == TransactionIndex.
-// OperationCount is zero-based per pubkey/bank and meaningful only for Kind == NativeOperation.
+// AccountIndex is a getter-only view of the raw protobuf field.
+// Index is zero-based and meaningful only for Kind == AccountIndexTransaction.
 type AccountIndex struct {
-	Kind           AccountIndexKind
-	Index          uint64
-	OperationCount uint64
+	Kind  AccountIndexKind
+	Index uint64
 }
 
-func DecodeAccountIndex(transactionIndex, nativeOperationCount uint64) AccountIndex {
+func DecodeAccountIndex(transactionIndex uint64) AccountIndex {
 	if transactionIndex == ^uint64(0) {
-		return AccountIndex{Kind: NativeOperation, OperationCount: nativeOperationCount}
+		return AccountIndex{Kind: AccountIndexNoTransaction}
 	}
-	return AccountIndex{Kind: TransactionIndex, Index: transactionIndex}
+	return AccountIndex{Kind: AccountIndexTransaction, Index: transactionIndex}
 }
 
-// AccountIndex returns TransactionIndex(0) for legacy omission and NativeOperation(0)
-// for legacy MAX without a native operation count.
+// AccountIndex returns Transaction(0) for legacy omission and NoTransaction for UINT64_MAX.
 func (account *SubscribeUpdateAccountInfo) AccountIndex() AccountIndex {
-	return DecodeAccountIndex(account.GetTransactionIndex(), account.GetNativeOperationCount())
+	return DecodeAccountIndex(account.GetTransactionIndex())
 }

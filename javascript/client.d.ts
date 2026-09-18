@@ -150,14 +150,12 @@ declare module 'laserstream-core-proto-js/generated' {
   namespace geyser {
     interface ISubscribeUpdateAccountInfo {
       /** Raw uint64 decimal strings; use getAccountIndex for the typed view.
-       * Legacy omission means TransactionIndex(0); MAX without a count means NativeOperation(0).
+       * Legacy omission means Transaction(0); UINT64_MAX means NoTransaction.
        */
       transactionIndex?: string;
-      nativeOperationCount?: string;
     }
     interface SubscribeUpdateAccountInfo {
       transactionIndex?: string;
-      nativeOperationCount?: string;
     }
     interface ISubscribeRequestFilterTransactions {
       /** Helius ATA expansion control (proto field #30). */

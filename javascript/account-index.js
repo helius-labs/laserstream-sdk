@@ -8,15 +8,15 @@ function safeInteger(value, field) {
   return number;
 }
 
-function decodeAccountIndex(transactionIndex, nativeOperationCount = '0') {
+function decodeAccountIndex(transactionIndex) {
   if (transactionIndex === MAX) {
-    return { kind: 'NativeOperation', operationCount: safeInteger(nativeOperationCount, 'native operation count') };
+    return { kind: 'NoTransaction' };
   }
-  return { kind: 'TransactionIndex', index: safeInteger(transactionIndex, 'transaction index') };
+  return { kind: 'Transaction', index: safeInteger(transactionIndex, 'transaction index') };
 }
 
 function getAccountIndex(account) {
-  return decodeAccountIndex(account.transactionIndex === undefined ? '0' : account.transactionIndex, account.nativeOperationCount);
+  return decodeAccountIndex(account.transactionIndex === undefined ? '0' : account.transactionIndex);
 }
 
 module.exports = { decodeAccountIndex, getAccountIndex };

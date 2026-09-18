@@ -7,6 +7,6 @@ type AccountIndex = pb.AccountIndex
 type AccountIndexKind = pb.AccountIndexKind
 
 const (
-	TransactionIndex = pb.TransactionIndex
-	NativeOperation  = pb.NativeOperation
+	AccountIndexTransaction   = pb.AccountIndexTransaction
+	AccountIndexNoTransaction = pb.AccountIndexNoTransaction
 )

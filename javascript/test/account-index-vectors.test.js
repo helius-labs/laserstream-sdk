@@ -4,12 +4,11 @@ const { getAccountIndex } = require('../account-index');
 
 (async () => {
   await initProtobuf();
-  for (const [hex, expected] of [
-    ['', { kind: 'TransactionIndex', index: 0 }],
-    ['800200', { kind: 'TransactionIndex', index: 0 }],
-    ['80022a880209', { kind: 'TransactionIndex', index: 42 }],
-    ['8002ffffffffffffffffff01', { kind: 'NativeOperation', operationCount: 0 }],
-    ['8002ffffffffffffffffff01880207', { kind: 'NativeOperation', operationCount: 7 }],
+  for (const { hex, expected } of [
+    { hex: '', expected: { kind: 'Transaction', index: 0 } },
+    { hex: '800200', expected: { kind: 'Transaction', index: 0 } },
+    { hex: '80022a', expected: { kind: 'Transaction', index: 42 } },
+    { hex: '8002ffffffffffffffffff01', expected: { kind: 'NoTransaction' } },
   ]) {
     const info = Buffer.from(hex, 'hex');
     for (const block of [false, true]) {
@@ -21,10 +20,8 @@ const { getAccountIndex } = require('../account-index');
   }
   for (const value of ['-1', '1.5', '9007199254740992']) {
     assert.throws(() => getAccountIndex({ transactionIndex: value }), RangeError);
-    assert.throws(() => getAccountIndex({ transactionIndex: '18446744073709551615', nativeOperationCount: value }), RangeError);
   }
-  assert.deepEqual(getAccountIndex({}), { kind: 'TransactionIndex', index: 0 });
-  assert.deepEqual(getAccountIndex({ transactionIndex: '9007199254740991' }), { kind: 'TransactionIndex', index: Number.MAX_SAFE_INTEGER });
-  assert.deepEqual(getAccountIndex({ transactionIndex: '18446744073709551615', nativeOperationCount: '9007199254740991' }), { kind: 'NativeOperation', operationCount: Number.MAX_SAFE_INTEGER });
-  console.log('account index: direct/nested legacy, transaction/native zero and nonzero, numeric guards passed');
+  assert.deepEqual(getAccountIndex({}), { kind: 'Transaction', index: 0 });
+  assert.deepEqual(getAccountIndex({ transactionIndex: '9007199254740991' }), { kind: 'Transaction', index: Number.MAX_SAFE_INTEGER });
+  console.log('account index: direct/nested legacy, transaction zero/nonzero, NoTransaction, numeric guards passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

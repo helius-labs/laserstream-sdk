@@ -1,8 +1,8 @@
-/** Getter-only view: zero-based transaction index or native operation count per pubkey/bank. */
+/** Getter-only view: no transaction or an unshifted zero-based transaction index. */
 export type AccountIndex =
-  | { readonly kind: 'NativeOperation'; readonly operationCount: number }
-  | { readonly kind: 'TransactionIndex'; readonly index: number };
-/** Decode raw uint64 strings; rejects the selected payload outside JS's safe nonnegative integer range. */
-export declare function decodeAccountIndex(transactionIndex: string, nativeOperationCount?: string): AccountIndex;
-/** Works on account updates and nested block accounts. Omitted legacy metadata means TransactionIndex(0). */
-export declare function getAccountIndex(account: { transactionIndex?: string; nativeOperationCount?: string }): AccountIndex;
+  | { readonly kind: 'NoTransaction' }
+  | { readonly kind: 'Transaction'; readonly index: number };
+/** Decode a raw uint64 string; exact UINT64_MAX means NoTransaction, otherwise requires a safe nonnegative integer. */
+export declare function decodeAccountIndex(transactionIndex: string): AccountIndex;
+/** Works on account updates and nested block accounts. Omitted legacy metadata means Transaction(0). */
+export declare function getAccountIndex(account: { transactionIndex?: string }): AccountIndex;
