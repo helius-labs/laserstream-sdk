@@ -73,9 +73,8 @@ impl StreamHandle {
             .map_err(|_| LaserstreamError::ConnectionError("Write channel closed".to_string()))
     }
 
-    /// Signals the background stream to shut down. The stream ends at its next
-    /// await point (an in-flight connection attempt is not interrupted, so
-    /// shutdown can take up to the connect timeout while reconnecting).
+    /// Signals the stream to shut down. Pending connection and subscription
+    /// setup are interrupted when the stream is polled.
     ///
     /// Any clone of the handle may call this; dropping handles without calling
     /// `close()` leaves the stream running, as before.
@@ -167,7 +166,12 @@ pub fn subscribe(
 
             let attempt_request = current_request.clone();
 
-            match connect_and_subscribe_once(&config, attempt_request, api_key_string.clone()).await {
+            let result = tokio::select! {
+                biased;
+                _ = close_rx.changed() => return,
+                result = connect_and_subscribe_once(&config, attempt_request, api_key_string.clone()) => result,
+            };
+            match result {
                 Ok((sender, stream)) => {
                     // Successful connection – reset attempt counter so we don't hit the cap
                     reconnect_attempts = 0;
@@ -584,9 +588,89 @@ fn merge_subscribe_requests(
 #[cfg(test)]
 mod tests {
     use futures::StreamExt;
+    use laserstream_core_proto::tonic::{
+        body::Body,
+        codegen::{http, Service},
+        server::NamedService,
+        transport::{server::TcpIncoming, Server},
+    };
+    use std::{
+        convert::Infallible,
+        future::Pending,
+        task::{Context, Poll},
+    };
     use tokio::time::timeout;
 
     use super::*;
+
+    #[derive(Clone)]
+    struct DelayedSubscribe {
+        started: mpsc::UnboundedSender<()>,
+    }
+
+    impl NamedService for DelayedSubscribe {
+        const NAME: &'static str = "geyser.Geyser";
+    }
+
+    impl Service<http::Request<Body>> for DelayedSubscribe {
+        type Response = http::Response<Body>;
+        type Error = Infallible;
+        type Future = Pending<Result<Self::Response, Self::Error>>;
+
+        fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn call(&mut self, request: http::Request<Body>) -> Self::Future {
+            assert_eq!(request.uri().path(), "/geyser.Geyser/Subscribe");
+            self.started.send(()).unwrap();
+            // Accept Subscribe but never send its response headers.
+            std::future::pending()
+        }
+    }
+
+    #[tokio::test]
+    async fn close_interrupts_pending_subscribe_response() {
+        let incoming = TcpIncoming::bind("127.0.0.1:0".parse().unwrap()).unwrap();
+        let addr = incoming.local_addr().unwrap();
+        let (started_tx, mut started_rx) = mpsc::unbounded_channel();
+        let server = tokio::spawn(async move {
+            Server::builder()
+                .add_service(DelayedSubscribe { started: started_tx })
+                .serve_with_incoming(incoming)
+                .await
+                .unwrap();
+        });
+        let config = LaserstreamConfig::new(format!("http://{addr}"), String::new())
+            .with_max_reconnect_attempts(1)
+            .with_channel_options(crate::config::ChannelOptions {
+                connect_timeout_secs: Some(1),
+                timeout_secs: Some(5),
+                ..Default::default()
+            });
+        let (stream, handle) = subscribe(config, SubscribeRequest::default());
+        tokio::pin!(stream);
+        let next = stream.next();
+        tokio::pin!(next);
+
+        // Poll the stream until the server receives Subscribe, ensuring close
+        // happens while setup is awaiting response headers, not before dialing.
+        tokio::select! {
+            first = &mut next => panic!("stream ended before Subscribe: {:?}", first),
+            started = timeout(Duration::from_secs(10), started_rx.recv()) => {
+                assert!(matches!(started, Ok(Some(()))), "Subscribe did not reach the server");
+            }
+        }
+        handle.close();
+        let first = timeout(Duration::from_secs(1), &mut next).await;
+        server.abort();
+        let _ = server.await;
+        assert!(
+            matches!(first, Ok(None)),
+            "expected clean end without waiting for the request timeout, got {:?}",
+            first
+        );
+    }
 
     /// Uses an endpoint that refuses connections, so the stream sits in its
     /// retry loop without needing a server. Binding then dropping a listener
