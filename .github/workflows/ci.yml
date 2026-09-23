@@ -18,6 +18,40 @@ permissions:
   id-token: write
 
 jobs:
+  bank-replay-transport:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - run: npm install --ignore-scripts
+        working-directory: javascript
+      - run: cargo test --locked --test replay_transport_consumer --no-default-features --no-run
+        working-directory: rust
+      - run: cargo build --locked && cp target/debug/liblaserstream_napi.so laserstream-napi.linux-x64-gnu.node
+        working-directory: javascript
+      - run: go test . ./proto -count=1
+        working-directory: go
+      - run: npx tsc --noEmit --strict --skipLibCheck test/bank-id-types.test.ts
+        working-directory: javascript
+      - run: |
+          node javascript/test/bank-id-vectors.test.js
+          node test/replay-transport.js
+          node test/replay-transport.js --case native-midbank --out replay-transport-evidence/native-midbank
+          node test/replay-transport.js --case native-midbank-prefix --out replay-transport-evidence/native-midbank-prefix
+          node test/replay-transport.js --case native-prefix-overlap --out replay-transport-evidence/native-prefix-overlap
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bank-replay-transport
+          path: replay-transport-evidence/
+
   rust-tests:
     name: Rust SDK tests
     runs-on: ubuntu-latest

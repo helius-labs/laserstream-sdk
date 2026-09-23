@@ -76,6 +76,7 @@
     "cuckoo.js",
     "cuckoo.d.ts",
     "proto-decoder.js",
+    "replay.js",
     "proto/",
     "README.md"
   ],

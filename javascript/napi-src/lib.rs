@@ -42,7 +42,8 @@ static ACTIVE_STREAM_COUNT: std::sync::atomic::AtomicU32 = std::sync::atomic::At
 // Simple wrapper that contains the protobuf bytes as ref-counted bytes::Bytes.
 // Using Bytes instead of Vec<u8> avoids an eager copy on the hot path — the .to_vec()
 // is deferred to ToNapiValue when the JS event loop actually picks up the callback.
-pub struct SubscribeUpdateBytes(pub bytes::Bytes);
+// The flag marks the first forwarded update on each transport connection.
+pub struct SubscribeUpdateBytes(pub bytes::Bytes, pub bool);
 
 impl ToNapiValue for SubscribeUpdateBytes {
     unsafe fn to_napi_value(env: napi::sys::napi_env, val: Self) -> napi::Result<napi::sys::napi_value> {
@@ -189,8 +190,9 @@ impl LaserstreamClient {
         let ts_callback: ThreadsafeFunction<SubscribeUpdateBytes, ErrorStrategy::CalleeHandled> =
             callback.create_threadsafe_function(1000, |ctx| {
                 let bytes_wrapper: SubscribeUpdateBytes = ctx.value;
+                let connection_start = ctx.env.get_boolean(bytes_wrapper.1)?.into_unknown();
                 let js_uint8array = unsafe { SubscribeUpdateBytes::to_napi_value(ctx.env.raw(), bytes_wrapper)? };
-                Ok(vec![unsafe { napi::JsUnknown::from_raw(ctx.env.raw(), js_uint8array)? }])
+                Ok(vec![unsafe { napi::JsUnknown::from_raw(ctx.env.raw(), js_uint8array)? }, connection_start])
             })?;
 
         let client_inner = self.inner.clone();
