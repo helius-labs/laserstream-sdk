@@ -1,21 +1,23 @@
-use base64::{engine::general_purpose, Engine as _};
 use napi::{bindgen_prelude::*, Env};
-use serde::Deserialize;
-use serde_json;
 use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
+use serde::Deserialize;
+use serde_json;
+use base64::{Engine as _, engine::general_purpose};
 
 use laserstream_core_proto::geyser::{
-    subscribe_request_filter_accounts_filter, subscribe_request_filter_accounts_filter_lamports,
-    subscribe_request_filter_accounts_filter_memcmp, CuckooFilter, SubscribePreprocessedRequest,
-    SubscribePreprocessedRequestFilterTransactions, SubscribeRequest,
-    SubscribeRequestAccountsDataSlice, SubscribeRequestFilterAccounts,
-    SubscribeRequestFilterAccountsFilter, SubscribeRequestFilterAccountsFilterLamports,
-    SubscribeRequestFilterAccountsFilterMemcmp, SubscribeRequestFilterBlockFooter,
-    SubscribeRequestFilterBlocks, SubscribeRequestFilterBlocksMeta, SubscribeRequestFilterEntry,
-    SubscribeRequestFilterSlots, SubscribeRequestFilterTransactions, SubscribeRequestPing,
-    TokenAccountExpansionControlFlag,
+    SubscribeRequest, SubscribeRequestFilterAccounts, SubscribeRequestFilterBlocks,
+    SubscribeRequestFilterSlots, SubscribeRequestFilterTransactions,
+    SubscribeRequestFilterBlocksMeta, SubscribeRequestFilterEntry, SubscribeRequestFilterBlockFooter,
+    SubscribeRequestAccountsDataSlice, SubscribeRequestPing,
+    SubscribeRequestFilterAccountsFilter, SubscribeRequestFilterAccountsFilterMemcmp,
+    SubscribeRequestFilterAccountsFilterLamports,
+    subscribe_request_filter_accounts_filter_memcmp,
+    subscribe_request_filter_accounts_filter_lamports,
+    subscribe_request_filter_accounts_filter,
+    SubscribePreprocessedRequest, SubscribePreprocessedRequestFilterTransactions,
+    CuckooFilter, TokenAccountExpansionControlFlag,
 };
 
 /// Map the JS-facing `tokenAccounts` string to the proto enum tag the wire
@@ -61,7 +63,7 @@ pub struct ChannelOptions {
     pub grpc_keepalive_permit_without_calls: Option<i32>,
     #[serde(rename = "grpc.default_compression_algorithm")]
     pub grpc_default_compression_algorithm: Option<i32>,
-
+    
     // Catch-all for other options
     #[serde(flatten)]
     pub other: HashMap<String, serde_json::Value>,
@@ -270,33 +272,35 @@ impl ClientInner {
         js_request: JsSubscribeRequest,
     ) -> Result<SubscribeRequest> {
         let mut request = SubscribeRequest::default();
-
+        
         // Handle accounts with complete filter support
         if let Some(accounts) = js_request.accounts {
             let mut accounts_map = HashMap::new();
             for (key, filter) in accounts {
                 let mut yellowstone_filter = SubscribeRequestFilterAccounts::default();
+                
 
+                
                 // Handle account field (legacy interface)
                 if let Some(account_list) = filter.account {
                     yellowstone_filter.account = account_list;
                 }
-
+                
                 // Handle accountInclude field (consistent interface)
                 if let Some(account_include_list) = filter.account_include {
                     yellowstone_filter.account = account_include_list;
                 }
-
+                
                 if let Some(owner_list) = filter.owner {
                     yellowstone_filter.owner = owner_list;
                 }
-
+                
                 // Handle accountExclude - NOT directly supported by Yellowstone accounts filter
                 // This would need to be implemented via complex filters, which is beyond scope
                 if let Some(_account_exclude_list) = filter.account_exclude {
                     // accountExclude not directly supported for account subscriptions
                 }
-
+                
                 // Handle accountRequired - NOT directly supported by Yellowstone accounts filter
                 if let Some(_account_required_list) = filter.account_required {
                     // accountRequired not directly supported for account subscriptions
@@ -305,96 +309,56 @@ impl ClientInner {
                 if let Some(nonempty_txn_signature) = filter.nonempty_txn_signature {
                     yellowstone_filter.nonempty_txn_signature = Some(nonempty_txn_signature);
                 }
-
+                
                 // Handle complete filters
                 if let Some(filters) = filter.filters {
                     let mut yellowstone_filters = Vec::new();
                     for js_filter in filters {
-                        let mut yellowstone_accounts_filter =
-                            SubscribeRequestFilterAccountsFilter::default();
-
+                        let mut yellowstone_accounts_filter = SubscribeRequestFilterAccountsFilter::default();
+                        
                         if let Some(memcmp) = js_filter.memcmp {
                             let mut memcmp_filter = SubscribeRequestFilterAccountsFilterMemcmp {
                                 offset: memcmp.offset,
                                 data: None,
                             };
-
+                            
                             if let Some(bytes_str) = memcmp.bytes {
-                                let bytes_data =
-                                    general_purpose::STANDARD.decode(&bytes_str).map_err(|e| {
-                                        Error::new(
-                                            Status::InvalidArg,
-                                            format!("Invalid base64 bytes: {}", e),
-                                        )
-                                    })?;
-                                memcmp_filter.data = Some(
-                                    subscribe_request_filter_accounts_filter_memcmp::Data::Bytes(
-                                        bytes_data,
-                                    ),
-                                );
+                                let bytes_data = general_purpose::STANDARD.decode(&bytes_str)
+                                    .map_err(|e| Error::new(Status::InvalidArg, format!("Invalid base64 bytes: {}", e)))?;
+                                memcmp_filter.data = Some(subscribe_request_filter_accounts_filter_memcmp::Data::Bytes(bytes_data));
                             } else if let Some(base58_str) = memcmp.base58 {
-                                memcmp_filter.data = Some(
-                                    subscribe_request_filter_accounts_filter_memcmp::Data::Base58(
-                                        base58_str,
-                                    ),
-                                );
+                                memcmp_filter.data = Some(subscribe_request_filter_accounts_filter_memcmp::Data::Base58(base58_str));
                             } else if let Some(base64_str) = memcmp.base64 {
-                                memcmp_filter.data = Some(
-                                    subscribe_request_filter_accounts_filter_memcmp::Data::Base64(
-                                        base64_str,
-                                    ),
-                                );
+                                memcmp_filter.data = Some(subscribe_request_filter_accounts_filter_memcmp::Data::Base64(base64_str));
                             }
-
-                            yellowstone_accounts_filter.filter =
-                                Some(subscribe_request_filter_accounts_filter::Filter::Memcmp(
-                                    memcmp_filter,
-                                ));
+                            
+                            yellowstone_accounts_filter.filter = Some(subscribe_request_filter_accounts_filter::Filter::Memcmp(memcmp_filter));
                         }
-
+                        
                         if let Some(datasize) = js_filter.datasize {
-                            yellowstone_accounts_filter.filter =
-                                Some(subscribe_request_filter_accounts_filter::Filter::Datasize(
-                                    datasize,
-                                ));
+                            yellowstone_accounts_filter.filter = Some(subscribe_request_filter_accounts_filter::Filter::Datasize(datasize));
                         }
-
+                        
                         if let Some(token_account_state) = js_filter.token_account_state {
-                            yellowstone_accounts_filter.filter = Some(
-                                subscribe_request_filter_accounts_filter::Filter::TokenAccountState(
-                                    token_account_state,
-                                ),
-                            );
+                            yellowstone_accounts_filter.filter = Some(subscribe_request_filter_accounts_filter::Filter::TokenAccountState(token_account_state));
                         }
-
+                        
                         if let Some(lamports) = js_filter.lamports {
-                            let mut lamports_filter =
-                                SubscribeRequestFilterAccountsFilterLamports::default();
-
+                            let mut lamports_filter = SubscribeRequestFilterAccountsFilterLamports::default();
+                            
                             if let Some(eq) = lamports.eq {
-                                lamports_filter.cmp = Some(
-                                    subscribe_request_filter_accounts_filter_lamports::Cmp::Eq(eq),
-                                );
+                                lamports_filter.cmp = Some(subscribe_request_filter_accounts_filter_lamports::Cmp::Eq(eq));
                             } else if let Some(ne) = lamports.ne {
-                                lamports_filter.cmp = Some(
-                                    subscribe_request_filter_accounts_filter_lamports::Cmp::Ne(ne),
-                                );
+                                lamports_filter.cmp = Some(subscribe_request_filter_accounts_filter_lamports::Cmp::Ne(ne));
                             } else if let Some(lt) = lamports.lt {
-                                lamports_filter.cmp = Some(
-                                    subscribe_request_filter_accounts_filter_lamports::Cmp::Lt(lt),
-                                );
+                                lamports_filter.cmp = Some(subscribe_request_filter_accounts_filter_lamports::Cmp::Lt(lt));
                             } else if let Some(gt) = lamports.gt {
-                                lamports_filter.cmp = Some(
-                                    subscribe_request_filter_accounts_filter_lamports::Cmp::Gt(gt),
-                                );
+                                lamports_filter.cmp = Some(subscribe_request_filter_accounts_filter_lamports::Cmp::Gt(gt));
                             }
-
-                            yellowstone_accounts_filter.filter =
-                                Some(subscribe_request_filter_accounts_filter::Filter::Lamports(
-                                    lamports_filter,
-                                ));
+                            
+                            yellowstone_accounts_filter.filter = Some(subscribe_request_filter_accounts_filter::Filter::Lamports(lamports_filter));
                         }
-
+                        
                         yellowstone_filters.push(yellowstone_accounts_filter);
                     }
                     yellowstone_filter.filters = yellowstone_filters;
@@ -402,20 +366,10 @@ impl ClientInner {
 
                 // Handle compressed account (cuckoo) filter — pass through bytes built client-side.
                 if let Some(cuckoo) = filter.cuckoo_accounts_filter {
-                    let data = general_purpose::STANDARD
-                        .decode(&cuckoo.data)
-                        .map_err(|e| {
-                            Error::new(
-                                Status::InvalidArg,
-                                format!("Invalid base64 cuckoo data: {}", e),
-                            )
-                        })?;
-                    let hash_seed = cuckoo.hash_seed.parse::<u64>().map_err(|e| {
-                        Error::new(
-                            Status::InvalidArg,
-                            format!("Invalid cuckoo hash_seed: {}", e),
-                        )
-                    })?;
+                    let data = general_purpose::STANDARD.decode(&cuckoo.data)
+                        .map_err(|e| Error::new(Status::InvalidArg, format!("Invalid base64 cuckoo data: {}", e)))?;
+                    let hash_seed = cuckoo.hash_seed.parse::<u64>()
+                        .map_err(|e| Error::new(Status::InvalidArg, format!("Invalid cuckoo hash_seed: {}", e)))?;
                     yellowstone_filter.cuckoo_accounts_filter = Some(CuckooFilter {
                         data,
                         bucket_count: cuckoo.bucket_count,
@@ -430,69 +384,59 @@ impl ClientInner {
             }
             request.accounts = accounts_map;
         }
-
+        
         // Handle slots with complete filter support
         if let Some(slots) = js_request.slots {
             let mut slots_map = HashMap::new();
             for (key, filter) in slots {
                 let mut yellowstone_filter = SubscribeRequestFilterSlots::default();
-
+                
                 if let Some(filter_by_commitment) = filter.filter_by_commitment {
                     yellowstone_filter.filter_by_commitment = Some(filter_by_commitment);
                 }
-
+                
                 if let Some(interslot_updates) = filter.interslot_updates {
                     yellowstone_filter.interslot_updates = Some(interslot_updates);
                 }
-
+                
                 slots_map.insert(key, yellowstone_filter);
             }
             request.slots = slots_map;
         }
-
+        
         // Handle transactions with complete filter support
         if let Some(transactions) = js_request.transactions {
             let mut transactions_map = HashMap::new();
             for (key, filter) in transactions {
                 let mut yellowstone_filter = SubscribeRequestFilterTransactions::default();
-
+                
                 yellowstone_filter.vote = filter.vote;
                 yellowstone_filter.failed = filter.failed;
                 yellowstone_filter.signature = filter.signature;
-
+                
                 if let Some(account_include) = filter.account_include {
                     yellowstone_filter.account_include = account_include;
                 }
-
+                
                 if let Some(account_exclude) = filter.account_exclude {
                     yellowstone_filter.account_exclude = account_exclude;
                 }
-
+                
                 if let Some(account_required) = filter.account_required {
                     yellowstone_filter.account_required = account_required;
                 }
 
-                yellowstone_filter.token_accounts =
-                    parse_token_accounts_mode(filter.token_accounts).map_err(Error::from_reason)?;
+                yellowstone_filter.token_accounts = parse_token_accounts_mode(filter.token_accounts)
+                    .map_err(Error::from_reason)?;
 
                 yellowstone_filter.match_mints = filter.match_mints.unwrap_or(false);
 
                 // Handle compressed account (cuckoo) filter — pass through bytes built client-side.
                 if let Some(cuckoo) = filter.cuckoo_account_include {
-                    let data = general_purpose::STANDARD
-                        .decode(&cuckoo.data)
-                        .map_err(|e| {
-                            Error::new(
-                                Status::InvalidArg,
-                                format!("Invalid base64 cuckoo data: {}", e),
-                            )
-                        })?;
-                    let hash_seed = cuckoo.hash_seed.parse::<u64>().map_err(|e| {
-                        Error::new(
-                            Status::InvalidArg,
-                            format!("Invalid cuckoo hash_seed: {}", e),
-                        )
-                    })?;
+                    let data = general_purpose::STANDARD.decode(&cuckoo.data)
+                        .map_err(|e| Error::new(Status::InvalidArg, format!("Invalid base64 cuckoo data: {}", e)))?;
+                    let hash_seed = cuckoo.hash_seed.parse::<u64>()
+                        .map_err(|e| Error::new(Status::InvalidArg, format!("Invalid cuckoo hash_seed: {}", e)))?;
                     yellowstone_filter.cuckoo_account_include = Some(CuckooFilter {
                         data,
                         bucket_count: cuckoo.bucket_count,
@@ -530,8 +474,8 @@ impl ClientInner {
                     yellowstone_filter.account_required = account_required;
                 }
 
-                yellowstone_filter.token_accounts =
-                    parse_token_accounts_mode(filter.token_accounts).map_err(Error::from_reason)?;
+                yellowstone_filter.token_accounts = parse_token_accounts_mode(filter.token_accounts)
+                    .map_err(Error::from_reason)?;
 
                 yellowstone_filter.match_mints = filter.match_mints.unwrap_or(false);
 
@@ -539,26 +483,26 @@ impl ClientInner {
             }
             request.transactions_status = transactions_status_map;
         }
-
+        
         // Handle blocks with complete filter support
         if let Some(blocks) = js_request.blocks {
             let mut blocks_map = HashMap::new();
             for (key, filter) in blocks {
                 let mut yellowstone_filter = SubscribeRequestFilterBlocks::default();
-
+                
                 if let Some(account_include) = filter.account_include {
                     yellowstone_filter.account_include = account_include;
                 }
-
+                
                 yellowstone_filter.include_transactions = filter.include_transactions;
                 yellowstone_filter.include_accounts = filter.include_accounts;
                 yellowstone_filter.include_entries = filter.include_entries;
-
+                
                 blocks_map.insert(key, yellowstone_filter);
             }
             request.blocks = blocks_map;
         }
-
+        
         // Handle blocks_meta
         if let Some(blocks_meta) = js_request.blocks_meta {
             let mut blocks_meta_map = HashMap::new();
@@ -567,7 +511,7 @@ impl ClientInner {
             }
             request.blocks_meta = blocks_meta_map;
         }
-
+        
         // Handle block_footer
         if let Some(block_footer) = js_request.block_footer {
             let mut block_footer_map = HashMap::new();
@@ -585,10 +529,10 @@ impl ClientInner {
             }
             request.entry = entry_map;
         }
-
+        
         // Handle commitment
         request.commitment = js_request.commitment;
-
+        
         // Handle accounts_data_slice
         if let Some(accounts_data_slice) = js_request.accounts_data_slice {
             let mut yellowstone_slices = Vec::new();
@@ -600,23 +544,21 @@ impl ClientInner {
             }
             request.accounts_data_slice = yellowstone_slices;
         }
-
+        
         // Handle ping
         if let Some(ping) = js_request.ping {
-            request.ping = Some(SubscribeRequestPing { id: ping.id });
+            request.ping = Some(SubscribeRequestPing {
+                id: ping.id,
+            });
         }
-
+        
         // Handle from_slot
         request.from_slot = js_request.from_slot;
-
+        
         Ok(request)
     }
 
-    pub fn js_to_subscribe_preprocessed_request(
-        &self,
-        env: &Env,
-        js_obj: Object,
-    ) -> Result<SubscribePreprocessedRequest> {
+    pub fn js_to_subscribe_preprocessed_request(&self, env: &Env, js_obj: Object) -> Result<SubscribePreprocessedRequest> {
         let js_request: JsSubscribePreprocessedRequest = env.from_js_value(js_obj)?;
 
         let mut request = SubscribePreprocessedRequest::default();
@@ -625,8 +567,7 @@ impl ClientInner {
         if let Some(transactions) = js_request.transactions {
             let mut transactions_map = HashMap::new();
             for (key, filter) in transactions {
-                let mut preprocessed_filter =
-                    SubscribePreprocessedRequestFilterTransactions::default();
+                let mut preprocessed_filter = SubscribePreprocessedRequestFilterTransactions::default();
 
                 preprocessed_filter.vote = filter.vote;
                 preprocessed_filter.signature = filter.signature;
@@ -650,7 +591,9 @@ impl ClientInner {
 
         // Handle ping
         if let Some(ping) = js_request.ping {
-            request.ping = Some(SubscribeRequestPing { id: ping.id });
+            request.ping = Some(SubscribeRequestPing {
+                id: ping.id,
+            });
         }
 
         Ok(request)

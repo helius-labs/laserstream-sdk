@@ -1,25 +1,20 @@
-use crate::client::ChannelOptions;
-use bytes::Buf;
-use futures_util::{SinkExt, StreamExt};
-use laserstream_core_client::{ClientTlsConfig, Interceptor};
-use laserstream_core_proto::geyser;
-use laserstream_core_proto::prelude::geyser_client::GeyserClient;
-use laserstream_core_proto::tonic::{
-    codec::{self, CompressionEncoding},
-    metadata::MetadataValue,
-    transport::Endpoint,
-    Request, Status,
-};
-use napi::bindgen_prelude::*;
+use futures_util::{StreamExt, SinkExt};
+use tokio::sync::mpsc;
 use napi::threadsafe_function::{ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode};
+use napi::bindgen_prelude::*;
 use parking_lot::Mutex;
-use prost::Message;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::mpsc;
 use tokio::sync::oneshot;
+use bytes::Buf;
+use laserstream_core_client::{ClientTlsConfig, Interceptor};
+use laserstream_core_proto::prelude::{geyser_client::GeyserClient};
+use laserstream_core_proto::geyser;
+use laserstream_core_proto::tonic::{codec::{self, CompressionEncoding}, transport::Endpoint, Request, Status, metadata::MetadataValue};
 use uuid;
+use prost::Message;
+use crate::client::ChannelOptions;
 
 // Constants for reconnect logic
 const HARD_CAP_RECONNECT_ATTEMPTS: u32 = (20 * 60) / 5; // 20 mins / 5 sec interval = 240 attempts
@@ -40,11 +35,9 @@ impl SdkMetadataInterceptor {
     fn new(token: &Option<String>) -> std::result::Result<Self, Status> {
         let x_token = if let Some(token_str) = token {
             if !token_str.is_empty() {
-                Some(
-                    token_str
-                        .parse()
-                        .map_err(|e| Status::invalid_argument(format!("Invalid API key: {}", e)))?,
-                )
+                Some(token_str.parse().map_err(|e| {
+                    Status::invalid_argument(format!("Invalid API key: {}", e))
+                })?)
             } else {
                 None
             }
@@ -63,12 +56,8 @@ impl Interceptor for SdkMetadataInterceptor {
         }
 
         // Add SDK metadata headers
-        request
-            .metadata_mut()
-            .insert("x-sdk-name", MetadataValue::from_static(SDK_NAME));
-        request
-            .metadata_mut()
-            .insert("x-sdk-version", MetadataValue::from_static(SDK_VERSION));
+        request.metadata_mut().insert("x-sdk-name", MetadataValue::from_static(SDK_NAME));
+        request.metadata_mut().insert("x-sdk-version", MetadataValue::from_static(SDK_VERSION));
 
         Ok(request)
     }
@@ -85,23 +74,15 @@ struct ChannelConfig {
 impl ChannelConfig {
     fn from_options(channel_options: &Option<ChannelOptions>) -> Self {
         if let Some(ref opts) = channel_options {
-            let send_compression =
-                opts.grpc_default_compression_algorithm
-                    .and_then(|algo| match algo {
-                        2 => Some(CompressionEncoding::Gzip),
-                        3 => Some(CompressionEncoding::Zstd),
-                        _ => None,
-                    });
+            let send_compression = opts.grpc_default_compression_algorithm.and_then(|algo| match algo {
+                2 => Some(CompressionEncoding::Gzip),
+                3 => Some(CompressionEncoding::Zstd),
+                _ => None,
+            });
 
             Self {
-                max_send_msg_size: opts
-                    .grpc_max_send_message_length
-                    .map(|v| v as usize)
-                    .unwrap_or(64 * 1024 * 1024),
-                max_recv_msg_size: opts
-                    .grpc_max_receive_message_length
-                    .map(|v| v as usize)
-                    .unwrap_or(1_000_000_000),
+                max_send_msg_size: opts.grpc_max_send_message_length.map(|v| v as usize).unwrap_or(64 * 1024 * 1024),
+                max_recv_msg_size: opts.grpc_max_receive_message_length.map(|v| v as usize).unwrap_or(1_000_000_000),
                 send_compression,
                 accept_compression: send_compression,
             }
@@ -126,8 +107,7 @@ fn configure_endpoint(
     if let Some(ref opts) = channel_options {
         // Keep-alive options
         if let Some(keepalive_time) = opts.grpc_keepalive_time_ms {
-            endpoint =
-                endpoint.http2_keep_alive_interval(Duration::from_millis(keepalive_time as u64));
+            endpoint = endpoint.http2_keep_alive_interval(Duration::from_millis(keepalive_time as u64));
         }
         if let Some(keepalive_timeout) = opts.grpc_keepalive_timeout_ms {
             endpoint = endpoint.keep_alive_timeout(Duration::from_millis(keepalive_timeout as u64));
@@ -142,8 +122,7 @@ fn configure_endpoint(
                 "grpc.http2.min_time_between_pings_ms" => {
                     if opts.grpc_keepalive_time_ms.is_none() {
                         if let Some(ms) = value.as_i64() {
-                            endpoint = endpoint
-                                .http2_keep_alive_interval(Duration::from_millis(ms as u64));
+                            endpoint = endpoint.http2_keep_alive_interval(Duration::from_millis(ms as u64));
                         }
                     }
                 }
@@ -214,10 +193,7 @@ impl codec::Decoder for RawBytesDecoder {
     type Item = bytes::Bytes;
     type Error = Status;
 
-    fn decode(
-        &mut self,
-        src: &mut codec::DecodeBuf<'_>,
-    ) -> std::result::Result<Option<Self::Item>, Self::Error> {
+    fn decode(&mut self, src: &mut codec::DecodeBuf<'_>) -> std::result::Result<Option<Self::Item>, Self::Error> {
         let len = src.remaining();
         if len == 0 {
             return Ok(None);
@@ -233,11 +209,7 @@ impl codec::Encoder for ProstRequestEncoder {
     type Item = geyser::SubscribeRequest;
     type Error = Status;
 
-    fn encode(
-        &mut self,
-        item: Self::Item,
-        dst: &mut codec::EncodeBuf<'_>,
-    ) -> std::result::Result<(), Self::Error> {
+    fn encode(&mut self, item: Self::Item, dst: &mut codec::EncodeBuf<'_>) -> std::result::Result<(), Self::Error> {
         item.encode(dst)
             .map_err(|e| Status::internal(format!("prost encode error: {}", e)))
     }
@@ -252,12 +224,8 @@ impl codec::Codec for SubscribeRawCodec {
     type Encoder = ProstRequestEncoder;
     type Decoder = RawBytesDecoder;
 
-    fn encoder(&mut self) -> Self::Encoder {
-        ProstRequestEncoder
-    }
-    fn decoder(&mut self) -> Self::Decoder {
-        RawBytesDecoder
-    }
+    fn encoder(&mut self) -> Self::Encoder { ProstRequestEncoder }
+    fn decoder(&mut self) -> Self::Decoder { RawBytesDecoder }
 }
 
 /// Peek at raw protobuf bytes to determine the SubscribeUpdate oneof field number.
@@ -349,14 +317,11 @@ impl StreamInner {
 
         // Add internal slot subscription for tracking only when replay is enabled
         if replay {
-            initial_request.slots.insert(
-                internal_slot_sub_id.clone(),
-                geyser::SubscribeRequestFilterSlots {
-                    filter_by_commitment: Some(true),
-                    interslot_updates: Some(false),
-                    ..Default::default()
-                },
-            );
+            initial_request.slots.insert(internal_slot_sub_id.clone(), geyser::SubscribeRequestFilterSlots {
+                filter_by_commitment: Some(true),
+                interslot_updates: Some(false),
+                ..Default::default()
+            });
         }
 
         // If replay is disabled, ensure any user-provided from_slot is cleared on initial connect
@@ -465,7 +430,7 @@ impl StreamInner {
                     }
                 }
             }
-
+            
             // Unregister from global registry when stream ends
             crate::unregister_stream(&id_for_cleanup);
         });
@@ -504,8 +469,7 @@ impl StreamInner {
         //   gRPC bytes → prost decode → Rust struct → prost re-encode → Vec<u8> → JS
         // the fast path is now:
         //   gRPC bytes → copy_to_bytes() → Vec<u8> → JS
-        let svc =
-            laserstream_core_proto::tonic::codegen::InterceptedService::new(channel, interceptor);
+        let svc = laserstream_core_proto::tonic::codegen::InterceptedService::new(channel, interceptor);
         let mut grpc = laserstream_core_proto::tonic::client::Grpc::new(svc)
             .max_decoding_message_size(channel_config.max_recv_msg_size)
             .max_encoding_message_size(channel_config.max_send_msg_size);
@@ -532,9 +496,7 @@ impl StreamInner {
             let path = laserstream_core_proto::tonic::codegen::http::uri::PathAndQuery::from_static(
                 "/geyser.Geyser/Subscribe",
             );
-            let response = grpc
-                .streaming(Request::new(subscribe_rx), path, codec)
-                .await?;
+            let response = grpc.streaming(Request::new(subscribe_rx), path, codec).await?;
             (subscribe_tx, response.into_inner())
         };
 
@@ -597,10 +559,8 @@ impl StreamInner {
                                         }
 
                                         let bytes_wrapper = crate::SubscribeUpdateBytes(buf.into());
-                                        let status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
-                                        if status == napi::Status::Ok {
-                                            progress_flag.store(true, Ordering::SeqCst);
-                                        }
+                                        progress_flag.store(true, Ordering::SeqCst);
+                                        let _status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
                                     }
                                     continue;
                                 }
@@ -621,7 +581,7 @@ impl StreamInner {
                                     if status == napi::Status::Ok {
                                         progress_flag.store(true, Ordering::SeqCst);
                                     } else if status == napi::Status::Closing {
-                                                continue;
+                                        continue;
                                     }
                                 }
                                 // All other messages (account=2, transaction=4, block=5, block_meta=7,
@@ -629,10 +589,8 @@ impl StreamInner {
                                 // No prost decode or re-encode needed - just one memcpy.
                                 _ => {
                                     let bytes_wrapper = crate::SubscribeUpdateBytes(raw_bytes);
-                                    let status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
-                                    if status == napi::Status::Ok {
-                                        progress_flag.store(true, Ordering::SeqCst);
-                                    }
+                                    progress_flag.store(true, Ordering::SeqCst);
+                                    let _status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
                                 }
                             }
                         }
@@ -678,10 +636,7 @@ impl StreamInner {
         endpoint: String,
         token: Option<String>,
         initial_request: geyser::SubscribePreprocessedRequest,
-        ts_callback: ThreadsafeFunction<
-            crate::SubscribePreprocessedUpdateBytes,
-            ErrorStrategy::CalleeHandled,
-        >,
+        ts_callback: ThreadsafeFunction<crate::SubscribePreprocessedUpdateBytes, ErrorStrategy::CalleeHandled>,
         max_reconnect_attempts: u32,
         channel_options: Option<ChannelOptions>,
     ) -> Result<Self> {
@@ -743,10 +698,7 @@ impl StreamInner {
         endpoint: &str,
         token: &Option<String>,
         request: &geyser::SubscribePreprocessedRequest,
-        ts_callback: ThreadsafeFunction<
-            crate::SubscribePreprocessedUpdateBytes,
-            ErrorStrategy::CalleeHandled,
-        >,
+        ts_callback: ThreadsafeFunction<crate::SubscribePreprocessedUpdateBytes, ErrorStrategy::CalleeHandled>,
         channel_options: &Option<ChannelOptions>,
     ) -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
         // Create our custom interceptor with SDK metadata
@@ -842,9 +794,7 @@ impl StreamInner {
         modification: &geyser::SubscribeRequest,
     ) {
         // Save the internal slot tracker before replacing slots
-        let internal_tracker = current
-            .slots
-            .iter()
+        let internal_tracker = current.slots.iter()
             .find(|(k, _)| k.starts_with("__internal_slot_tracker_"))
             .map(|(k, v)| (k.clone(), v.clone()));
 
@@ -882,9 +832,8 @@ impl StreamInner {
     pub fn write(&self, request: geyser::SubscribeRequest) -> Result<()> {
         let tx_guard = self.write_tx.lock();
         if let Some(ref tx) = *tx_guard {
-            tx.send(request).map_err(|_| {
-                napi::Error::from_reason("Failed to send write request: channel closed")
-            })?;
+            tx.send(request)
+                .map_err(|_| napi::Error::from_reason("Failed to send write request: channel closed"))?;
         } else {
             return Err(napi::Error::from_reason("write() is not supported for preprocessed subscriptions. Use subscribe() instead of subscribePreprocessed() if you need dynamic subscription updates."));
         }
