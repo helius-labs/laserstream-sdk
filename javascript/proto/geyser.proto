@@ -83,6 +83,7 @@ message SubscribeRequest {
   repeated SubscribeRequestAccountsDataSlice accounts_data_slice = 7;
   optional SubscribeRequestPing ping = 9;
   optional uint64 from_slot = 11;
+  map<string, SubscribeRequestFilterBlockFooter> block_footer = 12;
 }
 
 message SubscribeRequestFilterAccounts {
@@ -164,6 +165,8 @@ message SubscribeRequestFilterBlocksMeta {}
 
 message SubscribeRequestFilterEntry {}
 
+message SubscribeRequestFilterBlockFooter {}
+
 message SubscribeRequestAccountsDataSlice {
   uint64 offset = 1;
   uint64 length = 2;
@@ -185,6 +188,7 @@ message SubscribeUpdate {
     SubscribeUpdatePong pong = 9;
     SubscribeUpdateBlockMeta block_meta = 7;
     SubscribeUpdateEntry entry = 8;
+    SubscribeUpdateBlockFooter block_footer = 12;
   }
   google.protobuf.Timestamp created_at = 11;
 }
@@ -197,6 +201,8 @@ message SubscribeUpdateAccount {
   SubscribeUpdateAccountInfo account = 1;
   uint64 slot = 2;
   bool is_startup = 3;
+  // if is_startup is true, bank id is None.
+  optional uint64 bank_id = 4;
 }
 
 message SubscribeUpdateAccountInfo {
@@ -215,11 +221,14 @@ message SubscribeUpdateSlot {
   optional uint64 parent = 2;
   SlotStatus status = 3;
   optional string dead_error = 4;
+  // FIRST_SHRED_RECEIVED and COMPLETED slot status does not belong to any bank.
+  optional uint64 bank_id = 5;
 }
 
 message SubscribeUpdateTransaction {
   SubscribeUpdateTransactionInfo transaction = 1;
   uint64 slot = 2;
+  uint64 bank_id = 3;
 }
 
 message SubscribeUpdateTransactionInfo {
@@ -236,6 +245,7 @@ message SubscribeUpdateTransactionStatus {
   bool is_vote = 3;
   uint64 index = 4;
   solana.storage.ConfirmedBlock.TransactionError err = 5;
+  uint64 bank_id = 6;
 }
 
 message SubscribeUpdateBlock {
@@ -252,6 +262,7 @@ message SubscribeUpdateBlock {
   repeated SubscribeUpdateAccountInfo accounts = 11;
   uint64 entries_count = 12;
   repeated SubscribeUpdateEntry entries = 13;
+  uint64 bank_id = 14;
 }
 
 message SubscribeUpdateBlockMeta {
@@ -264,6 +275,15 @@ message SubscribeUpdateBlockMeta {
   string parent_blockhash = 7;
   uint64 executed_transaction_count = 8;
   uint64 entries_count = 9;
+  uint64 bank_id = 10;
+}
+
+message SubscribeUpdateBlockFooter {
+  uint64 slot = 1;
+  uint64 bank_id = 2;
+  bytes bank_hash = 3;
+  uint64 block_producer_time_nanos = 4;
+  bytes block_user_agent = 5;
 }
 
 message SubscribeUpdateEntry {
@@ -273,6 +293,7 @@ message SubscribeUpdateEntry {
   bytes hash = 4;
   uint64 executed_transaction_count = 5;
   uint64 starting_transaction_index = 6; // added in v1.18, for solana 1.17 value is always 0
+  uint64 bank_id = 7;
 }
 
 message SubscribeUpdatePing {}

@@ -1,25 +1,32 @@
-use futures_util::{StreamExt, SinkExt};
-use tokio::sync::mpsc;
-use napi::threadsafe_function::{ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode};
+use crate::client::ChannelOptions;
+use bytes::Buf;
+use futures_util::{SinkExt, StreamExt};
+use laserstream_core_client::{ClientTlsConfig, Interceptor};
+use laserstream_core_proto::geyser;
+use laserstream_core_proto::prelude::geyser_client::GeyserClient;
+use laserstream_core_proto::tonic::{
+    codec::{self, CompressionEncoding},
+    metadata::MetadataValue,
+    transport::Endpoint,
+    Request, Status,
+};
 use napi::bindgen_prelude::*;
+use napi::threadsafe_function::{ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use parking_lot::Mutex;
+use prost::Message;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::mpsc;
 use tokio::sync::oneshot;
-use bytes::Buf;
-use laserstream_core_client::{ClientTlsConfig, Interceptor};
-use laserstream_core_proto::prelude::{geyser_client::GeyserClient};
-use laserstream_core_proto::geyser;
-use laserstream_core_proto::tonic::{codec::{self, CompressionEncoding}, transport::Endpoint, Request, Status, metadata::MetadataValue};
 use uuid;
-use prost::Message;
-use crate::client::ChannelOptions;
 
 // Constants for reconnect logic
 const HARD_CAP_RECONNECT_ATTEMPTS: u32 = (20 * 60) / 5; // 20 mins / 5 sec interval = 240 attempts
 const FIXED_RECONNECT_INTERVAL_MS: u64 = 5000; // 5 seconds fixed interval
 const FORK_DEPTH_SAFETY_MARGIN: u64 = 31; // Max fork depth for processed commitment
+const FOOTER_DEDUP_SLOT_RETENTION: usize = 256;
 
 // SDK metadata constants
 const SDK_NAME: &str = "laserstream-javascript";
@@ -35,9 +42,11 @@ impl SdkMetadataInterceptor {
     fn new(token: &Option<String>) -> std::result::Result<Self, Status> {
         let x_token = if let Some(token_str) = token {
             if !token_str.is_empty() {
-                Some(token_str.parse().map_err(|e| {
-                    Status::invalid_argument(format!("Invalid API key: {}", e))
-                })?)
+                Some(
+                    token_str
+                        .parse()
+                        .map_err(|e| Status::invalid_argument(format!("Invalid API key: {}", e)))?,
+                )
             } else {
                 None
             }
@@ -56,8 +65,12 @@ impl Interceptor for SdkMetadataInterceptor {
         }
 
         // Add SDK metadata headers
-        request.metadata_mut().insert("x-sdk-name", MetadataValue::from_static(SDK_NAME));
-        request.metadata_mut().insert("x-sdk-version", MetadataValue::from_static(SDK_VERSION));
+        request
+            .metadata_mut()
+            .insert("x-sdk-name", MetadataValue::from_static(SDK_NAME));
+        request
+            .metadata_mut()
+            .insert("x-sdk-version", MetadataValue::from_static(SDK_VERSION));
 
         Ok(request)
     }
@@ -74,15 +87,23 @@ struct ChannelConfig {
 impl ChannelConfig {
     fn from_options(channel_options: &Option<ChannelOptions>) -> Self {
         if let Some(ref opts) = channel_options {
-            let send_compression = opts.grpc_default_compression_algorithm.and_then(|algo| match algo {
-                2 => Some(CompressionEncoding::Gzip),
-                3 => Some(CompressionEncoding::Zstd),
-                _ => None,
-            });
+            let send_compression =
+                opts.grpc_default_compression_algorithm
+                    .and_then(|algo| match algo {
+                        2 => Some(CompressionEncoding::Gzip),
+                        3 => Some(CompressionEncoding::Zstd),
+                        _ => None,
+                    });
 
             Self {
-                max_send_msg_size: opts.grpc_max_send_message_length.map(|v| v as usize).unwrap_or(64 * 1024 * 1024),
-                max_recv_msg_size: opts.grpc_max_receive_message_length.map(|v| v as usize).unwrap_or(1_000_000_000),
+                max_send_msg_size: opts
+                    .grpc_max_send_message_length
+                    .map(|v| v as usize)
+                    .unwrap_or(64 * 1024 * 1024),
+                max_recv_msg_size: opts
+                    .grpc_max_receive_message_length
+                    .map(|v| v as usize)
+                    .unwrap_or(1_000_000_000),
                 send_compression,
                 accept_compression: send_compression,
             }
@@ -107,7 +128,8 @@ fn configure_endpoint(
     if let Some(ref opts) = channel_options {
         // Keep-alive options
         if let Some(keepalive_time) = opts.grpc_keepalive_time_ms {
-            endpoint = endpoint.http2_keep_alive_interval(Duration::from_millis(keepalive_time as u64));
+            endpoint =
+                endpoint.http2_keep_alive_interval(Duration::from_millis(keepalive_time as u64));
         }
         if let Some(keepalive_timeout) = opts.grpc_keepalive_timeout_ms {
             endpoint = endpoint.keep_alive_timeout(Duration::from_millis(keepalive_timeout as u64));
@@ -122,7 +144,8 @@ fn configure_endpoint(
                 "grpc.http2.min_time_between_pings_ms" => {
                     if opts.grpc_keepalive_time_ms.is_none() {
                         if let Some(ms) = value.as_i64() {
-                            endpoint = endpoint.http2_keep_alive_interval(Duration::from_millis(ms as u64));
+                            endpoint = endpoint
+                                .http2_keep_alive_interval(Duration::from_millis(ms as u64));
                         }
                     }
                 }
@@ -193,7 +216,10 @@ impl codec::Decoder for RawBytesDecoder {
     type Item = bytes::Bytes;
     type Error = Status;
 
-    fn decode(&mut self, src: &mut codec::DecodeBuf<'_>) -> std::result::Result<Option<Self::Item>, Self::Error> {
+    fn decode(
+        &mut self,
+        src: &mut codec::DecodeBuf<'_>,
+    ) -> std::result::Result<Option<Self::Item>, Self::Error> {
         let len = src.remaining();
         if len == 0 {
             return Ok(None);
@@ -209,7 +235,11 @@ impl codec::Encoder for ProstRequestEncoder {
     type Item = geyser::SubscribeRequest;
     type Error = Status;
 
-    fn encode(&mut self, item: Self::Item, dst: &mut codec::EncodeBuf<'_>) -> std::result::Result<(), Self::Error> {
+    fn encode(
+        &mut self,
+        item: Self::Item,
+        dst: &mut codec::EncodeBuf<'_>,
+    ) -> std::result::Result<(), Self::Error> {
         item.encode(dst)
             .map_err(|e| Status::internal(format!("prost encode error: {}", e)))
     }
@@ -224,13 +254,17 @@ impl codec::Codec for SubscribeRawCodec {
     type Encoder = ProstRequestEncoder;
     type Decoder = RawBytesDecoder;
 
-    fn encoder(&mut self) -> Self::Encoder { ProstRequestEncoder }
-    fn decoder(&mut self) -> Self::Decoder { RawBytesDecoder }
+    fn encoder(&mut self) -> Self::Encoder {
+        ProstRequestEncoder
+    }
+    fn decoder(&mut self) -> Self::Decoder {
+        RawBytesDecoder
+    }
 }
 
 /// Peek at raw protobuf bytes to determine the SubscribeUpdate oneof field number.
 /// Returns the field number (2=account, 3=slot, 4=transaction, 5=block, 6=ping,
-/// 7=block_meta, 8=entry, 9=pong, 10=transaction_status).
+/// 7=block_meta, 8=entry, 9=pong, 10=transaction_status, 12=block_footer).
 ///
 /// NOTE: This assumes all field tags are single-byte (field numbers 1-15, which encode
 /// as one byte in protobuf wire format). This is correct for the current SubscribeUpdate
@@ -244,8 +278,8 @@ fn peek_update_type(data: &[u8]) -> Option<u8> {
         let field_number = tag >> 3;
         let wire_type = tag & 0x07;
 
-        // Fields 2-10 are the oneof variants we care about
-        if field_number >= 2 && field_number <= 10 {
+        // Single-byte oneof field tags we care about.
+        if matches!(field_number, 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 12) {
             return Some(field_number);
         }
 
@@ -291,6 +325,38 @@ fn read_varint(data: &[u8]) -> Option<(u64, usize)> {
     None
 }
 
+#[derive(Default)]
+struct FooterDedup {
+    by_slot: HashMap<u64, HashSet<u64>>,
+    slot_order: VecDeque<u64>,
+}
+
+impl FooterDedup {
+    fn contains(&self, slot: u64, bank_id: u64) -> bool {
+        self.by_slot
+            .get(&slot)
+            .is_some_and(|bank_ids| bank_ids.contains(&bank_id))
+    }
+
+    fn remember(&mut self, slot: u64, bank_id: u64) {
+        let bank_ids = self.by_slot.entry(slot).or_insert_with(|| {
+            self.slot_order.push_back(slot);
+            HashSet::new()
+        });
+        bank_ids.insert(bank_id);
+        while self.slot_order.len() > FOOTER_DEDUP_SLOT_RETENTION {
+            if let Some(old_slot) = self.slot_order.pop_front() {
+                self.by_slot.remove(&old_slot);
+            }
+        }
+    }
+
+    fn clear(&mut self) {
+        self.by_slot.clear();
+        self.slot_order.clear();
+    }
+}
+
 pub struct StreamInner {
     cancel_tx: Mutex<Option<oneshot::Sender<()>>>,
     write_tx: Mutex<Option<mpsc::UnboundedSender<geyser::SubscribeRequest>>>,
@@ -317,11 +383,14 @@ impl StreamInner {
 
         // Add internal slot subscription for tracking only when replay is enabled
         if replay {
-            initial_request.slots.insert(internal_slot_sub_id.clone(), geyser::SubscribeRequestFilterSlots {
-                filter_by_commitment: Some(true),
-                interslot_updates: Some(false),
-                ..Default::default()
-            });
+            initial_request.slots.insert(
+                internal_slot_sub_id.clone(),
+                geyser::SubscribeRequestFilterSlots {
+                    filter_by_commitment: Some(true),
+                    interslot_updates: Some(false),
+                    ..Default::default()
+                },
+            );
         }
 
         // If replay is disabled, ensure any user-provided from_slot is cleared on initial connect
@@ -336,6 +405,7 @@ impl StreamInner {
 
         tokio::spawn(async move {
             let mut reconnect_attempts = 0u32;
+            let mut footer_dedup = FooterDedup::default();
 
             // Determine effective max attempts
             let effective_max_attempts = max_reconnect_attempts.min(HARD_CAP_RECONNECT_ATTEMPTS);
@@ -364,10 +434,12 @@ impl StreamInner {
                         &endpoint,
                         &token,
                         &request_snapshot,
+                        replay,
                         ts_callback_clone,
                         tracked_slot_clone,
                         internal_slot_id_clone,
                         progress_flag_clone,
+                        &mut footer_dedup,
                         &channel_options,
                         &mut write_rx,
                         current_request.clone(),
@@ -429,7 +501,7 @@ impl StreamInner {
                     }
                 }
             }
-            
+
             // Unregister from global registry when stream ends
             crate::unregister_stream(&id_for_cleanup);
         });
@@ -444,10 +516,12 @@ impl StreamInner {
         endpoint: &str,
         token: &Option<String>,
         request: &geyser::SubscribeRequest,
+        replay: bool,
         ts_callback: ThreadsafeFunction<crate::SubscribeUpdateBytes, ErrorStrategy::CalleeHandled>,
         tracked_slot: Arc<AtomicU64>,
         internal_slot_sub_id: String,
         progress_flag: Arc<std::sync::atomic::AtomicBool>,
+        footer_dedup: &mut FooterDedup,
         channel_options: &Option<ChannelOptions>,
         write_rx: &mut mpsc::UnboundedReceiver<geyser::SubscribeRequest>,
         current_request: Arc<parking_lot::Mutex<geyser::SubscribeRequest>>,
@@ -467,7 +541,8 @@ impl StreamInner {
         //   gRPC bytes → prost decode → Rust struct → prost re-encode → Vec<u8> → JS
         // the fast path is now:
         //   gRPC bytes → copy_to_bytes() → Vec<u8> → JS
-        let svc = laserstream_core_proto::tonic::codegen::InterceptedService::new(channel, interceptor);
+        let svc =
+            laserstream_core_proto::tonic::codegen::InterceptedService::new(channel, interceptor);
         let mut grpc = laserstream_core_proto::tonic::client::Grpc::new(svc)
             .max_decoding_message_size(channel_config.max_recv_msg_size)
             .max_encoding_message_size(channel_config.max_send_msg_size);
@@ -494,7 +569,9 @@ impl StreamInner {
             let path = laserstream_core_proto::tonic::codegen::http::uri::PathAndQuery::from_static(
                 "/geyser.Geyser/Subscribe",
             );
-            let response = grpc.streaming(Request::new(subscribe_rx), path, codec).await?;
+            let response = grpc
+                .streaming(Request::new(subscribe_rx), path, codec)
+                .await?;
             (subscribe_tx, response.into_inner())
         };
 
@@ -557,18 +634,50 @@ impl StreamInner {
                                         }
 
                                         let bytes_wrapper = crate::SubscribeUpdateBytes(buf.into());
-                                        progress_flag.store(true, Ordering::SeqCst);
-                                        let _status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
+                                        let status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
+                                        if status == napi::Status::Ok {
+                                            progress_flag.store(true, Ordering::SeqCst);
+                                        }
                                     }
                                     continue;
+                                }
+                                // Block footer (field 12): decode just enough to track the
+                                // latest replay cursor even for footer-only subscriptions.
+                                Some(12) => {
+                                    let mut footer_key = None;
+                                    if let Ok(message) = geyser::SubscribeUpdate::decode(raw_bytes.as_ref()) {
+                                        if let Some(geyser::subscribe_update::UpdateOneof::BlockFooter(block_footer)) = &message.update_oneof {
+                                            if replay {
+                                                tracked_slot.fetch_max(block_footer.slot, Ordering::SeqCst);
+                                                if footer_dedup.contains(block_footer.slot, block_footer.bank_id) {
+                                                    continue;
+                                                }
+                                                footer_key = Some((block_footer.slot, block_footer.bank_id));
+                                            }
+                                        } else {
+                                            continue;
+                                        }
+                                    }
+                                    let bytes_wrapper = crate::SubscribeUpdateBytes(raw_bytes);
+                                    let status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
+                                    if status == napi::Status::Ok {
+                                        progress_flag.store(true, Ordering::SeqCst);
+                                        if let Some((slot, bank_id)) = footer_key {
+                                            footer_dedup.remember(slot, bank_id);
+                                        }
+                                    } else if status == napi::Status::Closing {
+                                                continue;
+                                    }
                                 }
                                 // All other messages (account=2, transaction=4, block=5, block_meta=7,
                                 // entry=8, transaction_status=10): forward raw bytes directly.
                                 // No prost decode or re-encode needed - just one memcpy.
                                 _ => {
                                     let bytes_wrapper = crate::SubscribeUpdateBytes(raw_bytes);
-                                    progress_flag.store(true, Ordering::SeqCst);
-                                    let _status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
+                                    let status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
+                                    if status == napi::Status::Ok {
+                                        progress_flag.store(true, Ordering::SeqCst);
+                                    }
                                 }
                             }
                         }
@@ -587,7 +696,12 @@ impl StreamInner {
                     // internal slot tracker and cause tracked_slot to go stale.
                     let send_req = {
                         let mut req = current_request.lock();
+                        let footer_filters_changed =
+                            replay && req.block_footer != write_request.block_footer;
                         Self::merge_subscribe_requests(&mut req, &write_request);
+                        if footer_filters_changed {
+                            footer_dedup.clear();
+                        }
                         let mut snapshot = req.clone();
                         snapshot.from_slot = None;
                         snapshot.ping = None;
@@ -614,7 +728,10 @@ impl StreamInner {
         endpoint: String,
         token: Option<String>,
         initial_request: geyser::SubscribePreprocessedRequest,
-        ts_callback: ThreadsafeFunction<crate::SubscribePreprocessedUpdateBytes, ErrorStrategy::CalleeHandled>,
+        ts_callback: ThreadsafeFunction<
+            crate::SubscribePreprocessedUpdateBytes,
+            ErrorStrategy::CalleeHandled,
+        >,
         max_reconnect_attempts: u32,
         channel_options: Option<ChannelOptions>,
     ) -> Result<Self> {
@@ -676,7 +793,10 @@ impl StreamInner {
         endpoint: &str,
         token: &Option<String>,
         request: &geyser::SubscribePreprocessedRequest,
-        ts_callback: ThreadsafeFunction<crate::SubscribePreprocessedUpdateBytes, ErrorStrategy::CalleeHandled>,
+        ts_callback: ThreadsafeFunction<
+            crate::SubscribePreprocessedUpdateBytes,
+            ErrorStrategy::CalleeHandled,
+        >,
         channel_options: &Option<ChannelOptions>,
     ) -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
         // Create our custom interceptor with SDK metadata
@@ -772,7 +892,9 @@ impl StreamInner {
         modification: &geyser::SubscribeRequest,
     ) {
         // Save the internal slot tracker before replacing slots
-        let internal_tracker = current.slots.iter()
+        let internal_tracker = current
+            .slots
+            .iter()
             .find(|(k, _)| k.starts_with("__internal_slot_tracker_"))
             .map(|(k, v)| (k.clone(), v.clone()));
 
@@ -783,6 +905,7 @@ impl StreamInner {
         current.transactions_status = modification.transactions_status.clone();
         current.blocks = modification.blocks.clone();
         current.blocks_meta = modification.blocks_meta.clone();
+        current.block_footer = modification.block_footer.clone();
         current.entry = modification.entry.clone();
         current.accounts_data_slice = modification.accounts_data_slice.clone();
 
@@ -809,11 +932,76 @@ impl StreamInner {
     pub fn write(&self, request: geyser::SubscribeRequest) -> Result<()> {
         let tx_guard = self.write_tx.lock();
         if let Some(ref tx) = *tx_guard {
-            tx.send(request)
-                .map_err(|_| napi::Error::from_reason("Failed to send write request: channel closed"))?;
+            tx.send(request).map_err(|_| {
+                napi::Error::from_reason("Failed to send write request: channel closed")
+            })?;
         } else {
             return Err(napi::Error::from_reason("write() is not supported for preprocessed subscriptions. Use subscribe() instead of subscribePreprocessed() if you need dynamic subscription updates."));
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn peek_update_type_detects_block_footer() {
+        let update = geyser::SubscribeUpdate {
+            update_oneof: Some(geyser::subscribe_update::UpdateOneof::BlockFooter(
+                geyser::SubscribeUpdateBlockFooter {
+                    slot: 42,
+                    bank_id: 7,
+                    bank_hash: vec![1; 32],
+                    block_producer_time_nanos: 123,
+                    block_user_agent: b"agave".to_vec(),
+                },
+            )),
+            ..Default::default()
+        };
+        let bytes = update.encode_to_vec();
+        assert_eq!(peek_update_type(&bytes), Some(12));
+    }
+
+    #[test]
+    fn merge_subscribe_requests_replaces_footer_filters_and_keeps_internal_tracker() {
+        let mut current = geyser::SubscribeRequest {
+            slots: HashMap::from([(
+                "__internal_slot_tracker_test".to_owned(),
+                geyser::SubscribeRequestFilterSlots::default(),
+            )]),
+            block_footer: HashMap::from([(
+                "old-footer".to_owned(),
+                geyser::SubscribeRequestFilterBlockFooter::default(),
+            )]),
+            ..Default::default()
+        };
+
+        let modification = geyser::SubscribeRequest {
+            block_footer: HashMap::from([(
+                "new-footer".to_owned(),
+                geyser::SubscribeRequestFilterBlockFooter::default(),
+            )]),
+            ..Default::default()
+        };
+
+        StreamInner::merge_subscribe_requests(&mut current, &modification);
+
+        assert!(current.slots.contains_key("__internal_slot_tracker_test"));
+        assert!(current.block_footer.contains_key("new-footer"));
+        assert!(!current.block_footer.contains_key("old-footer"));
+    }
+
+    #[test]
+    fn footer_dedup_remember_and_clear() {
+        let mut dedup = FooterDedup::default();
+
+        assert!(!dedup.contains(42, 7));
+        dedup.remember(42, 7);
+        assert!(dedup.contains(42, 7));
+        dedup.clear();
+        assert!(!dedup.contains(42, 7));
     }
 }

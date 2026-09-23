@@ -70,7 +70,7 @@ function processYellowstoneUpdate(obj) {
   // Initialize all update type fields to undefined (matching Yellowstone)
   const updateFields = [
     'account', 'slot', 'transaction', 'transactionStatus', 
-    'block', 'blockMeta', 'entry', 'ping', 'pong'
+    'block', 'blockMeta', 'entry', 'ping', 'pong', 'blockFooter'
   ];
   
   updateFields.forEach(field => {
@@ -107,6 +107,10 @@ function processYellowstoneUpdate(obj) {
   if (obj.entry) {
     obj.entry = processEntryUpdate(obj.entry);
   }
+
+  if (obj.blockFooter) {
+    obj.blockFooter = processBlockFooterUpdate(obj.blockFooter);
+  }
   
   // Ensure consistent field ordering like Yellowstone
   const orderedObj = {
@@ -120,6 +124,7 @@ function processYellowstoneUpdate(obj) {
     entry: obj.entry,
     ping: obj.ping,
     pong: obj.pong,
+    blockFooter: obj.blockFooter,
     createdAt: obj.createdAt,
   };
   
@@ -186,6 +191,10 @@ function processEntryUpdate(entry) {
   return entry;
 }
 
+function processBlockFooterUpdate(blockFooter) {
+  return blockFooter;
+}
+
 // Decode preprocessed update protobuf bytes to JavaScript object
 function decodeSubscribePreprocessedUpdate(bytes) {
   if (!SubscribePreprocessedUpdate) {
@@ -222,4 +231,4 @@ module.exports = {
   initProtobuf,
   decodeSubscribeUpdate,
   decodeSubscribePreprocessedUpdate
-}; 
+};

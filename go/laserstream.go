@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -28,6 +29,7 @@ const (
 	HardCapReconnectAttempts = 240  // 20 minutes / 5 seconds = 240 attempts
 	FixedReconnectIntervalMs = 5000 // 5 seconds fixed interval
 	ForkDepthSafetyMargin    = 31   // Max fork depth for processed commitment
+	footerDedupSlotRetention = 256
 )
 
 // SDK metadata constants
@@ -105,6 +107,40 @@ type Client struct {
 	// Bidirectional streaming support
 	writeChan     chan *SubscribeRequest
 	writeStopChan chan struct{}
+	footerDedup   *footerDedup
+}
+
+type footerDedup struct {
+	bySlot    map[uint64]map[uint64]struct{}
+	slotOrder []uint64
+}
+
+func newFooterDedup() *footerDedup {
+	return &footerDedup{
+		bySlot: make(map[uint64]map[uint64]struct{}),
+	}
+}
+
+func (d *footerDedup) shouldForward(slot, bankID uint64) bool {
+	if _, ok := d.bySlot[slot]; !ok {
+		d.bySlot[slot] = make(map[uint64]struct{})
+		d.slotOrder = append(d.slotOrder, slot)
+	}
+	if _, ok := d.bySlot[slot][bankID]; ok {
+		return false
+	}
+	d.bySlot[slot][bankID] = struct{}{}
+	for len(d.slotOrder) > footerDedupSlotRetention {
+		oldSlot := d.slotOrder[0]
+		d.slotOrder = d.slotOrder[1:]
+		delete(d.bySlot, oldSlot)
+	}
+	return true
+}
+
+func (d *footerDedup) clear() {
+	d.bySlot = make(map[uint64]map[uint64]struct{})
+	d.slotOrder = nil
 }
 
 // NewLaserstreamConfig creates a new LaserstreamConfig with default values.
@@ -123,6 +159,7 @@ func NewClient(config LaserstreamConfig) *Client {
 		config:        config,
 		writeChan:     make(chan *SubscribeRequest, 100),
 		writeStopChan: make(chan struct{}),
+		footerDedup:   newFooterDedup(),
 	}
 }
 
@@ -153,6 +190,7 @@ func (c *Client) SubscribeWithContext(
 	c.originalRequest = proto.Clone(req).(*SubscribeRequest)
 	c.dataCallback = dataCallback
 	c.errorCallback = errorCallback
+	c.footerDedup = newFooterDedup()
 
 	// Extract commitment level for reconnection logic
 	c.commitmentLevel = CommitmentProcessed
@@ -370,6 +408,10 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 				return
 			case req := <-c.writeChan:
 				if req != nil {
+					if c.isReplayEnabled() && c.footerDedup != nil &&
+						!reflect.DeepEqual(c.originalRequest.BlockFooter, req.BlockFooter) {
+						c.footerDedup.clear()
+					}
 					// Send merged originalRequest (preserves internal slot tracker, strips FromSlot)
 					c.mergeSubscribeRequest(req)
 					c.mu.RLock()
@@ -475,6 +517,20 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 			}
 		}
 
+		if footerUpdate, ok := resp.UpdateOneof.(*pb.SubscribeUpdate_BlockFooter); ok {
+			if footerUpdate.BlockFooter != nil && c.isReplayEnabled() {
+				current := atomic.LoadUint64(&c.trackedSlot)
+				if footerUpdate.BlockFooter.Slot > current {
+					atomic.StoreUint64(&c.trackedSlot, footerUpdate.BlockFooter.Slot)
+				}
+			}
+			if footerUpdate.BlockFooter != nil && c.isReplayEnabled() &&
+				c.footerDedup != nil &&
+				!c.footerDedup.shouldForward(footerUpdate.BlockFooter.Slot, footerUpdate.BlockFooter.BankId) {
+				continue
+			}
+		}
+
 		// Clean up internal filter ID from ALL message types (only when replay is enabled)
 		if c.isReplayEnabled() {
 			cleanedFilters := make([]string, 0, len(resp.Filters))
@@ -523,6 +579,7 @@ func (c *Client) mergeSubscribeRequest(modification *SubscribeRequest) {
 	c.originalRequest.TransactionsStatus = modification.TransactionsStatus
 	c.originalRequest.Blocks = modification.Blocks
 	c.originalRequest.BlocksMeta = modification.BlocksMeta
+	c.originalRequest.BlockFooter = modification.BlockFooter
 	c.originalRequest.Entry = modification.Entry
 	c.originalRequest.AccountsDataSlice = modification.AccountsDataSlice
 
@@ -786,6 +843,7 @@ type (
 	SubscribeRequestFilterAccounts     = pb.SubscribeRequestFilterAccounts
 	SubscribeRequestFilterBlocks       = pb.SubscribeRequestFilterBlocks
 	SubscribeRequestFilterBlocksMeta   = pb.SubscribeRequestFilterBlocksMeta
+	SubscribeRequestFilterBlockFooter  = pb.SubscribeRequestFilterBlockFooter
 	SubscribeRequestFilterEntry        = pb.SubscribeRequestFilterEntry
 )
 
@@ -811,6 +869,7 @@ type (
 	SubscribeUpdate_TransactionStatus = pb.SubscribeUpdate_TransactionStatus
 	SubscribeUpdate_Block             = pb.SubscribeUpdate_Block
 	SubscribeUpdate_BlockMeta         = pb.SubscribeUpdate_BlockMeta
+	SubscribeUpdate_BlockFooter       = pb.SubscribeUpdate_BlockFooter
 	SubscribeUpdate_Entry             = pb.SubscribeUpdate_Entry
 	SubscribeUpdate_Ping              = pb.SubscribeUpdate_Ping
 	SubscribeUpdate_Pong              = pb.SubscribeUpdate_Pong
@@ -824,6 +883,7 @@ type (
 	SubscribeUpdateTransactionStatus = pb.SubscribeUpdateTransactionStatus
 	SubscribeUpdateBlock             = pb.SubscribeUpdateBlock
 	SubscribeUpdateBlockMeta         = pb.SubscribeUpdateBlockMeta
+	SubscribeUpdateBlockFooter       = pb.SubscribeUpdateBlockFooter
 	SubscribeUpdateEntry             = pb.SubscribeUpdateEntry
 	SubscribeUpdatePing              = pb.SubscribeUpdatePing
 	SubscribeUpdatePong              = pb.SubscribeUpdatePong

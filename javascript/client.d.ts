@@ -1,4 +1,5 @@
 // TypeScript declarations for Laserstream client
+import Long = require('long');
 
 // Re-export gRPC types
 export { ChannelOptions } from '@grpc/grpc-js';
@@ -35,6 +36,12 @@ export {
   SubscribeRequestFilterEntry,
   SubscribeRequestAccountsDataSlice,
   SubscribeRequestPing,
+  // Solana payload types used by examples/tests
+  Message,
+  MessageAddressTableLookup,
+  Transaction,
+  TransactionStatusMeta,
+  TransactionError,
   // Enums
   CommitmentLevel,
   SlotStatus,
@@ -136,11 +143,97 @@ export {
  */
 export type TokenAccountsFilterMode = 'none' | 'balanceChanged' | 'all';
 
+export interface SubscribeRequestFilterBlockFooter {}
+
+export interface SubscribeUpdateBlockFooter {
+  slot: string;
+  bankId: string;
+  bankHash: Uint8Array | Buffer;
+  blockProducerTimeNanos: string;
+  blockUserAgent: Uint8Array | Buffer;
+}
+
 // Augment the generated proto type so `tokenAccounts` is accepted on
 // transaction filters without forking the generated bindings. Removed once a
 // core-proto-js release ships field #30 natively.
 declare module 'laserstream-core-proto-js/generated' {
   namespace geyser {
+    interface ISubscribeRequest {
+      /** Triton-compatible footer subscription map (proto field #12). */
+      blockFooter?: ({ [key: string]: SubscribeRequestFilterBlockFooter } | null);
+    }
+
+    interface SubscribeRequest {
+      blockFooter?: ({ [key: string]: SubscribeRequestFilterBlockFooter } | null);
+    }
+
+    interface ISubscribeUpdate {
+      /** Triton-compatible footer update (proto field #12). */
+      blockFooter?: (SubscribeUpdateBlockFooter | null);
+    }
+
+    interface SubscribeUpdate {
+      blockFooter?: (SubscribeUpdateBlockFooter | null);
+    }
+
+    interface ISubscribeUpdateAccount {
+      bankId?: (number | Long | null);
+    }
+
+    interface SubscribeUpdateAccount {
+      bankId?: (number | Long | null);
+      _bankId?: "bankId";
+    }
+
+    interface ISubscribeUpdateSlot {
+      bankId?: (number | Long | null);
+    }
+
+    interface SubscribeUpdateSlot {
+      bankId?: (number | Long | null);
+      _bankId?: "bankId";
+    }
+
+    interface ISubscribeUpdateTransaction {
+      bankId?: (number | Long | null);
+    }
+
+    interface SubscribeUpdateTransaction {
+      bankId?: (number | Long | null);
+    }
+
+    interface ISubscribeUpdateTransactionStatus {
+      bankId?: (number | Long | null);
+    }
+
+    interface SubscribeUpdateTransactionStatus {
+      bankId?: (number | Long | null);
+    }
+
+    interface ISubscribeUpdateBlock {
+      bankId?: (number | Long | null);
+    }
+
+    interface SubscribeUpdateBlock {
+      bankId?: (number | Long | null);
+    }
+
+    interface ISubscribeUpdateBlockMeta {
+      bankId?: (number | Long | null);
+    }
+
+    interface SubscribeUpdateBlockMeta {
+      bankId?: (number | Long | null);
+    }
+
+    interface ISubscribeUpdateEntry {
+      bankId?: (number | Long | null);
+    }
+
+    interface SubscribeUpdateEntry {
+      bankId?: (number | Long | null);
+    }
+
     interface ISubscribeRequestFilterTransactions {
       /** Helius ATA expansion control (proto field #30). */
       tokenAccounts?: (TokenAccountsFilterMode | string | null);

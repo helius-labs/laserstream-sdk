@@ -1,26 +1,32 @@
-use crate::{LaserstreamConfig, LaserstreamError, config::CompressionEncoding as ConfigCompressionEncoding};
+use crate::{
+    config::CompressionEncoding as ConfigCompressionEncoding, LaserstreamConfig, LaserstreamError,
+};
 use async_stream::stream;
 use futures::StreamExt;
 use futures_channel::mpsc as futures_mpsc;
 use futures_util::{sink::SinkExt, Stream};
-use std::{pin::Pin, time::Duration};
+use laserstream_core_client::{ClientTlsConfig, Interceptor};
+use laserstream_core_proto::geyser::{
+    subscribe_update::UpdateOneof, SubscribePreprocessedRequest, SubscribePreprocessedUpdate,
+    SubscribeRequest, SubscribeRequestFilterSlots, SubscribeRequestPing, SubscribeUpdate,
+};
+use laserstream_core_proto::prelude::geyser_client::GeyserClient;
+use laserstream_core_proto::tonic::{
+    codec::CompressionEncoding, metadata::MetadataValue, transport::Endpoint, Request, Status,
+};
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    pin::Pin,
+    time::Duration,
+};
 use tokio::sync::mpsc;
 use tokio::time::sleep;
-use laserstream_core_proto::tonic::{
-    Status, Request, metadata::MetadataValue, transport::Endpoint, codec::CompressionEncoding,
-};
 use tracing::{error, instrument, warn};
 use uuid;
-use laserstream_core_client::{ClientTlsConfig, Interceptor};
-use laserstream_core_proto::prelude::{geyser_client::GeyserClient};
-use laserstream_core_proto::geyser::{
-    subscribe_update::UpdateOneof, SubscribeRequest, SubscribeRequestFilterSlots,
-    SubscribeRequestPing, SubscribeUpdate,
-    SubscribePreprocessedRequest, SubscribePreprocessedUpdate,
-};
 
 const HARD_CAP_RECONNECT_ATTEMPTS: u32 = (20 * 60) / 5; // 20 mins / 5 sec interval
 const FIXED_RECONNECT_INTERVAL_MS: u64 = 5000; // 5 seconds fixed interval
+const FOOTER_DEDUP_SLOT_RETENTION: usize = 256;
 const SDK_NAME: &str = "laserstream-rust";
 const SDK_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[cfg(feature = "internal")]
@@ -32,6 +38,42 @@ fn is_terminal_error(_config: &LaserstreamConfig, _status: &Status) -> bool {
         return true;
     }
     false
+}
+
+fn footer_resume_slot(update: &SubscribeUpdate) -> Option<u64> {
+    match update.update_oneof.as_ref()? {
+        UpdateOneof::BlockFooter(msg) => Some(msg.slot),
+        _ => None,
+    }
+}
+
+#[derive(Debug, Default)]
+struct FooterDedup {
+    by_slot: HashMap<u64, HashSet<u64>>,
+    slot_order: VecDeque<u64>,
+}
+
+impl FooterDedup {
+    fn should_forward(&mut self, slot: u64, bank_id: u64) -> bool {
+        let bank_ids = self.by_slot.entry(slot).or_insert_with(|| {
+            self.slot_order.push_back(slot);
+            HashSet::new()
+        });
+        if !bank_ids.insert(bank_id) {
+            return false;
+        }
+        while self.slot_order.len() > FOOTER_DEDUP_SLOT_RETENTION {
+            if let Some(old_slot) = self.slot_order.pop_front() {
+                self.by_slot.remove(&old_slot);
+            }
+        }
+        true
+    }
+
+    fn clear(&mut self) {
+        self.by_slot.clear();
+        self.slot_order.clear();
+    }
 }
 
 #[cfg(feature = "internal")]
@@ -52,9 +94,11 @@ struct SdkMetadataInterceptor {
 impl SdkMetadataInterceptor {
     fn new(api_key: String) -> Result<Self, Status> {
         let x_token = if !api_key.is_empty() {
-            Some(api_key.parse().map_err(|e| {
-                Status::invalid_argument(format!("Invalid API key: {}", e))
-            })?)
+            Some(
+                api_key
+                    .parse()
+                    .map_err(|e| Status::invalid_argument(format!("Invalid API key: {}", e)))?,
+            )
         } else {
             None
         };
@@ -70,8 +114,12 @@ impl Interceptor for SdkMetadataInterceptor {
         }
 
         // Add SDK metadata headers
-        request.metadata_mut().insert("x-sdk-name", MetadataValue::from_static(SDK_NAME));
-        request.metadata_mut().insert("x-sdk-version", MetadataValue::from_static(SDK_VERSION));
+        request
+            .metadata_mut()
+            .insert("x-sdk-name", MetadataValue::from_static(SDK_NAME));
+        request
+            .metadata_mut()
+            .insert("x-sdk-version", MetadataValue::from_static(SDK_VERSION));
 
         Ok(request)
     }
@@ -107,6 +155,7 @@ pub fn subscribe(
     let update_stream = stream! {
         let mut reconnect_attempts = 0;
         let mut tracked_slot: u64 = 0;
+        let mut footer_dedup = FooterDedup::default();
 
         // Determine the effective max reconnect attempts
         let effective_max_attempts = config
@@ -117,10 +166,10 @@ pub fn subscribe(
         // Keep original request for reconnection attempts
         let mut current_request = request.clone();
         let internal_slot_sub_id = format!("internal-{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap());
-        
+
         // Get replay behavior from config
         let replay_enabled = config.replay;
-        
+
         // Add internal slot subscription only when replay is enabled
         if replay_enabled {
             current_request.slots.insert(
@@ -131,7 +180,7 @@ pub fn subscribe(
                 }
             );
         }
-        
+
         // Clear any user-provided from_slot if replay is disabled
         if !replay_enabled {
             current_request.from_slot = None;
@@ -194,7 +243,7 @@ pub fn subscribe(
                                 if let Some(result) = result {
                                     match result {
                                         Ok(update) => {
-                                            
+
                                             // Handle ping/pong
                                             if matches!(&update.update_oneof, Some(UpdateOneof::Ping(_))) {
                                                 let pong_req = SubscribeRequest { ping: Some(SubscribeRequestPing { id: 1 }), ..Default::default() };
@@ -204,29 +253,42 @@ pub fn subscribe(
                                                 }
                                                 continue;
                                             }
-                                            
+
                                             // Do not forward server 'Pong' updates to consumers either
                                             if matches!(&update.update_oneof, Some(UpdateOneof::Pong(_))) {
                                                 continue;
                                             }
 
-                                // Track the latest slot from any slot update (including internal subscription)
-                                if let Some(UpdateOneof::Slot(s)) = &update.update_oneof {
-                                    if replay_enabled {
-                                        tracked_slot = s.slot;
-                                    }
-                                    
-                                    // Skip if this slot update is EXCLUSIVELY from our internal subscription
-                                    if update.filters.len() == 1 && update.filters.contains(&internal_slot_sub_id) {
-                                        continue;
-                                    }
-                                }
+                                            if let Some(UpdateOneof::Slot(slot)) = &update.update_oneof {
+                                                if replay_enabled {
+                                                    tracked_slot = slot.slot;
+                                                }
+
+                                                // Skip if this slot update is EXCLUSIVELY from our internal subscription
+                                                if update.filters.len() == 1
+                                                    && update.filters.contains(&internal_slot_sub_id)
+                                                {
+                                                    continue;
+                                                }
+                                            } else if replay_enabled {
+                                                if let Some(slot) = footer_resume_slot(&update) {
+                                                    tracked_slot = tracked_slot.max(slot);
+                                                }
+                                            }
+
+                                            if replay_enabled {
+                                                if let Some(UpdateOneof::BlockFooter(block_footer)) = &update.update_oneof {
+                                                    if !footer_dedup.should_forward(block_footer.slot, block_footer.bank_id) {
+                                                        continue;
+                                                    }
+                                                }
+                                            }
 
                                             // Filter out internal subscription from filters before yielding (only if replay is enabled)
                                             let mut clean_update = update;
                                             if replay_enabled {
                                                 clean_update.filters.retain(|f| f != &internal_slot_sub_id);
-                                                
+
                                                 // Only yield if there are still filters after cleaning
                                                 if !clean_update.filters.is_empty() {
                                                     yield Ok(clean_update);
@@ -252,11 +314,16 @@ pub fn subscribe(
                                     break;
                                 }
                             }
-                            
+
                             // Handle write requests from the user
                             Some(write_request) = write_rx.recv() => {
                                 // Merge the write_request into current_request so it persists across reconnections
+                                let footer_filters_changed =
+                                    replay_enabled && current_request.block_footer != write_request.block_footer;
                                 merge_subscribe_requests(&mut current_request, &write_request, &internal_slot_sub_id);
+                                if footer_filters_changed {
+                                    footer_dedup.clear();
+                                }
 
                                 // Send the merged current_request (which preserves the internal slot
                                 // tracker) instead of the raw write_request. Yellowstone gRPC replaces
@@ -302,7 +369,7 @@ pub fn subscribe(
             sleep(delay).await;
         }
     };
-    
+
     (update_stream, handle)
 }
 
@@ -326,13 +393,23 @@ async fn connect_and_subscribe_once(
     // Build endpoint with all options
     let mut endpoint = Endpoint::from_shared(config.endpoint.clone())
         .map_err(|e| Status::internal(format!("Failed to parse endpoint: {}", e)))?
-        .connect_timeout(Duration::from_secs(options.connect_timeout_secs.unwrap_or(10)))
+        .connect_timeout(Duration::from_secs(
+            options.connect_timeout_secs.unwrap_or(10),
+        ))
         .timeout(Duration::from_secs(options.timeout_secs.unwrap_or(30)))
-        .http2_keep_alive_interval(Duration::from_secs(options.http2_keep_alive_interval_secs.unwrap_or(30)))
-        .keep_alive_timeout(Duration::from_secs(options.keep_alive_timeout_secs.unwrap_or(5)))
+        .http2_keep_alive_interval(Duration::from_secs(
+            options.http2_keep_alive_interval_secs.unwrap_or(30),
+        ))
+        .keep_alive_timeout(Duration::from_secs(
+            options.keep_alive_timeout_secs.unwrap_or(5),
+        ))
         .keep_alive_while_idle(options.keep_alive_while_idle.unwrap_or(true))
         .initial_stream_window_size(options.initial_stream_window_size.or(Some(1024 * 1024 * 4)))
-        .initial_connection_window_size(options.initial_connection_window_size.or(Some(1024 * 1024 * 8)))
+        .initial_connection_window_size(
+            options
+                .initial_connection_window_size
+                .or(Some(1024 * 1024 * 8)),
+        )
         .http2_adaptive_window(options.http2_adaptive_window.unwrap_or(true))
         .tcp_nodelay(options.tcp_nodelay.unwrap_or(true))
         .buffer_size(options.buffer_size.or(Some(1024 * 64)));
@@ -358,7 +435,11 @@ async fn connect_and_subscribe_once(
     // Configure message size limits
     geyser_client = geyser_client
         .max_decoding_message_size(options.max_decoding_message_size.unwrap_or(1_000_000_000))
-        .max_encoding_message_size(options.max_encoding_message_size.unwrap_or(64 * 1024 * 1024));
+        .max_encoding_message_size(
+            options
+                .max_encoding_message_size
+                .unwrap_or(64 * 1024 * 1024),
+        );
 
     // Configure compression if specified
     if let Some(send_comp) = options.send_compression {
@@ -482,7 +563,8 @@ async fn connect_and_subscribe_preprocessed_once(
     request: SubscribePreprocessedRequest,
     api_key: String,
 ) -> Result<
-    impl Stream<Item = Result<SubscribePreprocessedUpdate, laserstream_core_proto::tonic::Status>> + Send,
+    impl Stream<Item = Result<SubscribePreprocessedUpdate, laserstream_core_proto::tonic::Status>>
+        + Send,
     Status,
 > {
     let options = &config.channel_options;
@@ -493,12 +575,20 @@ async fn connect_and_subscribe_preprocessed_once(
     // Build endpoint with all options
     let mut endpoint = Endpoint::from_shared(config.endpoint.clone())
         .map_err(|e| Status::internal(format!("Failed to parse endpoint: {}", e)))?
-        .connect_timeout(Duration::from_secs(options.connect_timeout_secs.unwrap_or(10)))
+        .connect_timeout(Duration::from_secs(
+            options.connect_timeout_secs.unwrap_or(10),
+        ))
         .timeout(Duration::from_secs(options.timeout_secs.unwrap_or(30)))
         .tcp_nodelay(options.tcp_nodelay.unwrap_or(true))
-        .tcp_keepalive(Some(Duration::from_secs(options.tcp_keepalive_secs.unwrap_or(30))))
-        .http2_keep_alive_interval(Duration::from_secs(options.http2_keep_alive_interval_secs.unwrap_or(30)))
-        .keep_alive_timeout(Duration::from_secs(options.keep_alive_timeout_secs.unwrap_or(10)))
+        .tcp_keepalive(Some(Duration::from_secs(
+            options.tcp_keepalive_secs.unwrap_or(30),
+        )))
+        .http2_keep_alive_interval(Duration::from_secs(
+            options.http2_keep_alive_interval_secs.unwrap_or(30),
+        ))
+        .keep_alive_timeout(Duration::from_secs(
+            options.keep_alive_timeout_secs.unwrap_or(10),
+        ))
         .keep_alive_while_idle(options.keep_alive_while_idle.unwrap_or(true));
 
     endpoint = endpoint
@@ -512,7 +602,11 @@ async fn connect_and_subscribe_preprocessed_once(
 
     let mut geyser_client = GeyserClient::with_interceptor(channel, interceptor)
         .max_decoding_message_size(options.max_decoding_message_size.unwrap_or(1_000_000_000))
-        .max_encoding_message_size(options.max_encoding_message_size.unwrap_or(64 * 1024 * 1024));
+        .max_encoding_message_size(
+            options
+                .max_encoding_message_size
+                .unwrap_or(64 * 1024 * 1024),
+        );
 
     // Apply compression if specified
     if let Some(compression) = &options.send_compression {
@@ -520,7 +614,9 @@ async fn connect_and_subscribe_preprocessed_once(
             ConfigCompressionEncoding::Gzip => CompressionEncoding::Gzip,
             ConfigCompressionEncoding::Zstd => CompressionEncoding::Zstd,
         };
-        geyser_client = geyser_client.send_compressed(encoding).accept_compressed(encoding);
+        geyser_client = geyser_client
+            .send_compressed(encoding)
+            .accept_compressed(encoding);
     }
 
     let (mut subscribe_tx, subscribe_rx) = futures_mpsc::unbounded();
@@ -550,10 +646,7 @@ fn merge_subscribe_requests(
     internal_slot_sub_id: &str,
 ) {
     // Save the internal slot tracker before replacing slots
-    let internal_tracker = current
-        .slots
-        .get(internal_slot_sub_id)
-        .cloned();
+    let internal_tracker = current.slots.get(internal_slot_sub_id).cloned();
 
     // Replace all subscription types (Yellowstone gRPC replaces, not merges)
     current.accounts = modification.accounts.clone();
@@ -562,6 +655,7 @@ fn merge_subscribe_requests(
     current.transactions_status = modification.transactions_status.clone();
     current.blocks = modification.blocks.clone();
     current.blocks_meta = modification.blocks_meta.clone();
+    current.block_footer = modification.block_footer.clone();
     current.entry = modification.entry.clone();
     current.accounts_data_slice = modification.accounts_data_slice.clone();
 
@@ -579,4 +673,3 @@ fn merge_subscribe_requests(
 
     // Note: from_slot and ping are not replaced as they are connection-specific
 }
-
