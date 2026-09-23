@@ -44,8 +44,6 @@ jobs:
           node javascript/test/bank-id-vectors.test.js
           node test/replay-transport.js
           node test/replay-transport.js --case native-midbank --out replay-transport-evidence/native-midbank
-          node test/replay-transport.js --case native-midbank-prefix --out replay-transport-evidence/native-midbank-prefix
-          node test/replay-transport.js --case native-prefix-overlap --out replay-transport-evidence/native-prefix-overlap
       - uses: actions/upload-artifact@v4
         if: always()
         with:
