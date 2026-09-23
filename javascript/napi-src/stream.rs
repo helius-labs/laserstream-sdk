@@ -14,7 +14,6 @@ use napi::bindgen_prelude::*;
 use napi::threadsafe_function::{ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use parking_lot::Mutex;
 use prost::Message;
-use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -26,7 +25,6 @@ use uuid;
 const HARD_CAP_RECONNECT_ATTEMPTS: u32 = (20 * 60) / 5; // 20 mins / 5 sec interval = 240 attempts
 const FIXED_RECONNECT_INTERVAL_MS: u64 = 5000; // 5 seconds fixed interval
 const FORK_DEPTH_SAFETY_MARGIN: u64 = 31; // Max fork depth for processed commitment
-const FOOTER_DEDUP_SLOT_RETENTION: usize = 256;
 
 // SDK metadata constants
 const SDK_NAME: &str = "laserstream-javascript";
@@ -325,38 +323,6 @@ fn read_varint(data: &[u8]) -> Option<(u64, usize)> {
     None
 }
 
-#[derive(Default)]
-struct FooterDedup {
-    by_slot: HashMap<u64, HashSet<u64>>,
-    slot_order: VecDeque<u64>,
-}
-
-impl FooterDedup {
-    fn contains(&self, slot: u64, bank_id: u64) -> bool {
-        self.by_slot
-            .get(&slot)
-            .is_some_and(|bank_ids| bank_ids.contains(&bank_id))
-    }
-
-    fn remember(&mut self, slot: u64, bank_id: u64) {
-        let bank_ids = self.by_slot.entry(slot).or_insert_with(|| {
-            self.slot_order.push_back(slot);
-            HashSet::new()
-        });
-        bank_ids.insert(bank_id);
-        while self.slot_order.len() > FOOTER_DEDUP_SLOT_RETENTION {
-            if let Some(old_slot) = self.slot_order.pop_front() {
-                self.by_slot.remove(&old_slot);
-            }
-        }
-    }
-
-    fn clear(&mut self) {
-        self.by_slot.clear();
-        self.slot_order.clear();
-    }
-}
-
 pub struct StreamInner {
     cancel_tx: Mutex<Option<oneshot::Sender<()>>>,
     write_tx: Mutex<Option<mpsc::UnboundedSender<geyser::SubscribeRequest>>>,
@@ -405,7 +371,6 @@ impl StreamInner {
 
         tokio::spawn(async move {
             let mut reconnect_attempts = 0u32;
-            let mut footer_dedup = FooterDedup::default();
 
             // Determine effective max attempts
             let effective_max_attempts = max_reconnect_attempts.min(HARD_CAP_RECONNECT_ATTEMPTS);
@@ -439,7 +404,6 @@ impl StreamInner {
                         tracked_slot_clone,
                         internal_slot_id_clone,
                         progress_flag_clone,
-                        &mut footer_dedup,
                         &channel_options,
                         &mut write_rx,
                         current_request.clone(),
@@ -521,7 +485,6 @@ impl StreamInner {
         tracked_slot: Arc<AtomicU64>,
         internal_slot_sub_id: String,
         progress_flag: Arc<std::sync::atomic::AtomicBool>,
-        footer_dedup: &mut FooterDedup,
         channel_options: &Option<ChannelOptions>,
         write_rx: &mut mpsc::UnboundedReceiver<geyser::SubscribeRequest>,
         current_request: Arc<parking_lot::Mutex<geyser::SubscribeRequest>>,
@@ -644,15 +607,10 @@ impl StreamInner {
                                 // Block footer (field 12): decode just enough to track the
                                 // latest replay cursor even for footer-only subscriptions.
                                 Some(12) => {
-                                    let mut footer_key = None;
                                     if let Ok(message) = geyser::SubscribeUpdate::decode(raw_bytes.as_ref()) {
                                         if let Some(geyser::subscribe_update::UpdateOneof::BlockFooter(block_footer)) = &message.update_oneof {
                                             if replay {
                                                 tracked_slot.fetch_max(block_footer.slot, Ordering::SeqCst);
-                                                if footer_dedup.contains(block_footer.slot, block_footer.bank_id) {
-                                                    continue;
-                                                }
-                                                footer_key = Some((block_footer.slot, block_footer.bank_id));
                                             }
                                         } else {
                                             continue;
@@ -662,9 +620,6 @@ impl StreamInner {
                                     let status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
                                     if status == napi::Status::Ok {
                                         progress_flag.store(true, Ordering::SeqCst);
-                                        if let Some((slot, bank_id)) = footer_key {
-                                            footer_dedup.remember(slot, bank_id);
-                                        }
                                     } else if status == napi::Status::Closing {
                                                 continue;
                                     }
@@ -696,12 +651,7 @@ impl StreamInner {
                     // internal slot tracker and cause tracked_slot to go stale.
                     let send_req = {
                         let mut req = current_request.lock();
-                        let footer_filters_changed =
-                            replay && req.block_footer != write_request.block_footer;
                         Self::merge_subscribe_requests(&mut req, &write_request);
-                        if footer_filters_changed {
-                            footer_dedup.clear();
-                        }
                         let mut snapshot = req.clone();
                         snapshot.from_slot = None;
                         snapshot.ping = None;
@@ -992,16 +942,5 @@ mod tests {
         assert!(current.slots.contains_key("__internal_slot_tracker_test"));
         assert!(current.block_footer.contains_key("new-footer"));
         assert!(!current.block_footer.contains_key("old-footer"));
-    }
-
-    #[test]
-    fn footer_dedup_remember_and_clear() {
-        let mut dedup = FooterDedup::default();
-
-        assert!(!dedup.contains(42, 7));
-        dedup.remember(42, 7);
-        assert!(dedup.contains(42, 7));
-        dedup.clear();
-        assert!(!dedup.contains(42, 7));
     }
 }

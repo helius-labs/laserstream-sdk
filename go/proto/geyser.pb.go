@@ -1781,12 +1781,10 @@ func (x *SubscribeUpdateBatch) GetUpdates() []*SubscribeUpdate {
 }
 
 type SubscribeUpdateAccount struct {
-	state     protoimpl.MessageState      `protogen:"open.v1"`
-	Account   *SubscribeUpdateAccountInfo `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`
-	Slot      uint64                      `protobuf:"varint,2,opt,name=slot,proto3" json:"slot,omitempty"`
-	IsStartup bool                        `protobuf:"varint,3,opt,name=is_startup,json=isStartup,proto3" json:"is_startup,omitempty"`
-	// if is_startup is true, bank id is None.
-	BankId        *uint64 `protobuf:"varint,4,opt,name=bank_id,json=bankId,proto3,oneof" json:"bank_id,omitempty"`
+	state         protoimpl.MessageState      `protogen:"open.v1"`
+	Account       *SubscribeUpdateAccountInfo `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`
+	Slot          uint64                      `protobuf:"varint,2,opt,name=slot,proto3" json:"slot,omitempty"`
+	IsStartup     bool                        `protobuf:"varint,3,opt,name=is_startup,json=isStartup,proto3" json:"is_startup,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1840,13 +1838,6 @@ func (x *SubscribeUpdateAccount) GetIsStartup() bool {
 		return x.IsStartup
 	}
 	return false
-}
-
-func (x *SubscribeUpdateAccount) GetBankId() uint64 {
-	if x != nil && x.BankId != nil {
-		return *x.BankId
-	}
-	return 0
 }
 
 type SubscribeUpdateAccountInfo struct {
@@ -1950,13 +1941,11 @@ func (x *SubscribeUpdateAccountInfo) GetTxnSignature() []byte {
 }
 
 type SubscribeUpdateSlot struct {
-	state     protoimpl.MessageState `protogen:"open.v1"`
-	Slot      uint64                 `protobuf:"varint,1,opt,name=slot,proto3" json:"slot,omitempty"`
-	Parent    *uint64                `protobuf:"varint,2,opt,name=parent,proto3,oneof" json:"parent,omitempty"`
-	Status    SlotStatus             `protobuf:"varint,3,opt,name=status,proto3,enum=geyser.SlotStatus" json:"status,omitempty"`
-	DeadError *string                `protobuf:"bytes,4,opt,name=dead_error,json=deadError,proto3,oneof" json:"dead_error,omitempty"`
-	// FIRST_SHRED_RECEIVED and COMPLETED slot status does not belong to any bank.
-	BankId        *uint64 `protobuf:"varint,5,opt,name=bank_id,json=bankId,proto3,oneof" json:"bank_id,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Slot          uint64                 `protobuf:"varint,1,opt,name=slot,proto3" json:"slot,omitempty"`
+	Parent        *uint64                `protobuf:"varint,2,opt,name=parent,proto3,oneof" json:"parent,omitempty"`
+	Status        SlotStatus             `protobuf:"varint,3,opt,name=status,proto3,enum=geyser.SlotStatus" json:"status,omitempty"`
+	DeadError     *string                `protobuf:"bytes,4,opt,name=dead_error,json=deadError,proto3,oneof" json:"dead_error,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2019,18 +2008,10 @@ func (x *SubscribeUpdateSlot) GetDeadError() string {
 	return ""
 }
 
-func (x *SubscribeUpdateSlot) GetBankId() uint64 {
-	if x != nil && x.BankId != nil {
-		return *x.BankId
-	}
-	return 0
-}
-
 type SubscribeUpdateTransaction struct {
 	state         protoimpl.MessageState          `protogen:"open.v1"`
 	Transaction   *SubscribeUpdateTransactionInfo `protobuf:"bytes,1,opt,name=transaction,proto3" json:"transaction,omitempty"`
 	Slot          uint64                          `protobuf:"varint,2,opt,name=slot,proto3" json:"slot,omitempty"`
-	BankId        uint64                          `protobuf:"varint,3,opt,name=bank_id,json=bankId,proto3" json:"bank_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2075,13 +2056,6 @@ func (x *SubscribeUpdateTransaction) GetTransaction() *SubscribeUpdateTransactio
 func (x *SubscribeUpdateTransaction) GetSlot() uint64 {
 	if x != nil {
 		return x.Slot
-	}
-	return 0
-}
-
-func (x *SubscribeUpdateTransaction) GetBankId() uint64 {
-	if x != nil {
-		return x.BankId
 	}
 	return 0
 }
@@ -2169,7 +2143,6 @@ type SubscribeUpdateTransactionStatus struct {
 	IsVote        bool                   `protobuf:"varint,3,opt,name=is_vote,json=isVote,proto3" json:"is_vote,omitempty"`
 	Index         uint64                 `protobuf:"varint,4,opt,name=index,proto3" json:"index,omitempty"`
 	Err           *TransactionError      `protobuf:"bytes,5,opt,name=err,proto3" json:"err,omitempty"`
-	BankId        uint64                 `protobuf:"varint,6,opt,name=bank_id,json=bankId,proto3" json:"bank_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2239,13 +2212,6 @@ func (x *SubscribeUpdateTransactionStatus) GetErr() *TransactionError {
 	return nil
 }
 
-func (x *SubscribeUpdateTransactionStatus) GetBankId() uint64 {
-	if x != nil {
-		return x.BankId
-	}
-	return 0
-}
-
 type SubscribeUpdateBlock struct {
 	state                    protoimpl.MessageState            `protogen:"open.v1"`
 	Slot                     uint64                            `protobuf:"varint,1,opt,name=slot,proto3" json:"slot,omitempty"`
@@ -2261,7 +2227,6 @@ type SubscribeUpdateBlock struct {
 	Accounts                 []*SubscribeUpdateAccountInfo     `protobuf:"bytes,11,rep,name=accounts,proto3" json:"accounts,omitempty"`
 	EntriesCount             uint64                            `protobuf:"varint,12,opt,name=entries_count,json=entriesCount,proto3" json:"entries_count,omitempty"`
 	Entries                  []*SubscribeUpdateEntry           `protobuf:"bytes,13,rep,name=entries,proto3" json:"entries,omitempty"`
-	BankId                   uint64                            `protobuf:"varint,14,opt,name=bank_id,json=bankId,proto3" json:"bank_id,omitempty"`
 	unknownFields            protoimpl.UnknownFields
 	sizeCache                protoimpl.SizeCache
 }
@@ -2387,13 +2352,6 @@ func (x *SubscribeUpdateBlock) GetEntries() []*SubscribeUpdateEntry {
 	return nil
 }
 
-func (x *SubscribeUpdateBlock) GetBankId() uint64 {
-	if x != nil {
-		return x.BankId
-	}
-	return 0
-}
-
 type SubscribeUpdateBlockMeta struct {
 	state                    protoimpl.MessageState `protogen:"open.v1"`
 	Slot                     uint64                 `protobuf:"varint,1,opt,name=slot,proto3" json:"slot,omitempty"`
@@ -2405,7 +2363,6 @@ type SubscribeUpdateBlockMeta struct {
 	ParentBlockhash          string                 `protobuf:"bytes,7,opt,name=parent_blockhash,json=parentBlockhash,proto3" json:"parent_blockhash,omitempty"`
 	ExecutedTransactionCount uint64                 `protobuf:"varint,8,opt,name=executed_transaction_count,json=executedTransactionCount,proto3" json:"executed_transaction_count,omitempty"`
 	EntriesCount             uint64                 `protobuf:"varint,9,opt,name=entries_count,json=entriesCount,proto3" json:"entries_count,omitempty"`
-	BankId                   uint64                 `protobuf:"varint,10,opt,name=bank_id,json=bankId,proto3" json:"bank_id,omitempty"`
 	unknownFields            protoimpl.UnknownFields
 	sizeCache                protoimpl.SizeCache
 }
@@ -2503,13 +2460,6 @@ func (x *SubscribeUpdateBlockMeta) GetEntriesCount() uint64 {
 	return 0
 }
 
-func (x *SubscribeUpdateBlockMeta) GetBankId() uint64 {
-	if x != nil {
-		return x.BankId
-	}
-	return 0
-}
-
 type SubscribeUpdateBlockFooter struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
 	Slot                   uint64                 `protobuf:"varint,1,opt,name=slot,proto3" json:"slot,omitempty"`
@@ -2594,7 +2544,6 @@ type SubscribeUpdateEntry struct {
 	Hash                     []byte                 `protobuf:"bytes,4,opt,name=hash,proto3" json:"hash,omitempty"`
 	ExecutedTransactionCount uint64                 `protobuf:"varint,5,opt,name=executed_transaction_count,json=executedTransactionCount,proto3" json:"executed_transaction_count,omitempty"`
 	StartingTransactionIndex uint64                 `protobuf:"varint,6,opt,name=starting_transaction_index,json=startingTransactionIndex,proto3" json:"starting_transaction_index,omitempty"` // added in v1.18, for solana 1.17 value is always 0
-	BankId                   uint64                 `protobuf:"varint,7,opt,name=bank_id,json=bankId,proto3" json:"bank_id,omitempty"`
 	unknownFields            protoimpl.UnknownFields
 	sizeCache                protoimpl.SizeCache
 }
@@ -2667,13 +2616,6 @@ func (x *SubscribeUpdateEntry) GetExecutedTransactionCount() uint64 {
 func (x *SubscribeUpdateEntry) GetStartingTransactionIndex() uint64 {
 	if x != nil {
 		return x.StartingTransactionIndex
-	}
-	return 0
-}
-
-func (x *SubscribeUpdateEntry) GetBankId() uint64 {
-	if x != nil {
-		return x.BankId
 	}
 	return 0
 }
@@ -3551,15 +3493,12 @@ const file_geyser_proto_rawDesc = "" +
 	"created_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAtB\x0e\n" +
 	"\fupdate_oneof\"I\n" +
 	"\x14SubscribeUpdateBatch\x121\n" +
-	"\aupdates\x18\x01 \x03(\v2\x17.geyser.SubscribeUpdateR\aupdates\"\xb3\x01\n" +
+	"\aupdates\x18\x01 \x03(\v2\x17.geyser.SubscribeUpdateR\aupdates\"\x89\x01\n" +
 	"\x16SubscribeUpdateAccount\x12<\n" +
 	"\aaccount\x18\x01 \x01(\v2\".geyser.SubscribeUpdateAccountInfoR\aaccount\x12\x12\n" +
 	"\x04slot\x18\x02 \x01(\x04R\x04slot\x12\x1d\n" +
 	"\n" +
-	"is_startup\x18\x03 \x01(\bR\tisStartup\x12\x1c\n" +
-	"\abank_id\x18\x04 \x01(\x04H\x00R\x06bankId\x88\x01\x01B\n" +
-	"\n" +
-	"\b_bank_id\"\x9a\x02\n" +
+	"is_startup\x18\x03 \x01(\bR\tisStartup\"\x9a\x02\n" +
 	"\x1aSubscribeUpdateAccountInfo\x12\x16\n" +
 	"\x06pubkey\x18\x01 \x01(\fR\x06pubkey\x12\x1a\n" +
 	"\blamports\x18\x02 \x01(\x04R\blamports\x12\x14\n" +
@@ -3572,35 +3511,30 @@ const file_geyser_proto_rawDesc = "" +
 	"\x04data\x18\x06 \x01(\fR\x04data\x12#\n" +
 	"\rwrite_version\x18\a \x01(\x04R\fwriteVersion\x12(\n" +
 	"\rtxn_signature\x18\b \x01(\fH\x00R\ftxnSignature\x88\x01\x01B\x10\n" +
-	"\x0e_txn_signature\"\xda\x01\n" +
+	"\x0e_txn_signature\"\xb0\x01\n" +
 	"\x13SubscribeUpdateSlot\x12\x12\n" +
 	"\x04slot\x18\x01 \x01(\x04R\x04slot\x12\x1b\n" +
 	"\x06parent\x18\x02 \x01(\x04H\x00R\x06parent\x88\x01\x01\x12*\n" +
 	"\x06status\x18\x03 \x01(\x0e2\x12.geyser.SlotStatusR\x06status\x12\"\n" +
 	"\n" +
-	"dead_error\x18\x04 \x01(\tH\x01R\tdeadError\x88\x01\x01\x12\x1c\n" +
-	"\abank_id\x18\x05 \x01(\x04H\x02R\x06bankId\x88\x01\x01B\t\n" +
+	"dead_error\x18\x04 \x01(\tH\x01R\tdeadError\x88\x01\x01B\t\n" +
 	"\a_parentB\r\n" +
-	"\v_dead_errorB\n" +
-	"\n" +
-	"\b_bank_id\"\x93\x01\n" +
+	"\v_dead_error\"z\n" +
 	"\x1aSubscribeUpdateTransaction\x12H\n" +
 	"\vtransaction\x18\x01 \x01(\v2&.geyser.SubscribeUpdateTransactionInfoR\vtransaction\x12\x12\n" +
-	"\x04slot\x18\x02 \x01(\x04R\x04slot\x12\x17\n" +
-	"\abank_id\x18\x03 \x01(\x04R\x06bankId\"\x85\x02\n" +
+	"\x04slot\x18\x02 \x01(\x04R\x04slot\"\x85\x02\n" +
 	"\x1eSubscribeUpdateTransactionInfo\x12\x1c\n" +
 	"\tsignature\x18\x01 \x01(\fR\tsignature\x12\x17\n" +
 	"\ais_vote\x18\x02 \x01(\bR\x06isVote\x12L\n" +
 	"\vtransaction\x18\x03 \x01(\v2*.solana.storage.ConfirmedBlock.TransactionR\vtransaction\x12H\n" +
 	"\x04meta\x18\x04 \x01(\v24.solana.storage.ConfirmedBlock.TransactionStatusMetaR\x04meta\x12\x14\n" +
-	"\x05index\x18\x05 \x01(\x04R\x05index\"\xdf\x01\n" +
+	"\x05index\x18\x05 \x01(\x04R\x05index\"\xc6\x01\n" +
 	" SubscribeUpdateTransactionStatus\x12\x12\n" +
 	"\x04slot\x18\x01 \x01(\x04R\x04slot\x12\x1c\n" +
 	"\tsignature\x18\x02 \x01(\fR\tsignature\x12\x17\n" +
 	"\ais_vote\x18\x03 \x01(\bR\x06isVote\x12\x14\n" +
 	"\x05index\x18\x04 \x01(\x04R\x05index\x12A\n" +
-	"\x03err\x18\x05 \x01(\v2/.solana.storage.ConfirmedBlock.TransactionErrorR\x03err\x12\x17\n" +
-	"\abank_id\x18\x06 \x01(\x04R\x06bankId\"\xe6\x05\n" +
+	"\x03err\x18\x05 \x01(\v2/.solana.storage.ConfirmedBlock.TransactionErrorR\x03err\"\xcd\x05\n" +
 	"\x14SubscribeUpdateBlock\x12\x12\n" +
 	"\x04slot\x18\x01 \x01(\x04R\x04slot\x12\x1c\n" +
 	"\tblockhash\x18\x02 \x01(\tR\tblockhash\x12@\n" +
@@ -3617,8 +3551,7 @@ const file_geyser_proto_rawDesc = "" +
 	" \x01(\x04R\x13updatedAccountCount\x12>\n" +
 	"\baccounts\x18\v \x03(\v2\".geyser.SubscribeUpdateAccountInfoR\baccounts\x12#\n" +
 	"\rentries_count\x18\f \x01(\x04R\fentriesCount\x126\n" +
-	"\aentries\x18\r \x03(\v2\x1c.geyser.SubscribeUpdateEntryR\aentries\x12\x17\n" +
-	"\abank_id\x18\x0e \x01(\x04R\x06bankId\"\xf2\x03\n" +
+	"\aentries\x18\r \x03(\v2\x1c.geyser.SubscribeUpdateEntryR\aentries\"\xd9\x03\n" +
 	"\x18SubscribeUpdateBlockMeta\x12\x12\n" +
 	"\x04slot\x18\x01 \x01(\x04R\x04slot\x12\x1c\n" +
 	"\tblockhash\x18\x02 \x01(\tR\tblockhash\x12@\n" +
@@ -3630,15 +3563,13 @@ const file_geyser_proto_rawDesc = "" +
 	"parentSlot\x12)\n" +
 	"\x10parent_blockhash\x18\a \x01(\tR\x0fparentBlockhash\x12<\n" +
 	"\x1aexecuted_transaction_count\x18\b \x01(\x04R\x18executedTransactionCount\x12#\n" +
-	"\rentries_count\x18\t \x01(\x04R\fentriesCount\x12\x17\n" +
-	"\abank_id\x18\n" +
-	" \x01(\x04R\x06bankId\"\xcb\x01\n" +
+	"\rentries_count\x18\t \x01(\x04R\fentriesCount\"\xcb\x01\n" +
 	"\x1aSubscribeUpdateBlockFooter\x12\x12\n" +
 	"\x04slot\x18\x01 \x01(\x04R\x04slot\x12\x17\n" +
 	"\abank_id\x18\x02 \x01(\x04R\x06bankId\x12\x1b\n" +
 	"\tbank_hash\x18\x03 \x01(\fR\bbankHash\x129\n" +
 	"\x19block_producer_time_nanos\x18\x04 \x01(\x04R\x16blockProducerTimeNanos\x12(\n" +
-	"\x10block_user_agent\x18\x05 \x01(\fR\x0eblockUserAgent\"\x88\x02\n" +
+	"\x10block_user_agent\x18\x05 \x01(\fR\x0eblockUserAgent\"\xef\x01\n" +
 	"\x14SubscribeUpdateEntry\x12\x12\n" +
 	"\x04slot\x18\x01 \x01(\x04R\x04slot\x12\x14\n" +
 	"\x05index\x18\x02 \x01(\x04R\x05index\x12\x1d\n" +
@@ -3646,8 +3577,7 @@ const file_geyser_proto_rawDesc = "" +
 	"num_hashes\x18\x03 \x01(\x04R\tnumHashes\x12\x12\n" +
 	"\x04hash\x18\x04 \x01(\fR\x04hash\x12<\n" +
 	"\x1aexecuted_transaction_count\x18\x05 \x01(\x04R\x18executedTransactionCount\x12<\n" +
-	"\x1astarting_transaction_index\x18\x06 \x01(\x04R\x18startingTransactionIndex\x12\x17\n" +
-	"\abank_id\x18\a \x01(\x04R\x06bankId\"\x15\n" +
+	"\x1astarting_transaction_index\x18\x06 \x01(\x04R\x18startingTransactionIndex\"\x15\n" +
 	"\x13SubscribeUpdatePing\"%\n" +
 	"\x13SubscribeUpdatePong\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\"\x1c\n" +
@@ -3939,7 +3869,6 @@ func file_geyser_proto_init() {
 		(*SubscribeUpdate_Entry)(nil),
 		(*SubscribeUpdate_BlockFooter)(nil),
 	}
-	file_geyser_proto_msgTypes[20].OneofWrappers = []any{}
 	file_geyser_proto_msgTypes[21].OneofWrappers = []any{}
 	file_geyser_proto_msgTypes[22].OneofWrappers = []any{}
 	file_geyser_proto_msgTypes[33].OneofWrappers = []any{}

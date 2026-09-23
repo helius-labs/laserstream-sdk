@@ -416,16 +416,6 @@ fn footer_resume_slot_tracks_block_footer_updates() {
 }
 
 #[test]
-fn footer_dedup_suppresses_exact_duplicates_but_keeps_distinct_banks() {
-    let mut dedup = FooterDedup::default();
-
-    assert!(dedup.should_forward(42, 7));
-    assert!(!dedup.should_forward(42, 7));
-    assert!(dedup.should_forward(42, 8));
-    assert!(dedup.should_forward(43, 7));
-}
-
-#[test]
 fn footer_resume_slot_ignores_non_footer_updates() {
     let update = SubscribeUpdate {
         update_oneof: Some(subscribe_update::UpdateOneof::Account(

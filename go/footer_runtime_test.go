@@ -105,7 +105,7 @@ func startFooterRuntimeServer(t *testing.T, server pb.GeyserServer) (string, fun
 	}
 }
 
-func TestFooterWritePersistsAcrossReconnectAndClearsDedup(t *testing.T) {
+func TestFooterWritePersistsAcrossReconnect(t *testing.T) {
 	server := newFooterRuntimeServer(true)
 	endpoint, stop := startFooterRuntimeServer(t, server)
 	defer stop()
@@ -235,7 +235,7 @@ func TestFooterReplayDisabledDoesNotSuppressReconnectDelivery(t *testing.T) {
 	case <-done:
 		client.Close()
 	case <-ctx.Done():
-		t.Fatalf("timed out waiting for duplicate live footer after reconnect: %v", ctx.Err())
+		t.Fatalf("timed out waiting for footer after reconnect: %v", ctx.Err())
 	}
 
 	server.mu.Lock()

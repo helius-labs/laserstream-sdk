@@ -1,5 +1,4 @@
 // TypeScript declarations for Laserstream client
-import Long = require('long');
 
 // Re-export gRPC types
 export { ChannelOptions } from '@grpc/grpc-js';
@@ -175,65 +174,6 @@ declare module 'laserstream-core-proto-js/generated' {
     interface SubscribeUpdate {
       blockFooter?: (SubscribeUpdateBlockFooter | null);
     }
-
-    interface ISubscribeUpdateAccount {
-      bankId?: (number | Long | null);
-    }
-
-    interface SubscribeUpdateAccount {
-      bankId?: (number | Long | null);
-      _bankId?: "bankId";
-    }
-
-    interface ISubscribeUpdateSlot {
-      bankId?: (number | Long | null);
-    }
-
-    interface SubscribeUpdateSlot {
-      bankId?: (number | Long | null);
-      _bankId?: "bankId";
-    }
-
-    interface ISubscribeUpdateTransaction {
-      bankId?: (number | Long | null);
-    }
-
-    interface SubscribeUpdateTransaction {
-      bankId?: (number | Long | null);
-    }
-
-    interface ISubscribeUpdateTransactionStatus {
-      bankId?: (number | Long | null);
-    }
-
-    interface SubscribeUpdateTransactionStatus {
-      bankId?: (number | Long | null);
-    }
-
-    interface ISubscribeUpdateBlock {
-      bankId?: (number | Long | null);
-    }
-
-    interface SubscribeUpdateBlock {
-      bankId?: (number | Long | null);
-    }
-
-    interface ISubscribeUpdateBlockMeta {
-      bankId?: (number | Long | null);
-    }
-
-    interface SubscribeUpdateBlockMeta {
-      bankId?: (number | Long | null);
-    }
-
-    interface ISubscribeUpdateEntry {
-      bankId?: (number | Long | null);
-    }
-
-    interface SubscribeUpdateEntry {
-      bankId?: (number | Long | null);
-    }
-
     interface ISubscribeRequestFilterTransactions {
       /** Helius ATA expansion control (proto field #30). */
       tokenAccounts?: (TokenAccountsFilterMode | string | null);

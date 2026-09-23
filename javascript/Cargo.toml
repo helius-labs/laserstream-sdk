@@ -22,8 +22,8 @@ futures-util = "0.3"
 futures-channel = "0.3"
 parking_lot = "0.12"
 uuid = { version = "1", features = ["v4"] }
-laserstream-core-client = { git = "https://github.com/helius-labs/yellowstone-grpc", rev = "897753ec6d2d011d969bc7d797e0658220b0379b" }
-laserstream-core-proto = { git = "https://github.com/helius-labs/yellowstone-grpc", rev = "897753ec6d2d011d969bc7d797e0658220b0379b", default-features = false, features = ["tonic", "tonic-compression"] }
+laserstream-core-client = { git = "https://github.com/helius-labs/yellowstone-grpc", rev = "17f310a5a4567aa1899f03d86093d1db18584e1a" }
+laserstream-core-proto = { git = "https://github.com/helius-labs/yellowstone-grpc", rev = "17f310a5a4567aa1899f03d86093d1db18584e1a", default-features = false, features = ["tonic", "tonic-compression"] }
 # RUSTSEC-2026-0258: floor the core client's tonic 0.14 graph at the 0.4.19 fix.
 h2 = ">=0.4.19,<0.5"
 prost = "0.14"

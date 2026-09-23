@@ -31,30 +31,4 @@ func TestMergeSubscribeRequestPreservesInternalSlotTrackerAndReplacesFooterFilte
 	}
 }
 
-func TestFooterDedupClearAllowsReplacementReplay(t *testing.T) {
-	dedup := newFooterDedup()
-	if !dedup.shouldForward(42, 7) {
-		t.Fatalf("first footer should pass")
-	}
-	dedup.clear()
-	if !dedup.shouldForward(42, 7) {
-		t.Fatalf("cleared dedup should allow the same footer again")
-	}
-}
-
-func TestFooterDedupConcurrentFilterReplacement(t *testing.T) {
-	dedup := newFooterDedup()
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		for i := 0; i < 1000; i++ {
-			dedup.clear()
-		}
-	}()
-	for i := 0; i < 1000; i++ {
-		dedup.shouldForward(uint64(i), 7)
-	}
-	<-done
-}
-
 func boolPtr(v bool) *bool { return &v }

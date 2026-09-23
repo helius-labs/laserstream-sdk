@@ -14,11 +14,7 @@ use laserstream_core_proto::prelude::geyser_client::GeyserClient;
 use laserstream_core_proto::tonic::{
     codec::CompressionEncoding, metadata::MetadataValue, transport::Endpoint, Request, Status,
 };
-use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    pin::Pin,
-    time::Duration,
-};
+use std::{pin::Pin, time::Duration};
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 use tracing::{error, instrument, warn};
@@ -26,7 +22,6 @@ use uuid;
 
 const HARD_CAP_RECONNECT_ATTEMPTS: u32 = (20 * 60) / 5; // 20 mins / 5 sec interval
 const FIXED_RECONNECT_INTERVAL_MS: u64 = 5000; // 5 seconds fixed interval
-const FOOTER_DEDUP_SLOT_RETENTION: usize = 256;
 const SDK_NAME: &str = "laserstream-rust";
 const SDK_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[cfg(feature = "internal")]
@@ -44,35 +39,6 @@ fn footer_resume_slot(update: &SubscribeUpdate) -> Option<u64> {
     match update.update_oneof.as_ref()? {
         UpdateOneof::BlockFooter(msg) => Some(msg.slot),
         _ => None,
-    }
-}
-
-#[derive(Debug, Default)]
-struct FooterDedup {
-    by_slot: HashMap<u64, HashSet<u64>>,
-    slot_order: VecDeque<u64>,
-}
-
-impl FooterDedup {
-    fn should_forward(&mut self, slot: u64, bank_id: u64) -> bool {
-        let bank_ids = self.by_slot.entry(slot).or_insert_with(|| {
-            self.slot_order.push_back(slot);
-            HashSet::new()
-        });
-        if !bank_ids.insert(bank_id) {
-            return false;
-        }
-        while self.slot_order.len() > FOOTER_DEDUP_SLOT_RETENTION {
-            if let Some(old_slot) = self.slot_order.pop_front() {
-                self.by_slot.remove(&old_slot);
-            }
-        }
-        true
-    }
-
-    fn clear(&mut self) {
-        self.by_slot.clear();
-        self.slot_order.clear();
     }
 }
 
@@ -155,7 +121,6 @@ pub fn subscribe(
     let update_stream = stream! {
         let mut reconnect_attempts = 0;
         let mut tracked_slot: u64 = 0;
-        let mut footer_dedup = FooterDedup::default();
 
         // Determine the effective max reconnect attempts
         let effective_max_attempts = config
@@ -276,14 +241,6 @@ pub fn subscribe(
                                                 }
                                             }
 
-                                            if replay_enabled {
-                                                if let Some(UpdateOneof::BlockFooter(block_footer)) = &update.update_oneof {
-                                                    if !footer_dedup.should_forward(block_footer.slot, block_footer.bank_id) {
-                                                        continue;
-                                                    }
-                                                }
-                                            }
-
                                             // Filter out internal subscription from filters before yielding (only if replay is enabled)
                                             let mut clean_update = update;
                                             if replay_enabled {
@@ -318,12 +275,7 @@ pub fn subscribe(
                             // Handle write requests from the user
                             Some(write_request) = write_rx.recv() => {
                                 // Merge the write_request into current_request so it persists across reconnections
-                                let footer_filters_changed =
-                                    replay_enabled && current_request.block_footer != write_request.block_footer;
                                 merge_subscribe_requests(&mut current_request, &write_request, &internal_slot_sub_id);
-                                if footer_filters_changed {
-                                    footer_dedup.clear();
-                                }
 
                                 // Send the merged current_request (which preserves the internal slot
                                 // tracker) instead of the raw write_request. Yellowstone gRPC replaces

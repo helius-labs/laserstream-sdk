@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -29,7 +28,6 @@ const (
 	HardCapReconnectAttempts = 240  // 20 minutes / 5 seconds = 240 attempts
 	FixedReconnectIntervalMs = 5000 // 5 seconds fixed interval
 	ForkDepthSafetyMargin    = 31   // Max fork depth for processed commitment
-	footerDedupSlotRetention = 256
 )
 
 // SDK metadata constants
@@ -107,45 +105,6 @@ type Client struct {
 	// Bidirectional streaming support
 	writeChan     chan *SubscribeRequest
 	writeStopChan chan struct{}
-	footerDedup   *footerDedup
-}
-
-type footerDedup struct {
-	mu        sync.Mutex
-	bySlot    map[uint64]map[uint64]struct{}
-	slotOrder []uint64
-}
-
-func newFooterDedup() *footerDedup {
-	return &footerDedup{
-		bySlot: make(map[uint64]map[uint64]struct{}),
-	}
-}
-
-func (d *footerDedup) shouldForward(slot, bankID uint64) bool {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if _, ok := d.bySlot[slot]; !ok {
-		d.bySlot[slot] = make(map[uint64]struct{})
-		d.slotOrder = append(d.slotOrder, slot)
-	}
-	if _, ok := d.bySlot[slot][bankID]; ok {
-		return false
-	}
-	d.bySlot[slot][bankID] = struct{}{}
-	for len(d.slotOrder) > footerDedupSlotRetention {
-		oldSlot := d.slotOrder[0]
-		d.slotOrder = d.slotOrder[1:]
-		delete(d.bySlot, oldSlot)
-	}
-	return true
-}
-
-func (d *footerDedup) clear() {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	d.bySlot = make(map[uint64]map[uint64]struct{})
-	d.slotOrder = nil
 }
 
 // NewLaserstreamConfig creates a new LaserstreamConfig with default values.
@@ -164,7 +123,6 @@ func NewClient(config LaserstreamConfig) *Client {
 		config:        config,
 		writeChan:     make(chan *SubscribeRequest, 100),
 		writeStopChan: make(chan struct{}),
-		footerDedup:   newFooterDedup(),
 	}
 }
 
@@ -195,7 +153,6 @@ func (c *Client) SubscribeWithContext(
 	c.originalRequest = proto.Clone(req).(*SubscribeRequest)
 	c.dataCallback = dataCallback
 	c.errorCallback = errorCallback
-	c.footerDedup = newFooterDedup()
 
 	// Extract commitment level for reconnection logic
 	c.commitmentLevel = CommitmentProcessed
@@ -525,11 +482,6 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 					atomic.StoreUint64(&c.trackedSlot, footerUpdate.BlockFooter.Slot)
 				}
 			}
-			if footerUpdate.BlockFooter != nil && c.isReplayEnabled() &&
-				c.footerDedup != nil &&
-				!c.footerDedup.shouldForward(footerUpdate.BlockFooter.Slot, footerUpdate.BlockFooter.BankId) {
-				continue
-			}
 		}
 
 		// Clean up internal filter ID from ALL message types (only when replay is enabled)
@@ -559,10 +511,6 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 func (c *Client) mergeSubscribeRequest(modification *SubscribeRequest) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.isReplayEnabled() && c.footerDedup != nil &&
-		!reflect.DeepEqual(c.originalRequest.BlockFooter, modification.BlockFooter) {
-		c.footerDedup.clear()
-	}
 
 	// Save internal slot tracker before replacing slots
 	var internalKey string
