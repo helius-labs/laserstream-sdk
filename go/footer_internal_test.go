@@ -42,4 +42,19 @@ func TestFooterDedupClearAllowsReplacementReplay(t *testing.T) {
 	}
 }
 
+func TestFooterDedupConcurrentFilterReplacement(t *testing.T) {
+	dedup := newFooterDedup()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 1000; i++ {
+			dedup.clear()
+		}
+	}()
+	for i := 0; i < 1000; i++ {
+		dedup.shouldForward(uint64(i), 7)
+	}
+	<-done
+}
+
 func boolPtr(v bool) *bool { return &v }

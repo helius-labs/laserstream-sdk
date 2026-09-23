@@ -111,6 +111,7 @@ type Client struct {
 }
 
 type footerDedup struct {
+	mu        sync.Mutex
 	bySlot    map[uint64]map[uint64]struct{}
 	slotOrder []uint64
 }
@@ -122,6 +123,8 @@ func newFooterDedup() *footerDedup {
 }
 
 func (d *footerDedup) shouldForward(slot, bankID uint64) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	if _, ok := d.bySlot[slot]; !ok {
 		d.bySlot[slot] = make(map[uint64]struct{})
 		d.slotOrder = append(d.slotOrder, slot)
@@ -139,6 +142,8 @@ func (d *footerDedup) shouldForward(slot, bankID uint64) bool {
 }
 
 func (d *footerDedup) clear() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	d.bySlot = make(map[uint64]map[uint64]struct{})
 	d.slotOrder = nil
 }
@@ -408,10 +413,6 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 				return
 			case req := <-c.writeChan:
 				if req != nil {
-					if c.isReplayEnabled() && c.footerDedup != nil &&
-						!reflect.DeepEqual(c.originalRequest.BlockFooter, req.BlockFooter) {
-						c.footerDedup.clear()
-					}
 					// Send merged originalRequest (preserves internal slot tracker, strips FromSlot)
 					c.mergeSubscribeRequest(req)
 					c.mu.RLock()
@@ -558,6 +559,10 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 func (c *Client) mergeSubscribeRequest(modification *SubscribeRequest) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.isReplayEnabled() && c.footerDedup != nil &&
+		!reflect.DeepEqual(c.originalRequest.BlockFooter, modification.BlockFooter) {
+		c.footerDedup.clear()
+	}
 
 	// Save internal slot tracker before replacing slots
 	var internalKey string
