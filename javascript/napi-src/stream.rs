@@ -291,29 +291,6 @@ fn read_varint(data: &[u8]) -> Option<(u64, usize)> {
     None
 }
 
-// Read only the slot field; large transaction/account payloads remain raw.
-fn payload_slot(mut data: &[u8]) -> Option<u64> {
-    use prost::encoding::{decode_key, decode_varint, skip_field, DecodeContext, WireType};
-    while !data.is_empty() {
-        let (tag, wire) = decode_key(&mut data).ok()?;
-        if matches!(tag, 2 | 3 | 4 | 5 | 7 | 8 | 10) && wire == WireType::LengthDelimited {
-            let len = usize::try_from(decode_varint(&mut data).ok()?).ok()?;
-            let mut payload = data.get(..len)?;
-            let slot_tag = if matches!(tag, 2 | 4) { 2 } else { 1 };
-            while !payload.is_empty() {
-                let (field, wire) = decode_key(&mut payload).ok()?;
-                if field == slot_tag && wire == WireType::Varint {
-                    return decode_varint(&mut payload).ok();
-                }
-                skip_field(wire, field, &mut payload, DecodeContext::default()).ok()?;
-            }
-            return Some(0);
-        }
-        skip_field(wire, tag, &mut data, DecodeContext::default()).ok()?;
-    }
-    None
-}
-
 pub struct StreamInner {
     cancel_tx: Mutex<Option<oneshot::Sender<()>>>,
     write_tx: Mutex<Option<mpsc::UnboundedSender<geyser::SubscribeRequest>>>,
@@ -443,7 +420,7 @@ impl StreamInner {
                             };
 
                             current_request.lock().from_slot = Some(from_slot);
-                        } else if !replay {
+                        } else {
                             current_request.lock().from_slot = None;
                         }
 
@@ -521,8 +498,6 @@ impl StreamInner {
             (subscribe_tx, response.into_inner())
         };
 
-        // Carry the boundary on the same ordered callback queue as raw updates.
-        let mut connection_start = true;
         // Ping interval timer
         let mut ping_interval = tokio::time::interval(Duration::from_secs(30));
         ping_interval.tick().await; // Skip first immediate tick
@@ -540,8 +515,7 @@ impl StreamInner {
                     let _ = sender.send(ping_request).await;
                 },
                 // Handle incoming messages from the server (raw bytes via custom codec)
-                result = stream.next() => {
-                    let Some(result) = result else { return Ok(()); };
+                Some(result) = stream.next() => {
                     match result {
                         Ok(raw_bytes) => {
                             // Peek at protobuf wire format to classify message type without full decode
@@ -562,13 +536,13 @@ impl StreamInner {
                                 // Slot (field 3): decode for slot tracking, then forward with filter cleanup
                                 Some(3) => {
                                     if let Ok(message) = geyser::SubscribeUpdate::decode(raw_bytes.as_ref()) {
+                                        if let Some(geyser::subscribe_update::UpdateOneof::Slot(slot)) = &message.update_oneof {
+                                            tracked_slot.fetch_max(slot.slot, Ordering::SeqCst);
+                                        }
+
                                         // If exclusively from internal subscription, skip forwarding
                                         if message.filters.len() == 1 && message.filters.contains(&internal_slot_sub_id) {
                                             continue;
-                                        }
-
-                                        if let Some(geyser::subscribe_update::UpdateOneof::Slot(slot)) = &message.update_oneof {
-                                            tracked_slot.fetch_max(slot.slot, Ordering::SeqCst);
                                         }
 
                                         // User also has a slot subscription - remove internal filter and re-encode
@@ -582,8 +556,7 @@ impl StreamInner {
                                             continue;
                                         }
 
-                                        let bytes_wrapper = crate::SubscribeUpdateBytes(buf.into(), connection_start);
-                                        connection_start = false;
+                                        let bytes_wrapper = crate::SubscribeUpdateBytes(buf.into());
                                         progress_flag.store(true, Ordering::SeqCst);
                                         let _status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
                                     }
@@ -593,11 +566,7 @@ impl StreamInner {
                                 // entry=8, transaction_status=10): forward raw bytes directly.
                                 // No prost decode or re-encode needed - just one memcpy.
                                 _ => {
-                                    if let Some(slot) = payload_slot(&raw_bytes) {
-                                        tracked_slot.fetch_max(slot, Ordering::SeqCst);
-                                    }
-                                    let bytes_wrapper = crate::SubscribeUpdateBytes(raw_bytes, connection_start);
-                                    connection_start = false;
+                                    let bytes_wrapper = crate::SubscribeUpdateBytes(raw_bytes);
                                     progress_flag.store(true, Ordering::SeqCst);
                                     let _status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
                                 }

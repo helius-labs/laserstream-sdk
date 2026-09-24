@@ -95,8 +95,7 @@ type Client struct {
 
 	// Enhanced slot tracking
 	trackedSlot  uint64
-	madeProgress uint64      // atomic bool (0/1)
-	dedup        replayDedup // protected by mu
+	madeProgress uint64 // atomic bool (0/1)
 
 	// Request management
 	originalRequest   *SubscribeRequest
@@ -151,8 +150,6 @@ func (c *Client) SubscribeWithContext(
 	}
 
 	// Clone the original request
-	c.dedup = replayDedup{}
-	atomic.StoreUint64(&c.trackedSlot, 0)
 	c.originalRequest = proto.Clone(req).(*SubscribeRequest)
 	c.dataCallback = dataCallback
 	c.errorCallback = errorCallback
@@ -345,7 +342,6 @@ func (c *Client) connectAndStream(ctx context.Context) error {
 
 	c.mu.Lock()
 	c.stream = stream
-	c.dedup.beginConnection()
 	c.mu.Unlock()
 
 	// Handle streaming messages
@@ -460,6 +456,25 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 			continue
 		}
 
+		// Track slot updates for reconnection only when replay is enabled
+		if slotUpdate, ok := resp.UpdateOneof.(*pb.SubscribeUpdate_Slot); ok {
+			if slotUpdate.Slot != nil && c.isReplayEnabled() {
+				atomic.StoreUint64(&c.trackedSlot, slotUpdate.Slot.Slot)
+			}
+
+			// Check if this slot update is EXCLUSIVELY from our internal subscription
+			if c.isReplayEnabled() && len(resp.Filters) == 1 && resp.Filters[0] == c.internalSlotSubID {
+				continue // Skip forwarding this message
+			}
+		}
+
+		// Also track slots from block updates when replay is enabled (for cases where no slot subscription exists)
+		if blockUpdate, ok := resp.UpdateOneof.(*pb.SubscribeUpdate_Block); ok {
+			if blockUpdate.Block != nil && c.isReplayEnabled() {
+				atomic.StoreUint64(&c.trackedSlot, blockUpdate.Block.Slot)
+			}
+		}
+
 		// Clean up internal filter ID from ALL message types (only when replay is enabled)
 		if c.isReplayEnabled() {
 			cleanedFilters := make([]string, 0, len(resp.Filters))
@@ -469,22 +484,6 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 				}
 			}
 			resp.Filters = cleanedFilters
-		}
-
-		if c.isReplayEnabled() {
-			if len(resp.Filters) == 0 {
-				continue
-			}
-			c.mu.Lock()
-			duplicate := c.dedup.duplicate(resp)
-			c.mu.Unlock()
-			if duplicate {
-				continue
-			}
-			slot, _ := updateSlot(resp)
-			if slot > atomic.LoadUint64(&c.trackedSlot) {
-				atomic.StoreUint64(&c.trackedSlot, slot)
-			}
 		}
 
 		// Mark that at least one message was forwarded in this session
@@ -503,7 +502,6 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 func (c *Client) mergeSubscribeRequest(modification *SubscribeRequest) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.dedup = replayDedup{}
 
 	// Save internal slot tracker before replacing slots
 	var internalKey string
@@ -580,6 +578,8 @@ func (c *Client) updateRequestForReconnection() {
 		}
 
 		c.originalRequest.FromSlot = &fromSlot
+	} else {
+		c.originalRequest.FromSlot = nil
 	}
 }
 

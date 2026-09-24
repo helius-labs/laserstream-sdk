@@ -19,10 +19,6 @@ use laserstream_core_proto::geyser::{
     SubscribePreprocessedRequest, SubscribePreprocessedUpdate,
 };
 
-#[path = "replay.rs"]
-mod replay;
-use replay::{update_slot, ReplayDedup};
-
 const HARD_CAP_RECONNECT_ATTEMPTS: u32 = (20 * 60) / 5; // 20 mins / 5 sec interval
 const FIXED_RECONNECT_INTERVAL_MS: u64 = 5000; // 5 seconds fixed interval
 const SDK_NAME: &str = "laserstream-rust";
@@ -111,7 +107,6 @@ pub fn subscribe(
     let update_stream = stream! {
         let mut reconnect_attempts = 0;
         let mut tracked_slot: u64 = 0;
-        let mut dedup = ReplayDedup::default();
 
         // Determine the effective max reconnect attempts
         let effective_max_attempts = config
@@ -147,16 +142,8 @@ pub fn subscribe(
         loop {
             // Drain any pending write requests that arrived during reconnection delay.
             // This ensures writes sent while disconnected are included in the next connection.
-            let mut caller_from_slot = None;
             while let Ok(write_request) = write_rx.try_recv() {
                 merge_subscribe_requests(&mut current_request, &write_request, &internal_slot_sub_id);
-                dedup = ReplayDedup::default();
-                if replay_enabled {
-                    if let Some(slot) = write_request.from_slot {
-                        tracked_slot = slot;
-                        caller_from_slot = Some(slot);
-                    }
-                }
             }
 
             // Always update from_slot on current_request based on tracked_slot.
@@ -174,14 +161,10 @@ pub fn subscribe(
                 current_request.from_slot = None;
             }
 
-            if let Some(slot) = caller_from_slot {
-                current_request.from_slot = Some(slot);
-            }
             let attempt_request = current_request.clone();
 
             match connect_and_subscribe_once(&config, attempt_request, api_key_string.clone()).await {
                 Ok((sender, stream)) => {
-                    dedup.begin_connection();
                     // Successful connection – reset attempt counter so we don't hit the cap
                     reconnect_attempts = 0;
 
@@ -227,16 +210,25 @@ pub fn subscribe(
                                                 continue;
                                             }
 
+                                // Track the latest slot from any slot update (including internal subscription)
+                                if let Some(UpdateOneof::Slot(s)) = &update.update_oneof {
+                                    if replay_enabled {
+                                        tracked_slot = s.slot;
+                                    }
+                                    
+                                    // Skip if this slot update is EXCLUSIVELY from our internal subscription
+                                    if update.filters.len() == 1 && update.filters.contains(&internal_slot_sub_id) {
+                                        continue;
+                                    }
+                                }
+
                                             // Filter out internal subscription from filters before yielding (only if replay is enabled)
                                             let mut clean_update = update;
                                             if replay_enabled {
                                                 clean_update.filters.retain(|f| f != &internal_slot_sub_id);
                                                 
                                                 // Only yield if there are still filters after cleaning
-                                                if !clean_update.filters.is_empty() && !dedup.duplicate(&clean_update) {
-                                                    if let Some(slot) = update_slot(&clean_update) {
-                                                        tracked_slot = tracked_slot.max(slot);
-                                                    }
+                                                if !clean_update.filters.is_empty() {
                                                     yield Ok(clean_update);
                                                 }
                                             } else {
@@ -265,19 +257,13 @@ pub fn subscribe(
                             Some(write_request) = write_rx.recv() => {
                                 // Merge the write_request into current_request so it persists across reconnections
                                 merge_subscribe_requests(&mut current_request, &write_request, &internal_slot_sub_id);
-                                dedup = ReplayDedup::default();
-                                if replay_enabled {
-                                    if let Some(slot) = write_request.from_slot {
-                                        tracked_slot = slot;
-                                    }
-                                }
 
                                 // Send the merged current_request (which preserves the internal slot
                                 // tracker) instead of the raw write_request. Yellowstone gRPC replaces
                                 // all subscriptions on each write, so the raw request would drop the
                                 // internal slot tracker and cause tracked_slot to go stale.
                                 let mut send_req = current_request.clone();
-                                send_req.from_slot = if replay_enabled { write_request.from_slot } else { None };
+                                send_req.from_slot = None;
                                 send_req.ping = None;
 
                                 if let Err(e) = sender.send(send_req).await {

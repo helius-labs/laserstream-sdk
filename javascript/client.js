@@ -1,7 +1,6 @@
 const { LaserstreamClient: NapiClient, CommitmentLevel, shutdownAllStreams, getActiveStreamCount } = require('./index');
 const { initProtobuf, decodeSubscribeUpdate, decodeSubscribePreprocessedUpdate } = require('./proto-decoder');
 const { CompressedAccountFilterSet, TableFullError, DEFAULT_HASH_SEED } = require('./cuckoo');
-const { ReplayDedup } = require('./replay');
 
 // Compression algorithms enum
 const CompressionAlgorithms = {
@@ -35,9 +34,8 @@ async function subscribe(config, request, onData, onError) {
     config.replay
   );
 
-  let dedup = new ReplayDedup();
   // Wrap the callbacks to decode protobuf bytes
-  const wrappedCallback = (error, updateBytes, connectionStart) => {
+  const wrappedCallback = (error, updateBytes) => {
     if (error) {
       if (onError) {
         onError(error);
@@ -46,12 +44,9 @@ async function subscribe(config, request, onData, onError) {
     }
 
     try {
-      // Ordered with updates on the native callback queue, including retries
-      // that previously ended before forwarding any user data.
-      if (connectionStart) dedup.beginConnection();
       // Decode the protobuf bytes to JavaScript object
       const decodedUpdate = decodeSubscribeUpdate(updateBytes);
-      if (onData && (config.replay === false || !dedup.duplicate(decodedUpdate))) {
+      if (onData) {
         onData(decodedUpdate);
       }
     } catch (decodeError) {
@@ -64,11 +59,6 @@ async function subscribe(config, request, onData, onError) {
   // Call the NAPI client directly with the wrapped callback
   try {
     const streamHandle = await napiClient.subscribe(request, wrappedCallback);
-    const write = streamHandle.write.bind(streamHandle);
-    streamHandle.write = async modification => {
-      dedup = new ReplayDedup();
-      return write(modification);
-    };
     return streamHandle;
   } catch (error) {
     if (onError) {
