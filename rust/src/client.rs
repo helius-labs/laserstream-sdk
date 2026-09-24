@@ -602,7 +602,7 @@ fn merge_subscribe_requests(
 }
 
 #[cfg(test)]
-mod tests {
+mod replay_cursor_tests {
     use super::*;
 
     #[test]
