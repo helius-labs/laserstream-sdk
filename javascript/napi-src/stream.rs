@@ -27,12 +27,12 @@ const SDK_VERSION: &str = "0.6.1";
 
 /// Custom interceptor that adds SDK metadata headers to all gRPC requests
 #[derive(Clone)]
-struct SdkMetadataInterceptor {
+pub(crate) struct SdkMetadataInterceptor {
     x_token: Option<laserstream_core_proto::tonic::metadata::AsciiMetadataValue>,
 }
 
 impl SdkMetadataInterceptor {
-    fn new(token: &Option<String>) -> std::result::Result<Self, Status> {
+    pub(crate) fn new(token: &Option<String>) -> std::result::Result<Self, Status> {
         let x_token = if let Some(token_str) = token {
             if !token_str.is_empty() {
                 Some(token_str.parse().map_err(|e| {
@@ -64,15 +64,15 @@ impl Interceptor for SdkMetadataInterceptor {
 }
 
 // Helper struct to hold channel configuration
-struct ChannelConfig {
-    max_send_msg_size: usize,
-    max_recv_msg_size: usize,
-    send_compression: Option<CompressionEncoding>,
-    accept_compression: Option<CompressionEncoding>,
+pub(crate) struct ChannelConfig {
+    pub(crate) max_send_msg_size: usize,
+    pub(crate) max_recv_msg_size: usize,
+    pub(crate) send_compression: Option<CompressionEncoding>,
+    pub(crate) accept_compression: Option<CompressionEncoding>,
 }
 
 impl ChannelConfig {
-    fn from_options(channel_options: &Option<ChannelOptions>) -> Self {
+    pub(crate) fn from_options(channel_options: &Option<ChannelOptions>) -> Self {
         if let Some(ref opts) = channel_options {
             let send_compression = opts.grpc_default_compression_algorithm.and_then(|algo| match algo {
                 2 => Some(CompressionEncoding::Gzip),
@@ -98,11 +98,22 @@ impl ChannelConfig {
 }
 
 // Helper function to configure endpoint with channel options
-fn configure_endpoint(
+pub(crate) fn configure_endpoint(
     endpoint_str: &str,
     channel_options: &Option<ChannelOptions>,
 ) -> std::result::Result<Endpoint, Box<dyn std::error::Error + Send + Sync>> {
-    let mut endpoint = Endpoint::from_shared(endpoint_str.to_string())?;
+    // Performance defaults first, so explicit channel options below override them.
+    // tcp_nodelay disables Nagle's algorithm (critical for H2 WINDOW_UPDATE latency).
+    // Adaptive windows and large initial window sizes prevent H2 flow control
+    // from throttling high-throughput streams (default 65KB window is far too small).
+    let default_timeout = if channel_options.is_some() { 30 } else { 10 };
+    let mut endpoint = Endpoint::from_shared(endpoint_str.to_string())?
+        .connect_timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(default_timeout))
+        .http2_adaptive_window(true)
+        .tcp_nodelay(true)
+        .initial_stream_window_size(Some(4 * 1024 * 1024))
+        .initial_connection_window_size(Some(8 * 1024 * 1024));
 
     if let Some(ref opts) = channel_options {
         // Keep-alive options
@@ -152,27 +163,6 @@ fn configure_endpoint(
                 _ => {}
             }
         }
-
-        // Apply sensible defaults for options not specified
-        endpoint = endpoint
-            .connect_timeout(Duration::from_secs(10))
-            .timeout(Duration::from_secs(30))
-            .http2_adaptive_window(true)
-            .tcp_nodelay(true)
-            .initial_stream_window_size(Some(4 * 1024 * 1024))
-            .initial_connection_window_size(Some(8 * 1024 * 1024));
-    } else {
-        // Apply performance defaults even without explicit channel_options.
-        // tcp_nodelay disables Nagle's algorithm (critical for H2 WINDOW_UPDATE latency).
-        // Adaptive windows and large initial window sizes prevent H2 flow control
-        // from throttling high-throughput streams (default 65KB window is far too small).
-        endpoint = endpoint
-            .connect_timeout(Duration::from_secs(10))
-            .timeout(Duration::from_secs(10))
-            .http2_adaptive_window(true)
-            .tcp_nodelay(true)
-            .initial_stream_window_size(Some(4 * 1024 * 1024))
-            .initial_connection_window_size(Some(8 * 1024 * 1024));
     }
 
     // Configure TLS

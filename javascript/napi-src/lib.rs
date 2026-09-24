@@ -4,6 +4,7 @@ use h2 as _;
 mod client;
 mod proto;
 mod stream;
+mod unary;
 
 use std::sync::Once;
 

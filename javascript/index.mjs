@@ -8,6 +8,7 @@ const indexModule = require('./index.js');
 
 // Export clean API for ES modules
 export const subscribe = clientModule.subscribe;
+export const LaserstreamClient = clientModule.LaserstreamClient;
 export const CommitmentLevel = clientModule.CommitmentLevel;
 export const initProtobuf = clientModule.initProtobuf;
 export const decodeSubscribeUpdate = clientModule.decodeSubscribeUpdate;

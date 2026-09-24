@@ -1,4 +1,4 @@
-const { LaserstreamClient: NapiClient, CommitmentLevel, shutdownAllStreams, getActiveStreamCount } = require('./index');
+const { LaserstreamClient: NapiClient, UnaryClient, CommitmentLevel, shutdownAllStreams, getActiveStreamCount } = require('./index');
 const { initProtobuf, decodeSubscribeUpdate, decodeSubscribePreprocessedUpdate } = require('./proto-decoder');
 const { CompressedAccountFilterSet, TableFullError, DEFAULT_HASH_SEED } = require('./cuckoo');
 
@@ -116,10 +116,39 @@ async function subscribePreprocessed(config, request, onData, onError) {
   }
 }
 
+// Client for unary (request/response) RPCs. Create once and reuse: all calls
+// share one HTTP/2 connection, opened lazily on the first call.
+// uint64 fields are returned as decimal strings (same as subscribe updates).
+// `timeoutMs` is the per-call deadline (default 30000).
+class LaserstreamClient {
+  constructor(config) {
+    if (!config || !config.endpoint) {
+      throw new Error('LaserstreamClient: config.endpoint is required');
+    }
+    const { timeoutMs } = config;
+    if (timeoutMs !== undefined && !(Number.isInteger(timeoutMs) && timeoutMs > 0)) {
+      throw new Error('LaserstreamClient: config.timeoutMs must be a positive integer');
+    }
+    this._native = new UnaryClient(config.endpoint, config.apiKey, config.channelOptions, timeoutMs);
+  }
+
+  // Releases the shared connection. In-flight calls complete; a later call reconnects.
+  close() { this._native.close(); }
+
+  getSlot(commitment) { return this._native.getSlot(commitment); }
+  getBlockHeight(commitment) { return this._native.getBlockHeight(commitment); }
+  getLatestBlockhash(commitment) { return this._native.getLatestBlockhash(commitment); }
+  isBlockhashValid(blockhash, commitment) { return this._native.isBlockhashValid(blockhash, commitment); }
+  getVersion() { return this._native.getVersion(); }
+  ping(count) { return this._native.ping(count); }
+  subscribeReplayInfo() { return this._native.subscribeReplayInfo(); }
+}
+
 // Export clean API with only NAPI-based subscribe
 module.exports = {
   subscribe,
   subscribePreprocessed,
+  LaserstreamClient,
   CommitmentLevel,
   CompressionAlgorithms,
   initProtobuf,

@@ -105,6 +105,11 @@ type Client struct {
 	// Bidirectional streaming support
 	writeChan     chan *SubscribeRequest
 	writeStopChan chan struct{}
+
+	// Unary RPC connection (see unary.go). Separate from conn because the
+	// streaming connection is torn down and re-dialed on every reconnect.
+	unaryMu   sync.Mutex
+	unaryConn *grpc.ClientConn
 }
 
 // NewLaserstreamConfig creates a new LaserstreamConfig with default values.
@@ -233,6 +238,8 @@ func (c *Client) Close() {
 
 	c.cleanup()
 	c.running = false
+
+	c.closeUnary()
 }
 
 // streamLoop handles the main streaming logic with enhanced reconnection
@@ -587,7 +594,25 @@ func (c *Client) updateRequestForReconnection() {
 func (c *Client) connect(ctx context.Context) error {
 	c.cleanup()
 
-	endpoint := c.config.Endpoint
+	target, opts, err := dialConfig(c.config)
+	if err != nil {
+		return err
+	}
+
+	conn, err := grpc.DialContext(ctx, target, opts...)
+	if err != nil {
+		return fmt.Errorf("failed to dial: %w", err)
+	}
+
+	c.conn = conn
+	return nil
+}
+
+// dialConfig resolves the dial target and gRPC dial options (TLS, keepalive,
+// message sizes, window/buffer sizes) from the config. Shared by the
+// streaming and unary connections.
+func dialConfig(config LaserstreamConfig) (string, []grpc.DialOption, error) {
+	endpoint := config.Endpoint
 
 	// Handle production endpoint formats
 	var target string
@@ -598,7 +623,7 @@ func (c *Client) connect(ctx context.Context) error {
 		// URL format (e.g., https://example.com or http://localhost:4003)
 		u, err := url.Parse(endpoint)
 		if err != nil {
-			return fmt.Errorf("error parsing endpoint URL: %w", err)
+			return "", nil, fmt.Errorf("error parsing endpoint URL: %w", err)
 		}
 
 		useInsecure = u.Scheme == "http"
@@ -632,7 +657,7 @@ func (c *Client) connect(ctx context.Context) error {
 	}
 
 	// Apply channel options with defaults
-	channelOpts := c.config.ChannelOptions
+	channelOpts := config.ChannelOptions
 	if channelOpts == nil {
 		channelOpts = &ChannelOptions{} // Use all defaults
 	}
@@ -708,13 +733,7 @@ func (c *Client) connect(ctx context.Context) error {
 		opts = append(opts, grpc.WithReadBufferSize(channelOpts.ReadBufferSize))
 	}
 
-	conn, err := grpc.DialContext(ctx, target, opts...)
-	if err != nil {
-		return fmt.Errorf("failed to dial: %w", err)
-	}
-
-	c.conn = conn
-	return nil
+	return target, opts, nil
 }
 
 // Unsubscribe closes the stream and cleans up resources

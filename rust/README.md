@@ -295,6 +295,36 @@ request.slots.insert(
 );
 ```
 
+## Unary RPCs
+
+Besides streaming, the Geyser service exposes request/response RPCs. Use `LaserstreamClient`: connect once and reuse it (it's cheap to clone, and clones share one HTTP/2 connection).
+
+```rust
+use helius_laserstream::{LaserstreamClient, LaserstreamConfig, grpc::CommitmentLevel};
+
+let client = LaserstreamClient::connect(LaserstreamConfig::new(endpoint, api_key)).await?;
+
+let slot = client.get_slot(Some(CommitmentLevel::Confirmed)).await?.slot;
+let height = client.get_block_height(None).await?.block_height;
+let bh = client.get_latest_blockhash(None).await?; // .blockhash, .slot, .last_valid_block_height
+let valid = client.is_blockhash_valid(&bh.blockhash, None).await?.valid;
+let version = client.get_version().await?.version;
+let pong = client.ping(1).await?.count;
+let first_available = client.subscribe_replay_info().await?.first_available; // Option<u64>
+```
+
+`commitment: None` uses the server default. Every method returns the proto response type from `helius_laserstream::grpc`.
+
+**Picking a valid `from_slot`:** `subscribe_replay_info` returns the oldest slot the endpoint can replay from. A `from_slot` below it may not be servable, and the subscription can fail (e.g. `OUT_OF_RANGE`) instead of streaming. Clamp before subscribing, and treat the skipped slots as missed:
+
+```rust
+if let Some(first) = client.subscribe_replay_info().await?.first_available {
+    request.from_slot = request.from_slot.map(|s| s.max(first));
+}
+```
+
+This only reports the lower bound; it can't detect gaps in storage above it.
+
 ## Stream Write - Dynamic Updates
 
 ```rust
@@ -578,4 +608,5 @@ See [`./examples/`](./examples/) for complete working examples:
 - [`slot_sub.rs`](./examples/slot_sub.rs) - Slot progression
 - [`channel-options-example.rs`](./examples/channel-options-example.rs) - Performance tuning
 - [`stream_write_example.rs`](./examples/stream_write_example.rs) - Dynamic updates
+- [`unary_methods.rs`](./examples/unary_methods.rs) - Unary RPCs (get_slot, get_latest_blockhash, ...)
 - [`compression-example.rs`](./examples/compression-example.rs) - Compression usage

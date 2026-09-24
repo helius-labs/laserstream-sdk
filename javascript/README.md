@@ -253,6 +253,42 @@ const request = {
 };
 ```
 
+## Unary RPCs
+
+Besides streaming, the Geyser service exposes request/response RPCs. Create a `LaserstreamClient` once and reuse it: all calls share one connection, which opens on the first call.
+
+```typescript
+import { LaserstreamClient, CommitmentLevel } from 'helius-laserstream';
+
+const client = new LaserstreamClient({ apiKey: 'your-api-key', endpoint: 'your-endpoint' });
+
+const { slot } = await client.getSlot(CommitmentLevel.CONFIRMED);
+const { blockHeight } = await client.getBlockHeight();
+const bh = await client.getLatestBlockhash(); // { blockhash, slot, lastValidBlockHeight }
+const { valid } = await client.isBlockhashValid(bh.blockhash);
+const { version } = await client.getVersion();
+const { count } = await client.ping(1);
+const { firstAvailable } = await client.subscribeReplayInfo();
+
+client.close(); // release the connection when done
+```
+
+If you omit `commitment`, the server default is used. uint64 values (slots, heights) are returned as decimal strings, the same as in `subscribe` updates.
+
+Each call has a deadline of `timeoutMs` (default `30000`), e.g. `new LaserstreamClient({ apiKey, endpoint, timeoutMs: 5000 })`. `close()` releases the connection; calls already in flight complete, and a later call opens a new connection.
+
+**Picking a valid `fromSlot`:** `subscribeReplayInfo()` returns the oldest slot the endpoint can replay from. A `fromSlot` below it may not be servable, and the subscription can fail (e.g. `OUT_OF_RANGE`) instead of streaming. Clamp before subscribing, and treat the skipped slots as missed:
+
+```typescript
+const { firstAvailable } = await client.subscribeReplayInfo();
+if (firstAvailable !== undefined && request.fromSlot !== undefined) {
+  // firstAvailable is a decimal string, but fromSlot must be a number.
+  request.fromSlot = Math.max(request.fromSlot, Number(firstAvailable));
+}
+```
+
+This only reports the lower bound; it can't detect gaps in storage above it.
+
 ## Stream Write - Dynamic Updates
 
 ```typescript

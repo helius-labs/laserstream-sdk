@@ -7,7 +7,8 @@ use std::{pin::Pin, time::Duration};
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 use laserstream_core_proto::tonic::{
-    Status, Request, metadata::MetadataValue, transport::Endpoint, codec::CompressionEncoding,
+    Status, Request, metadata::MetadataValue, transport::{Channel, Endpoint}, codec::CompressionEncoding,
+    service::interceptor::InterceptedService,
 };
 use tracing::{error, instrument, warn};
 use uuid;
@@ -45,7 +46,7 @@ mod tests;
 
 /// Custom interceptor that adds SDK metadata headers to all gRPC requests
 #[derive(Clone)]
-struct SdkMetadataInterceptor {
+pub(crate) struct SdkMetadataInterceptor {
     x_token: Option<laserstream_core_proto::tonic::metadata::AsciiMetadataValue>,
 }
 
@@ -306,18 +307,15 @@ pub fn subscribe(
     (update_stream, handle)
 }
 
-#[instrument(skip(config, request, api_key))]
-async fn connect_and_subscribe_once(
+/// Concrete geyser client type used by the SDK (auth + SDK metadata interceptor).
+pub(crate) type SdkGeyserClient = GeyserClient<InterceptedService<Channel, SdkMetadataInterceptor>>;
+
+/// Connects a channel to `config.endpoint` and wraps it in a geyser client
+/// configured with the SDK's auth, channel options, and compression settings.
+pub(crate) async fn build_geyser_client(
     config: &LaserstreamConfig,
-    request: SubscribeRequest,
     api_key: String,
-) -> Result<
-    (
-        impl futures_util::Sink<SubscribeRequest, Error = futures_mpsc::SendError> + Send,
-        impl Stream<Item = Result<SubscribeUpdate, laserstream_core_proto::tonic::Status>> + Send,
-    ),
-    Status,
-> {
+) -> Result<SdkGeyserClient, Status> {
     let options = &config.channel_options;
 
     // Create our custom interceptor with SDK metadata
@@ -379,6 +377,23 @@ async fn connect_and_subscribe_once(
             geyser_client = geyser_client.accept_compressed(encoding);
         }
     }
+
+    Ok(geyser_client)
+}
+
+#[instrument(skip(config, request, api_key))]
+async fn connect_and_subscribe_once(
+    config: &LaserstreamConfig,
+    request: SubscribeRequest,
+    api_key: String,
+) -> Result<
+    (
+        impl futures_util::Sink<SubscribeRequest, Error = futures_mpsc::SendError> + Send,
+        impl Stream<Item = Result<SubscribeUpdate, laserstream_core_proto::tonic::Status>> + Send,
+    ),
+    Status,
+> {
+    let mut geyser_client = build_geyser_client(config, api_key).await?;
 
     // Create bidirectional stream
     let (mut subscribe_tx, subscribe_rx) = futures_mpsc::unbounded();
