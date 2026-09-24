@@ -475,6 +475,15 @@ func (c *Client) handleStream(ctx context.Context, stream pb.Geyser_SubscribeCli
 			}
 		}
 
+		if footerUpdate, ok := resp.UpdateOneof.(*pb.SubscribeUpdate_BlockFooter); ok {
+			if footerUpdate.BlockFooter != nil && c.isReplayEnabled() {
+				current := atomic.LoadUint64(&c.trackedSlot)
+				if footerUpdate.BlockFooter.Slot > current {
+					atomic.StoreUint64(&c.trackedSlot, footerUpdate.BlockFooter.Slot)
+				}
+			}
+		}
+
 		// Clean up internal filter ID from ALL message types (only when replay is enabled)
 		if c.isReplayEnabled() {
 			cleanedFilters := make([]string, 0, len(resp.Filters))
@@ -523,6 +532,7 @@ func (c *Client) mergeSubscribeRequest(modification *SubscribeRequest) {
 	c.originalRequest.TransactionsStatus = modification.TransactionsStatus
 	c.originalRequest.Blocks = modification.Blocks
 	c.originalRequest.BlocksMeta = modification.BlocksMeta
+	c.originalRequest.BlockFooter = modification.BlockFooter
 	c.originalRequest.Entry = modification.Entry
 	c.originalRequest.AccountsDataSlice = modification.AccountsDataSlice
 
@@ -786,6 +796,7 @@ type (
 	SubscribeRequestFilterAccounts     = pb.SubscribeRequestFilterAccounts
 	SubscribeRequestFilterBlocks       = pb.SubscribeRequestFilterBlocks
 	SubscribeRequestFilterBlocksMeta   = pb.SubscribeRequestFilterBlocksMeta
+	SubscribeRequestFilterBlockFooter  = pb.SubscribeRequestFilterBlockFooter
 	SubscribeRequestFilterEntry        = pb.SubscribeRequestFilterEntry
 )
 
@@ -811,6 +822,7 @@ type (
 	SubscribeUpdate_TransactionStatus = pb.SubscribeUpdate_TransactionStatus
 	SubscribeUpdate_Block             = pb.SubscribeUpdate_Block
 	SubscribeUpdate_BlockMeta         = pb.SubscribeUpdate_BlockMeta
+	SubscribeUpdate_BlockFooter       = pb.SubscribeUpdate_BlockFooter
 	SubscribeUpdate_Entry             = pb.SubscribeUpdate_Entry
 	SubscribeUpdate_Ping              = pb.SubscribeUpdate_Ping
 	SubscribeUpdate_Pong              = pb.SubscribeUpdate_Pong
@@ -824,6 +836,7 @@ type (
 	SubscribeUpdateTransactionStatus = pb.SubscribeUpdateTransactionStatus
 	SubscribeUpdateBlock             = pb.SubscribeUpdateBlock
 	SubscribeUpdateBlockMeta         = pb.SubscribeUpdateBlockMeta
+	SubscribeUpdateBlockFooter       = pb.SubscribeUpdateBlockFooter
 	SubscribeUpdateEntry             = pb.SubscribeUpdateEntry
 	SubscribeUpdatePing              = pb.SubscribeUpdatePing
 	SubscribeUpdatePong              = pb.SubscribeUpdatePong
