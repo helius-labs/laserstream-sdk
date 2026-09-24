@@ -291,6 +291,88 @@ fn read_varint(data: &[u8]) -> Option<(u64, usize)> {
     None
 }
 
+/// Inspect a footer without allocating its filters, bank hash or user agent.
+/// Ok(None) retains the old drop policy for a successfully decoded non-footer;
+/// errors still forward the original bytes, without advancing the replay cursor.
+fn block_footer_slot(data: &[u8], replay: bool) -> std::io::Result<Option<u64>> {
+    use prost::encoding::{
+        check_wire_type, decode_key, decode_varint, skip_field, DecodeContext, WireType,
+    };
+
+    fn take_message<'a>(wire: WireType, buf: &mut &'a [u8]) -> std::io::Result<&'a [u8]> {
+        check_wire_type(WireType::LengthDelimited, wire)?;
+        let len = decode_varint(buf)?;
+        if len > buf.len() as u64 {
+            return Err(std::io::ErrorKind::UnexpectedEof.into());
+        }
+        let (message, rest) = buf.split_at(len as usize);
+        *buf = rest;
+        Ok(message)
+    }
+
+    // Unusual mixed-oneof envelopes and deprecated groups use the original
+    // decoder to retain merge, validation and recursion-limit semantics.
+    let fallback = || {
+        geyser::SubscribeUpdate::decode(data)
+            .map(|message| match message.update_oneof {
+                Some(geyser::subscribe_update::UpdateOneof::BlockFooter(footer)) => {
+                    Some(if replay { footer.slot } else { 0 })
+                }
+                _ => None,
+            })
+            .map_err(std::io::Error::from)
+    };
+    let mut buf = data;
+    let mut slot = None;
+    let mut metadata = geyser::SubscribeUpdate::default();
+    while !buf.is_empty() {
+        let (tag, wire) = decode_key(&mut buf)?;
+        match tag {
+            12 => {
+                let mut footer = take_message(wire, &mut buf)?;
+                let slot = slot.get_or_insert(0);
+                // With replay disabled, even malformed footer fields are passed
+                // through unchanged: neither validation nor a cursor is needed.
+                if !replay {
+                    continue;
+                }
+                while !footer.is_empty() {
+                    let (tag, wire) = decode_key(&mut footer)?;
+                    match tag {
+                        1 | 2 | 4 => {
+                            check_wire_type(WireType::Varint, wire)?;
+                            let value = decode_varint(&mut footer)?;
+                            if tag == 1 {
+                                *slot = value;
+                            }
+                        }
+                        3 | 5 => {
+                            take_message(wire, &mut footer)?;
+                        }
+                        _ if wire == WireType::StartGroup => return fallback(),
+                        _ => skip_field(wire, tag, &mut footer, DecodeContext::default())?,
+                    }
+                }
+            }
+            2..=10 => return fallback(),
+            1 if replay => {
+                let filter = take_message(wire, &mut buf)?;
+                std::str::from_utf8(filter).map_err(|_| std::io::ErrorKind::InvalidData)?;
+            }
+            11 if replay => {
+                // Timestamp is scalar-only; let Prost validate it without
+                // materializing the footer or copying any payload bytes.
+                metadata.merge_field(tag, wire, &mut buf, DecodeContext::default())?;
+            }
+            _ => skip_field(wire, tag, &mut buf, DecodeContext::default())?,
+        }
+    }
+    if slot.is_none() {
+        return fallback();
+    }
+    Ok(slot)
+}
+
 pub struct StreamInner {
     cancel_tx: Mutex<Option<oneshot::Sender<()>>>,
     write_tx: Mutex<Option<mpsc::UnboundedSender<geyser::SubscribeRequest>>>,
@@ -564,17 +646,15 @@ impl StreamInner {
                                     }
                                     continue;
                                 }
-                                // Block footer (field 12): decode just enough to track the
-                                // latest replay cursor even for footer-only subscriptions.
+                                // Block footer (field 12): borrow the slot only when replay
+                                // needs a cursor; always forward the original payload bytes.
                                 Some(12) => {
-                                    if let Ok(message) = geyser::SubscribeUpdate::decode(raw_bytes.as_ref()) {
-                                        if let Some(geyser::subscribe_update::UpdateOneof::BlockFooter(block_footer)) = &message.update_oneof {
-                                            if replay {
-                                                tracked_slot.fetch_max(block_footer.slot, Ordering::SeqCst);
-                                            }
-                                        } else {
-                                            continue;
+                                    match block_footer_slot(raw_bytes.as_ref(), replay) {
+                                        Ok(Some(slot)) if replay => {
+                                            tracked_slot.fetch_max(slot, Ordering::SeqCst);
                                         }
+                                        Ok(None) => continue,
+                                        _ => {}
                                     }
                                     let bytes_wrapper = crate::SubscribeUpdateBytes(raw_bytes);
                                     let status = ts_callback.call(Ok(bytes_wrapper), ThreadsafeFunctionCallMode::Blocking);
@@ -862,6 +942,59 @@ mod tests {
         };
         let bytes = update.encode_to_vec();
         assert_eq!(peek_update_type(&bytes), Some(12));
+        assert_eq!(block_footer_slot(&bytes, true).unwrap(), Some(42));
+        assert_eq!(block_footer_slot(&bytes, false).unwrap(), Some(0));
+    }
+
+    #[test]
+    fn borrowed_footer_cursor_preserves_wire_policy() {
+        let cases: &[&[u8]] = &[
+            &[0x62, 0],                          // omitted slot defaults to zero
+            &[0x62, 4, 8, 42, 8, 7],             // last scalar wins
+            &[0x62, 2, 8, 42, 0x62, 0],          // same oneof merges, not resets
+            &[0x62, 2, 8, 42, 0x32, 0],          // different final oneof is dropped
+            &[0x62, 2, 8, 42, 0x32, 0, 0x62, 0], // switching back resets slot
+            &[0x62, 2, 8, 42, 0x0a, 1, b'x', 0x5a, 2, 8, 1],
+            &[0x62, 4, 8, 42, 0x33, 0x34],       // unknown group
+            &[0x62, 7, 8, 42, 0x35, 1, 2, 3, 4], // unknown fixed32
+            &[0x62, 2, 8],                       // truncated envelope
+            &[0x62, 1, 8],                       // truncated slot
+            &[0x62, 2, 0x0a, 0],                 // wrong slot wire type
+            &[0x62, 4, 8, 42, 0x12, 0],          // malformed non-slot scalar
+            &[0x62, 4, 8, 42, 0x1a, 1],          // truncated bank hash
+            &[0x62, 2, 8, 42, 0x0a, 1, 0xff],    // invalid filter UTF-8
+            &[0x62, 2, 8, 42, 0x5a, 1, 8],       // invalid timestamp
+            &[0x62, 2, 8, 42, 0x32, 1, 0],       // malformed final oneof is forwarded
+            &[
+                0x62, 11, 8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 1,
+            ],
+            &[
+                0x62, 11, 8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 2,
+            ],
+        ];
+        for &bytes in cases {
+            let expected = geyser::SubscribeUpdate::decode(bytes)
+                .map(|message| match message.update_oneof {
+                    Some(geyser::subscribe_update::UpdateOneof::BlockFooter(footer)) => {
+                        Some(footer.slot)
+                    }
+                    _ => None,
+                })
+                .map_err(|_| ());
+            assert_eq!(
+                block_footer_slot(bytes, true).map_err(|_| ()),
+                expected,
+                "{bytes:?}"
+            );
+            // Disabled replay still distinguishes valid non-footers (drop) from
+            // malformed messages (forward), but does not inspect footer fields.
+            assert_eq!(
+                matches!(block_footer_slot(bytes, false), Ok(None)),
+                matches!(expected, Ok(None)),
+                "{bytes:?}"
+            );
+        }
+        assert_eq!(block_footer_slot(&[0x62, 1, 8], false).unwrap(), Some(0));
     }
 
     #[test]
