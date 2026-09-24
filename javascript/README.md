@@ -172,6 +172,30 @@ const request = {
 
 See [`examples/token-accounts-sub.ts`](./examples/token-accounts-sub.ts).
 
+#### matchMints (subscribe by token mint)
+
+Set `matchMints: true` so `accountInclude` / `accountExclude` /
+`accountRequired` also match against the **mints of pre/post token balances**.
+Put mints in `accountInclude` to stream every transaction touching those
+tokens — including classic SPL `Transfer`s, whose account keys never contain
+the mint (an account-key filter alone misses them).
+
+```typescript
+const request = {
+  transactions: {
+    "usdc-txs": {
+      accountInclude: ["EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"], // USDC mint
+      accountExclude: [],
+      accountRequired: [],
+      vote: false,
+      failed: false,
+      matchMints: true,
+    },
+  },
+  commitment: CommitmentLevel.CONFIRMED,
+};
+```
+
 ### Block Subscriptions
 ```typescript
 const request = {

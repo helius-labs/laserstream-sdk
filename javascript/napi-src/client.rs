@@ -6,8 +6,6 @@ use serde::Deserialize;
 use serde_json;
 use base64::{Engine as _, engine::general_purpose};
 
-#[allow(deprecated)] // NotifyOn is a deprecated no-op (Agave 4.2); kept for backward-compat mapping
-use laserstream_core_proto::geyser::NotifyOn;
 use laserstream_core_proto::geyser::{
     SubscribeRequest, SubscribeRequestFilterAccounts, SubscribeRequestFilterBlocks,
     SubscribeRequestFilterSlots, SubscribeRequestFilterTransactions,
@@ -98,11 +96,6 @@ pub struct JsAccountFilter {
     pub filters: Option<Vec<JsAccountsFilter>>,
     #[serde(alias = "nonemptyTxnSignature")]
     pub nonempty_txn_signature: Option<bool>,
-    // DEPRECATED (no-op as of Agave 4.2): the validator now skips updates for
-    // accounts write-locked but never written, so "write"-only delivery is the
-    // default and only behavior. Still accepted for backward compatibility.
-    #[serde(alias = "notifyOn")]
-    pub notify_on: Option<String>,
     // Add aliases for consistent interface matching transactions
     #[serde(alias = "accountInclude")]
     pub account_include: Option<Vec<String>>,
@@ -182,6 +175,10 @@ pub struct JsTransactionFilter {
     // Cuckoo filter over accountInclude (proto field #31), built client-side.
     #[serde(alias = "cuckooAccountInclude")]
     pub cuckoo_account_include: Option<JsCuckooFilter>,
+    // Helius mint matching (proto field #32): when true, the account lists
+    // also match against the mints of pre/post token balances.
+    #[serde(alias = "matchMints")]
+    pub match_mints: Option<bool>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -294,19 +291,6 @@ impl ClientInner {
                 // Handle accountRequired - NOT directly supported by Yellowstone accounts filter
                 if let Some(_account_required_list) = filter.account_required {
                     // accountRequired not directly supported for account subscriptions
-                }
-                
-                // DEPRECATED (no-op as of Agave 4.2): map the "lock" | "write"
-                // string to the proto NotifyOn enum for backward compatibility.
-                // The server ignores it — write-only delivery is now the default
-                // and only behavior. Unknown strings fall back to Lock.
-                #[allow(deprecated)]
-                if let Some(notify_on) = filter.notify_on.as_deref() {
-                    let state = match notify_on {
-                        "write" => NotifyOn::Write,
-                        _ => NotifyOn::Lock,
-                    };
-                    yellowstone_filter.notify_on = state as i32;
                 }
 
                 if let Some(nonempty_txn_signature) = filter.nonempty_txn_signature {
@@ -432,6 +416,8 @@ impl ClientInner {
                 yellowstone_filter.token_accounts = parse_token_accounts_mode(filter.token_accounts)
                     .map_err(Error::from_reason)?;
 
+                yellowstone_filter.match_mints = filter.match_mints.unwrap_or(false);
+
                 // Handle compressed account (cuckoo) filter — pass through bytes built client-side.
                 if let Some(cuckoo) = filter.cuckoo_account_include {
                     let data = general_purpose::STANDARD.decode(&cuckoo.data)
@@ -477,6 +463,8 @@ impl ClientInner {
 
                 yellowstone_filter.token_accounts = parse_token_accounts_mode(filter.token_accounts)
                     .map_err(Error::from_reason)?;
+
+                yellowstone_filter.match_mints = filter.match_mints.unwrap_or(false);
 
                 transactions_status_map.insert(key, yellowstone_filter);
             }

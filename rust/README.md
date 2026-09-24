@@ -186,6 +186,33 @@ let request = SubscribeRequest {
 
 See [`examples/token_accounts_filter.rs`](./examples/token_accounts_filter.rs).
 
+#### match_mints (subscribe by token mint)
+
+Set `match_mints: true` so `account_include` / `account_exclude` /
+`account_required` also match against the **mints of pre/post token balances**.
+Put mints in `account_include` to stream every transaction touching those
+tokens — including classic SPL `Transfer`s, whose account keys never contain
+the mint (an account-key filter alone misses them).
+
+```rust
+use helius_laserstream::grpc::{SubscribeRequest, SubscribeRequestFilterTransactions};
+
+let request = SubscribeRequest {
+    transactions: HashMap::from([(
+        "usdc-txs".to_string(),
+        SubscribeRequestFilterTransactions {
+            // USDC mint
+            account_include: vec!["EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string()],
+            vote: Some(false),
+            failed: Some(false),
+            match_mints: true,
+            ..Default::default()
+        },
+    )]),
+    ..Default::default()
+};
+```
+
 ### Block Subscriptions
 ```rust
 use helius_laserstream::grpc::{

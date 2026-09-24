@@ -149,16 +149,14 @@ declare module 'laserstream-core-proto-js/generated' {
        * Built client-side via {@link CompressedAccountFilterSet.toTransactionFilter}.
        */
       cuckooAccountInclude?: (import('./cuckoo').CuckooFilterProto | null);
-    }
-    interface ISubscribeRequestFilterAccounts {
       /**
-       * @deprecated No-op as of Agave 4.2. The validator now skips updates for
-       * accounts a transaction write-locked but never wrote to, so `'write'`-only
-       * delivery is the default and only behavior. Setting this has no effect; it
-       * is accepted only for backward compatibility and will be removed in a
-       * future release. (proto field #31)
+       * Helius mint matching (proto field #32). When true, `accountInclude` /
+       * `accountExclude` / `accountRequired` also match against the mints of
+       * pre/post token balances — catches classic SPL `Transfer`s, whose
+       * account keys never contain the mint. Put mints in `accountInclude`
+       * to stream every transaction touching those tokens.
        */
-      notifyOn?: ('lock' | 'write' | null);
+      matchMints?: (boolean | null);
     }
   }
 }

@@ -176,6 +176,31 @@ req := &laserstream.SubscribeRequest{
 
 See [`examples/token-accounts-sub.go`](./examples/token-accounts-sub.go).
 
+#### MatchMints (subscribe by token mint)
+
+Set `MatchMints: true` so `AccountInclude` / `AccountExclude` /
+`AccountRequired` also match against the **mints of pre/post token balances**.
+Put mints in `AccountInclude` to stream every transaction touching those
+tokens — including classic SPL `Transfer`s, whose account keys never contain
+the mint (an account-key filter alone misses them).
+
+```go
+vote := false
+failed := false
+req := &laserstream.SubscribeRequest{
+    Transactions: map[string]*laserstream.SubscribeRequestFilterTransactions{
+        "usdc-txs": {
+            // USDC mint
+            AccountInclude: []string{"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"},
+            Vote:           &vote,
+            Failed:         &failed,
+            MatchMints:     true,
+        },
+    },
+    Commitment: &commitmentLevel,
+}
+```
+
 ### Block Subscriptions
 ```go
 includeTransactions := true

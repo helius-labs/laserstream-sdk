@@ -18,6 +18,30 @@ permissions:
   id-token: write
 
 jobs:
+  rust-tests:
+    name: Rust SDK tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache Rust SDK build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/
+            ~/.cargo/git/db/
+            rust/target/
+          key: rust-sdk-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock') }}
+      - run: cargo test --locked --lib
+      - run: cargo test --locked --lib --no-default-features
+      - run: cargo test --locked --lib --features internal
+      - run: cargo test --locked --lib --no-default-features --features internal
+
   build:
     strategy:
       fail-fast: false
@@ -109,13 +133,13 @@ jobs:
               ls -la *.node
             "
         working-directory: javascript
-      - name: Build in Docker (gnu - older glibc 2.31 for compatibility)
+      - name: Build in Docker (gnu - older glibc 2.36 for compatibility)
         if: matrix.settings.docker == 'gnu'
         run: |
           docker run --rm \
             -v $(pwd):/workspace \
             --platform ${{ startsWith(matrix.settings.target, 'aarch64') && 'linux/arm64' || 'linux/amd64' }} \
-            debian:bullseye sh -c "
+            debian:bookworm sh -c "
               apt-get update && \
               apt-get install -y curl build-essential pkg-config libssl-dev perl make ca-certificates gnupg && \
               mkdir -p /etc/apt/keyrings && \
@@ -347,16 +371,22 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           echo "🔍 Verifying publication of version $VERSION"
 
-          # npm reads are eventually consistent; retry briefly before failing
+          # npm reads are eventually consistent and the read CDN can lag a
+          # successful publish by a few minutes. Poll with a generous window
+          # (~4 min) and bypass the npm cache so we hit the registry directly;
+          # a too-short window here has red-flagged two already-successful
+          # releases (0.8.5, 0.9.0) even though publish succeeded.
           verify_package() {
-            for i in 1 2 3 4 5 6; do
-              if npm view "$1@$VERSION" version > /dev/null 2>&1; then
+            # initial grace period before the first check
+            sleep 15
+            for i in $(seq 1 24); do
+              if npm view "$1@$VERSION" version --prefer-online > /dev/null 2>&1; then
                 echo "✅ Verified: $1@$VERSION"
                 return 0
               fi
               sleep 10
             done
-            echo "❌ Error: Package $1@$VERSION not found on NPM"
+            echo "❌ Error: Package $1@$VERSION not found on NPM after ~4 min"
             return 1
           }
 

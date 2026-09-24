@@ -1,3 +1,6 @@
+// RUSTSEC-2026-0258: direct dep holds the h2 >=0.4.19 floor; used only transitively.
+use h2 as _;
+
 pub mod client;
 pub mod config;
 pub mod error;

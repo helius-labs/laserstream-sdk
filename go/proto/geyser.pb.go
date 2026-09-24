@@ -1138,6 +1138,8 @@ type SubscribeRequestFilterTransactions struct {
 	// against owners of pre/post token balances on each transaction.
 	// Absent = no expansion.
 	TokenAccounts *TokenAccountExpansionControlFlag `protobuf:"varint,30,opt,name=token_accounts,json=tokenAccounts,proto3,enum=geyser.TokenAccountExpansionControlFlag,oneof" json:"token_accounts,omitempty"`
+	// Also match the account lists against pre/post token-balance mints.
+	MatchMints    bool `protobuf:"varint,32,opt,name=match_mints,json=matchMints,proto3" json:"match_mints,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1219,6 +1221,13 @@ func (x *SubscribeRequestFilterTransactions) GetTokenAccounts() TokenAccountExpa
 		return *x.TokenAccounts
 	}
 	return TokenAccountExpansionControlFlag_ALL
+}
+
+func (x *SubscribeRequestFilterTransactions) GetMatchMints() bool {
+	if x != nil {
+		return x.MatchMints
+	}
+	return false
 }
 
 type SubscribeRequestFilterBlocks struct {
@@ -3294,7 +3303,7 @@ const file_geyser_proto_rawDesc = "" +
 	"\x14filter_by_commitment\x18\x01 \x01(\bH\x00R\x12filterByCommitment\x88\x01\x01\x120\n" +
 	"\x11interslot_updates\x18\x02 \x01(\bH\x01R\x10interslotUpdates\x88\x01\x01B\x17\n" +
 	"\x15_filter_by_commitmentB\x14\n" +
-	"\x12_interslot_updates\"\x85\x03\n" +
+	"\x12_interslot_updates\"\xa6\x03\n" +
 	"\"SubscribeRequestFilterTransactions\x12\x17\n" +
 	"\x04vote\x18\x01 \x01(\bH\x00R\x04vote\x88\x01\x01\x12\x1b\n" +
 	"\x06failed\x18\x02 \x01(\bH\x01R\x06failed\x88\x01\x01\x12!\n" +
@@ -3302,7 +3311,9 @@ const file_geyser_proto_rawDesc = "" +
 	"\x0faccount_include\x18\x03 \x03(\tR\x0eaccountInclude\x12'\n" +
 	"\x0faccount_exclude\x18\x04 \x03(\tR\x0eaccountExclude\x12)\n" +
 	"\x10account_required\x18\x06 \x03(\tR\x0faccountRequired\x12T\n" +
-	"\x0etoken_accounts\x18\x1e \x01(\x0e2(.geyser.TokenAccountExpansionControlFlagH\x03R\rtokenAccounts\x88\x01\x01B\a\n" +
+	"\x0etoken_accounts\x18\x1e \x01(\x0e2(.geyser.TokenAccountExpansionControlFlagH\x03R\rtokenAccounts\x88\x01\x01\x12\x1f\n" +
+	"\vmatch_mints\x18  \x01(\bR\n" +
+	"matchMintsB\a\n" +
 	"\x05_voteB\t\n" +
 	"\a_failedB\f\n" +
 	"\n" +
