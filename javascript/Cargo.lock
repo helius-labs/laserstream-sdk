@@ -51,9 +51,9 @@ dependencies = [
 
 [[package]]
 name = "aws-lc-rs"
-version = "1.17.3"
+version = "1.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00bdb5da18dac48ca2cc7cd4a98e533e8635a58e2361d13a1a4ee3888e0d72f1"
+checksum = "b281d307588d634de920874890732659e2e7672f72b5e10e81badc1a8a83621e"
 dependencies = [
  "aws-lc-sys",
  "zeroize",
@@ -61,9 +61,9 @@ dependencies = [
 
 [[package]]
 name = "aws-lc-sys"
-version = "0.43.0"
+version = "0.45.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43103168cc76fe62678a375e722fc9cb3a0146159ac5828bc4f0dfd755c2224c"
+checksum = "9bff6c3b54fad79a2e60b8102caf565819711497c1f5f092f49508e2f5c31b27"
 dependencies = [
  "cc",
  "cmake",
@@ -596,37 +596,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "laserstream-core-client"
-version = "12.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab08da2d30af18da75e41c56af175154ba5af346a3251ac3d094fffd788718f8"
-dependencies = [
- "bytes",
- "futures",
- "laserstream-core-proto",
- "thiserror",
- "tonic",
- "tonic-health",
-]
-
-[[package]]
-name = "laserstream-core-proto"
-version = "12.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0c12bc1245cb4bb984ecec00b087651017943a8474c2a97cc7d73396f3f5eae"
-dependencies = [
- "anyhow",
- "prost",
- "prost-types",
- "protobuf-src",
- "siphasher",
- "tonic",
- "tonic-build",
- "tonic-prost",
- "tonic-prost-build",
-]
-
-[[package]]
 name = "laserstream-napi"
 version = "0.9.0"
 dependencies = [
@@ -638,8 +607,6 @@ dependencies = [
  "futures-channel",
  "futures-util",
  "h2",
- "laserstream-core-client",
- "laserstream-core-proto",
  "napi",
  "napi-build",
  "napi-derive",
@@ -651,6 +618,8 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "uuid",
+ "yellowstone-grpc-client",
+ "yellowstone-grpc-proto",
 ]
 
 [[package]]
@@ -1062,9 +1031,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.42"
+version = "0.23.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c54fcab019b409d04215d3a17cb438fd7fbf192ee61461f20f4fe18704bc138"
+checksum = "0d41d731c7d2f962d1ccc364cec258de3c0e93b38c2fb3ba97ac74513048d634"
 dependencies = [
  "aws-lc-rs",
  "log",
@@ -1099,9 +1068,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.13"
+version = "0.103.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61c429a8649f110dddef65e2a5ad240f747e85f7758a6bccc7e5777bd33f756e"
+checksum = "f3c3cf1d8b1e7d4927e2d154c3fcb02979afb9939629c62cd9048d4f07b60ac2"
 dependencies = [
  "aws-lc-rs",
  "ring",
@@ -1733,6 +1702,35 @@ name = "windows_x86_64_msvc"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
+
+[[package]]
+name = "yellowstone-grpc-client"
+version = "9.0.1"
+source = "git+https://github.com/helius-labs/yellowstone-grpc?rev=3fd9604503033138ec312367bc18fa2233fca8fd#3fd9604503033138ec312367bc18fa2233fca8fd"
+dependencies = [
+ "bytes",
+ "futures",
+ "thiserror",
+ "tonic",
+ "tonic-health",
+ "yellowstone-grpc-proto",
+]
+
+[[package]]
+name = "yellowstone-grpc-proto"
+version = "9.0.1"
+source = "git+https://github.com/helius-labs/yellowstone-grpc?rev=3fd9604503033138ec312367bc18fa2233fca8fd#3fd9604503033138ec312367bc18fa2233fca8fd"
+dependencies = [
+ "anyhow",
+ "prost",
+ "prost-types",
+ "protobuf-src",
+ "siphasher",
+ "tonic",
+ "tonic-build",
+ "tonic-prost",
+ "tonic-prost-build",
+]
 
 [[package]]
 name = "zeroize"
