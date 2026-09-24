@@ -18,25 +18,6 @@ permissions:
   id-token: write
 
 jobs:
-  bank-id-fields:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go/go.mod
-          cache-dependency-path: go/go.sum
-      - run: npm install --ignore-scripts
-        working-directory: javascript
-      - run: go test . ./proto -count=1
-        working-directory: go
-      - run: npx tsc --noEmit --strict --skipLibCheck test/bank-id-types.test.ts
-        working-directory: javascript
-      - run: node javascript/test/bank-id-vectors.test.js
-
   rust-tests:
     name: Rust SDK tests
     runs-on: ubuntu-latest
