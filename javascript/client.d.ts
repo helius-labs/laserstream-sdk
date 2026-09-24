@@ -1,5 +1,19 @@
 // TypeScript declarations for Laserstream client
 
+import type { geyser } from 'laserstream-core-proto-js/generated';
+
+// The generated package exports a namespace, not these top-level aliases.
+// Bind update outputs locally so callback/decoder types carry bank IDs.
+export type SubscribeUpdate = geyser.ISubscribeUpdate;
+export type SubscribeUpdateAccount = geyser.ISubscribeUpdateAccount;
+export type SubscribeUpdateAccountInfo = geyser.ISubscribeUpdateAccountInfo;
+export type SubscribeUpdateBlock = geyser.ISubscribeUpdateBlock;
+export type SubscribeUpdateSlot = geyser.ISubscribeUpdateSlot;
+export type SubscribeUpdateTransaction = geyser.ISubscribeUpdateTransaction;
+export type SubscribeUpdateTransactionStatus = geyser.ISubscribeUpdateTransactionStatus;
+export type SubscribeUpdateBlockMeta = geyser.ISubscribeUpdateBlockMeta;
+export type SubscribeUpdateEntry = geyser.ISubscribeUpdateEntry;
+
 // Re-export gRPC types
 export { ChannelOptions } from '@grpc/grpc-js';
 
@@ -12,16 +26,7 @@ export {
   SubscribePreprocessedTransaction,
   SubscribePreprocessedTransactionInfo,
   // Regular subscription types
-  SubscribeUpdate,
-  SubscribeUpdateAccount,
-  SubscribeUpdateAccountInfo,
-  SubscribeUpdateSlot,
-  SubscribeUpdateTransaction,
   SubscribeUpdateTransactionInfo,
-  SubscribeUpdateTransactionStatus,
-  SubscribeUpdateBlock,
-  SubscribeUpdateBlockMeta,
-  SubscribeUpdateEntry,
   SubscribeUpdatePing,
   SubscribeUpdatePong,
   // Request types
@@ -168,6 +173,14 @@ declare module 'laserstream-core-proto-js/generated' {
     interface SubscribeUpdate {
       blockFooter?: (SubscribeUpdateBlockFooter | null);
     }
+
+    interface ISubscribeUpdateAccount { bankId?: (string | null); }
+    interface ISubscribeUpdateSlot { bankId?: (string | null); }
+    interface ISubscribeUpdateTransaction { bankId?: (string | null); }
+    interface ISubscribeUpdateTransactionStatus { bankId?: (string | null); }
+    interface ISubscribeUpdateBlock { bankId?: (string | null); }
+    interface ISubscribeUpdateBlockMeta { bankId?: (string | null); }
+    interface ISubscribeUpdateEntry { bankId?: (string | null); }
     interface ISubscribeRequestFilterTransactions {
       /** Helius ATA expansion control (proto field #30). */
       tokenAccounts?: (TokenAccountsFilterMode | string | null);
