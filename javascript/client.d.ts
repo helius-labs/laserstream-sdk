@@ -136,11 +136,38 @@ export {
  */
 export type TokenAccountsFilterMode = 'none' | 'balanceChanged' | 'all';
 
+export interface SubscribeRequestFilterBlockFooter {}
+
+export interface SubscribeUpdateBlockFooter {
+  slot: string;
+  bankId: string;
+  bankHash: Uint8Array | Buffer;
+  blockProducerTimeNanos: string;
+  blockUserAgent: Uint8Array | Buffer;
+}
+
 // Augment the generated proto type so `tokenAccounts` is accepted on
 // transaction filters without forking the generated bindings. Removed once a
 // core-proto-js release ships field #30 natively.
 declare module 'laserstream-core-proto-js/generated' {
   namespace geyser {
+    interface ISubscribeRequest {
+      /** Triton-compatible footer subscription map (proto field #12). */
+      blockFooter?: ({ [key: string]: SubscribeRequestFilterBlockFooter } | null);
+    }
+
+    interface SubscribeRequest {
+      blockFooter?: ({ [key: string]: SubscribeRequestFilterBlockFooter } | null);
+    }
+
+    interface ISubscribeUpdate {
+      /** Triton-compatible footer update (proto field #12). */
+      blockFooter?: (SubscribeUpdateBlockFooter | null);
+    }
+
+    interface SubscribeUpdate {
+      blockFooter?: (SubscribeUpdateBlockFooter | null);
+    }
     interface ISubscribeRequestFilterTransactions {
       /** Helius ATA expansion control (proto field #30). */
       tokenAccounts?: (TokenAccountsFilterMode | string | null);
