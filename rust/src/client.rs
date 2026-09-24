@@ -217,22 +217,21 @@ pub fn subscribe(
                                                 continue;
                                             }
 
-                                            if let Some(UpdateOneof::Slot(slot)) = &update.update_oneof {
-                                                if replay_enabled {
-                                                    tracked_slot = slot.slot;
-                                                }
-
-                                                // Skip if this slot update is EXCLUSIVELY from our internal subscription
-                                                if update.filters.len() == 1
-                                                    && update.filters.contains(&internal_slot_sub_id)
-                                                {
-                                                    continue;
-                                                }
-                                            } else if replay_enabled {
-                                                if let Some(slot) = footer_resume_slot(&update) {
-                                                    tracked_slot = tracked_slot.max(slot);
-                                                }
-                                            }
+                                // Track the latest slot from any slot update (including internal subscription)
+                                if let Some(UpdateOneof::Slot(s)) = &update.update_oneof {
+                                    if replay_enabled {
+                                        tracked_slot = s.slot;
+                                    }
+                                    
+                                    // Skip if this slot update is EXCLUSIVELY from our internal subscription
+                                    if update.filters.len() == 1 && update.filters.contains(&internal_slot_sub_id) {
+                                        continue;
+                                    }
+                                } else if replay_enabled {
+                                    if let Some(slot) = footer_resume_slot(&update) {
+                                        tracked_slot = tracked_slot.max(slot);
+                                    }
+                                }
 
                                             // Filter out internal subscription from filters before yielding (only if replay is enabled)
                                             let mut clean_update = update;
@@ -574,7 +573,7 @@ fn merge_subscribe_requests(
     current.transactions_status = modification.transactions_status.clone();
     current.blocks = modification.blocks.clone();
     current.blocks_meta = modification.blocks_meta.clone();
-    current.block_footer = modification.block_footer.clone();
+    current.block_footer.clone_from(&modification.block_footer);
     current.entry = modification.entry.clone();
     current.accounts_data_slice = modification.accounts_data_slice.clone();
 

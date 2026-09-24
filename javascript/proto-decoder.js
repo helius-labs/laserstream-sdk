@@ -107,10 +107,6 @@ function processYellowstoneUpdate(obj) {
   if (obj.entry) {
     obj.entry = processEntryUpdate(obj.entry);
   }
-
-  if (obj.blockFooter) {
-    obj.blockFooter = processBlockFooterUpdate(obj.blockFooter);
-  }
   
   // Ensure consistent field ordering like Yellowstone
   const orderedObj = {
@@ -189,10 +185,6 @@ function processEntryUpdate(entry) {
   // protobufjs with bytes: Buffer already returns Buffer objects
   // No conversion needed - they already match Yellowstone format
   return entry;
-}
-
-function processBlockFooterUpdate(blockFooter) {
-  return blockFooter;
 }
 
 // Decode preprocessed update protobuf bytes to JavaScript object

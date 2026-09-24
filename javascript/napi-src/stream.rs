@@ -805,7 +805,7 @@ impl StreamInner {
         current.transactions_status = modification.transactions_status.clone();
         current.blocks = modification.blocks.clone();
         current.blocks_meta = modification.blocks_meta.clone();
-        current.block_footer = modification.block_footer.clone();
+        current.block_footer.clone_from(&modification.block_footer);
         current.entry = modification.entry.clone();
         current.accounts_data_slice = modification.accounts_data_slice.clone();
 

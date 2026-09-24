@@ -35,12 +35,6 @@ export {
   SubscribeRequestFilterEntry,
   SubscribeRequestAccountsDataSlice,
   SubscribeRequestPing,
-  // Solana payload types used by examples/tests
-  Message,
-  MessageAddressTableLookup,
-  Transaction,
-  TransactionStatusMeta,
-  TransactionError,
   // Enums
   CommitmentLevel,
   SlotStatus,
