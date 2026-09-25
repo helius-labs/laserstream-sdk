@@ -35,6 +35,13 @@ fn is_terminal_error(_config: &LaserstreamConfig, _status: &Status) -> bool {
     false
 }
 
+fn footer_resume_slot(update: &SubscribeUpdate) -> Option<u64> {
+    match update.update_oneof.as_ref()? {
+        UpdateOneof::BlockFooter(msg) => Some(msg.slot),
+        _ => None,
+    }
+}
+
 #[cfg(feature = "internal")]
 fn is_out_of_range_with_ga_disabled(config: &LaserstreamConfig, status: &Status) -> bool {
     config.internal_disable_geyser_archive_fallback
@@ -220,6 +227,10 @@ pub fn subscribe(
                                     // Skip if this slot update is EXCLUSIVELY from our internal subscription
                                     if update.filters.len() == 1 && update.filters.contains(&internal_slot_sub_id) {
                                         continue;
+                                    }
+                                } else if replay_enabled {
+                                    if let Some(slot) = footer_resume_slot(&update) {
+                                        tracked_slot = tracked_slot.max(slot);
                                     }
                                 }
 
@@ -577,6 +588,7 @@ fn merge_subscribe_requests(
     current.transactions_status = modification.transactions_status.clone();
     current.blocks = modification.blocks.clone();
     current.blocks_meta = modification.blocks_meta.clone();
+    current.block_footer.clone_from(&modification.block_footer);
     current.entry = modification.entry.clone();
     current.accounts_data_slice = modification.accounts_data_slice.clone();
 

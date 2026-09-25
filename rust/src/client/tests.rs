@@ -4,7 +4,10 @@ use laserstream_core_proto::{
     geyser::*,
     tonic::{self, Response, Streaming},
 };
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 const SLOT_TOO_OLD_MESSAGE: &str = "Requested slot 95 is older than the oldest available slot 100. Please request a more recent slot.";
 
@@ -389,4 +392,92 @@ async fn assert_terminal_with_config(
         assert_eq!(request.disable_archive.as_deref(), expected_header);
         assert_eq!(request.from_slot, Some(95));
     }
+}
+
+#[test]
+fn merge_subscribe_requests_replaces_footer_filters_and_keeps_internal_slot_tracker() {
+    let internal_slot_sub_id = "__internal_slot_tracker_test";
+    let mut current = SubscribeRequest {
+        slots: HashMap::from([(
+            internal_slot_sub_id.to_owned(),
+            SubscribeRequestFilterSlots {
+                filter_by_commitment: Some(true),
+                ..Default::default()
+            },
+        )]),
+        block_footer: HashMap::from([(
+            "old-footer".to_owned(),
+            SubscribeRequestFilterBlockFooter {},
+        )]),
+        ..Default::default()
+    };
+
+    let modification = SubscribeRequest {
+        block_footer: HashMap::from([(
+            "new-footer".to_owned(),
+            SubscribeRequestFilterBlockFooter {},
+        )]),
+        ..Default::default()
+    };
+
+    merge_subscribe_requests(&mut current, &modification, internal_slot_sub_id);
+
+    assert!(current.slots.contains_key(internal_slot_sub_id));
+    assert!(current.block_footer.contains_key("new-footer"));
+    assert!(!current.block_footer.contains_key("old-footer"));
+}
+
+#[test]
+fn merge_subscribe_requests_can_remove_footer_filters() {
+    let internal_slot_sub_id = "__internal_slot_tracker_test";
+    let mut current = SubscribeRequest {
+        slots: HashMap::from([(
+            internal_slot_sub_id.to_owned(),
+            SubscribeRequestFilterSlots::default(),
+        )]),
+        block_footer: HashMap::from([("footer".to_owned(), SubscribeRequestFilterBlockFooter {})]),
+        ..Default::default()
+    };
+
+    merge_subscribe_requests(
+        &mut current,
+        &SubscribeRequest::default(),
+        internal_slot_sub_id,
+    );
+
+    assert!(current.block_footer.is_empty());
+    assert!(current.slots.contains_key(internal_slot_sub_id));
+}
+
+#[test]
+fn footer_resume_slot_tracks_block_footer_updates() {
+    let update = SubscribeUpdate {
+        update_oneof: Some(subscribe_update::UpdateOneof::BlockFooter(
+            SubscribeUpdateBlockFooter {
+                slot: 42,
+                bank_id: 7,
+                bank_hash: vec![1; 32],
+                block_producer_time_nanos: 123,
+                block_user_agent: b"agave".to_vec(),
+            },
+        )),
+        ..Default::default()
+    };
+
+    assert_eq!(footer_resume_slot(&update), Some(42));
+}
+
+#[test]
+fn footer_resume_slot_ignores_non_footer_updates() {
+    let update = SubscribeUpdate {
+        update_oneof: Some(subscribe_update::UpdateOneof::Account(
+            SubscribeUpdateAccount {
+                slot: 42,
+                ..Default::default()
+            },
+        )),
+        ..Default::default()
+    };
+
+    assert_eq!(footer_resume_slot(&update), None);
 }
