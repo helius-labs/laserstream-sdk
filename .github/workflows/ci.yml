@@ -41,6 +41,60 @@ jobs:
       - run: cargo test --locked --lib --no-default-features
       - run: cargo test --locked --lib --features internal
       - run: cargo test --locked --lib --no-default-features --features internal
+      # Compile-checks doc examples (e.g. the `no_run` example in src/unary.rs).
+      - run: cargo test --locked --doc
+
+  go-tests:
+    name: Go SDK tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      # Root package only: examples/ and test/ hold multiple `main` programs per directory.
+      - run: go vet .
+      - run: go test -race -count=1 .
+
+  js-tests:
+    name: JS SDK tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: javascript
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            javascript/target/
+          key: js-tests-cargo-${{ runner.os }}-${{ hashFiles('javascript/Cargo.lock') }}
+          restore-keys: |
+            js-tests-cargo-${{ runner.os }}-
+      - run: npm install --ignore-scripts
+      # Debug build: tests only need a loadable binding for the host platform.
+      - run: npm run build:debug
+      - run: npm run test:unary
+      - run: npm run test:cuckoo
+      - run: npm run test:v1-config
 
   build:
     strategy:

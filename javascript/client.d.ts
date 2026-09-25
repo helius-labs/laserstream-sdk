@@ -1,4 +1,5 @@
 // TypeScript declarations for Laserstream client
+import type { CommitmentLevel } from 'laserstream-core-proto-js/generated';
 
 // Re-export gRPC types
 export { ChannelOptions } from '@grpc/grpc-js';
@@ -91,6 +92,56 @@ export declare function subscribePreprocessed(
   onData: (update: SubscribePreprocessedUpdate) => void | Promise<void>,
   onError?: (error: Error) => void | Promise<void>
 ): Promise<StreamHandle>;
+
+// ============================================================================
+// Unary RPCs
+// ============================================================================
+
+// uint64 values are decimal strings (same convention as subscribe updates).
+export interface GetSlotResponse { slot: string }
+export interface GetBlockHeightResponse { blockHeight: string }
+export interface GetLatestBlockhashResponse { slot: string; blockhash: string; lastValidBlockHeight: string }
+export interface IsBlockhashValidResponse { slot: string; valid: boolean }
+export interface GetVersionResponse { version: string }
+export interface PongResponse { count: number }
+export interface SubscribeReplayInfoResponse { firstAvailable?: string }
+
+/**
+ * Client for unary (request/response) RPCs. Create once and reuse: all calls
+ * share one HTTP/2 connection, opened lazily on the first call.
+ * `commitment` defaults to the server default when omitted.
+ */
+export interface LaserstreamClientConfig extends Pick<LaserstreamConfig, 'endpoint' | 'apiKey' | 'channelOptions'> {
+  /** Per-call deadline in milliseconds, including connecting (default 30000). */
+  timeoutMs?: number;
+}
+
+export declare class LaserstreamClient {
+  constructor(config: LaserstreamClientConfig);
+  /** Releases the shared connection. In-flight calls complete; a later call reconnects. */
+  close(): void;
+  getSlot(commitment?: CommitmentLevel): Promise<GetSlotResponse>;
+  getBlockHeight(commitment?: CommitmentLevel): Promise<GetBlockHeightResponse>;
+  getLatestBlockhash(commitment?: CommitmentLevel): Promise<GetLatestBlockhashResponse>;
+  isBlockhashValid(blockhash: string, commitment?: CommitmentLevel): Promise<IsBlockhashValidResponse>;
+  getVersion(): Promise<GetVersionResponse>;
+  ping(count?: number): Promise<PongResponse>;
+  /**
+   * Oldest slot this endpoint can replay from: the smallest usable `fromSlot`
+   * (`firstAvailable` is undefined if the server reports no replay data).
+   *
+   * Call it right before subscribing with an explicit `fromSlot` (the value
+   * moves forward as old data is evicted). A `fromSlot` below it may not be
+   * servable, and the subscription can fail (e.g. `OUT_OF_RANGE`) instead of
+   * streaming. Clamp with `Math.max(fromSlot, Number(firstAvailable))` and
+   * treat the skipped slots as missed. `firstAvailable` is a decimal string,
+   * but `fromSlot` in a subscribe request must be a number.
+   *
+   * It only reports this lower bound; it can't detect gaps in storage above it.
+   * Despite the name, this is a single request/response call, not a stream.
+   */
+  subscribeReplayInfo(): Promise<SubscribeReplayInfoResponse>;
+}
 
 // ============================================================================
 // Utility Functions

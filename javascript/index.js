@@ -310,8 +310,9 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { shutdownAllStreams, getActiveStreamCount, CommitmentLevel, LaserstreamClient, StreamHandle } = nativeBinding
+const { UnaryClient, shutdownAllStreams, getActiveStreamCount, CommitmentLevel, LaserstreamClient, StreamHandle } = nativeBinding
 
+module.exports.UnaryClient = UnaryClient
 module.exports.shutdownAllStreams = shutdownAllStreams
 module.exports.getActiveStreamCount = getActiveStreamCount
 module.exports.CommitmentLevel = CommitmentLevel

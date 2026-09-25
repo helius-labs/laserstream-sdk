@@ -23,16 +23,16 @@ const FORK_DEPTH_SAFETY_MARGIN: u64 = 31; // Max fork depth for processed commit
 
 // SDK metadata constants
 const SDK_NAME: &str = "laserstream-javascript";
-const SDK_VERSION: &str = "0.6.1";
+const SDK_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Custom interceptor that adds SDK metadata headers to all gRPC requests
 #[derive(Clone)]
-struct SdkMetadataInterceptor {
+pub(crate) struct SdkMetadataInterceptor {
     x_token: Option<laserstream_core_proto::tonic::metadata::AsciiMetadataValue>,
 }
 
 impl SdkMetadataInterceptor {
-    fn new(token: &Option<String>) -> std::result::Result<Self, Status> {
+    pub(crate) fn new(token: &Option<String>) -> std::result::Result<Self, Status> {
         let x_token = if let Some(token_str) = token {
             if !token_str.is_empty() {
                 Some(token_str.parse().map_err(|e| {
@@ -64,15 +64,15 @@ impl Interceptor for SdkMetadataInterceptor {
 }
 
 // Helper struct to hold channel configuration
-struct ChannelConfig {
-    max_send_msg_size: usize,
-    max_recv_msg_size: usize,
-    send_compression: Option<CompressionEncoding>,
-    accept_compression: Option<CompressionEncoding>,
+pub(crate) struct ChannelConfig {
+    pub(crate) max_send_msg_size: usize,
+    pub(crate) max_recv_msg_size: usize,
+    pub(crate) send_compression: Option<CompressionEncoding>,
+    pub(crate) accept_compression: Option<CompressionEncoding>,
 }
 
 impl ChannelConfig {
-    fn from_options(channel_options: &Option<ChannelOptions>) -> Self {
+    pub(crate) fn from_options(channel_options: &Option<ChannelOptions>) -> Self {
         if let Some(ref opts) = channel_options {
             let send_compression = opts.grpc_default_compression_algorithm.and_then(|algo| match algo {
                 2 => Some(CompressionEncoding::Gzip),
@@ -98,7 +98,7 @@ impl ChannelConfig {
 }
 
 // Helper function to configure endpoint with channel options
-fn configure_endpoint(
+pub(crate) fn configure_endpoint(
     endpoint_str: &str,
     channel_options: &Option<ChannelOptions>,
 ) -> std::result::Result<Endpoint, Box<dyn std::error::Error + Send + Sync>> {

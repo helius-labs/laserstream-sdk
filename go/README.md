@@ -251,6 +251,36 @@ req := &laserstream.SubscribeRequest{
 }
 ```
 
+## Unary RPCs
+
+Besides streaming, the Geyser service exposes request/response RPCs. They are methods on the same `Client`, so you don't need to call `Subscribe` first. Unary calls share one connection, created on first use and closed by `Close()`.
+
+```go
+client := laserstream.NewClient(laserstream.NewLaserstreamConfig(endpoint, apiKey))
+defer client.Close()
+
+slot, err := client.GetSlot(ctx, laserstream.CommitmentLevel_CONFIRMED) // slot.Slot
+height, err := client.GetBlockHeight(ctx)                               // commitment optional
+bh, err := client.GetLatestBlockhash(ctx)                               // bh.Blockhash, bh.Slot, bh.LastValidBlockHeight
+valid, err := client.IsBlockhashValid(ctx, bh.Blockhash)                // valid.Valid
+version, err := client.GetVersion(ctx)
+pong, err := client.Ping(ctx, 1)
+replay, err := client.SubscribeReplayInfo(ctx)                          // *replay.FirstAvailable
+```
+
+If `ctx` has no deadline, a default of `laserstream.DefaultUnaryTimeout` (30s) is applied.
+
+**Picking a valid `FromSlot`:** `SubscribeReplayInfo` returns the oldest slot the endpoint can replay from. A `FromSlot` below it may not be servable, and the subscription can fail (e.g. `OUT_OF_RANGE`) instead of streaming. Clamp before subscribing, and treat the skipped slots as missed:
+
+```go
+if info, err := client.SubscribeReplayInfo(ctx); err == nil && info.FirstAvailable != nil &&
+	req.FromSlot != nil && *req.FromSlot < *info.FirstAvailable {
+	req.FromSlot = info.FirstAvailable
+}
+```
+
+This only reports the lower bound; it can't detect gaps in storage above it.
+
 ## Stream Write - Dynamic Updates
 
 ```go
@@ -406,3 +436,4 @@ See [`./examples/`](./examples/) for complete working examples:
 - [`slot-sub.go`](./examples/slot-sub.go) - Slot progression
 - [`channel-options-example.go`](./examples/channel-options-example.go) - Performance tuning
 - [`stream-write-example.go`](./examples/stream-write-example.go) - Dynamic updates
+- [`unary-methods.go`](./examples/unary-methods.go) - Unary RPCs (GetSlot, GetLatestBlockhash, ...)

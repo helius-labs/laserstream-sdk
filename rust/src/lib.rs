@@ -4,8 +4,10 @@ use h2 as _;
 pub mod client;
 pub mod config;
 pub mod error;
+pub mod unary;
 
 pub use client::{subscribe, subscribe_preprocessed, StreamHandle, PreprocessedStreamHandle};
+pub use unary::LaserstreamClient;
 pub use config::{ChannelOptions, LaserstreamConfig, CompressionEncoding};
 pub use error::LaserstreamError;
 

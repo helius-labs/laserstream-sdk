@@ -67,6 +67,11 @@ Control data consistency vs. performance:
 - Faster reconnection, potential data gaps
 - Lower memory footprint
 
+### Unary RPCs
+All SDKs also expose the Geyser request/response RPCs: `getSlot`, `getBlockHeight`, `getLatestBlockhash`, `isBlockhashValid`, `getVersion`, `ping` and `subscribeReplayInfo`. Rust and TypeScript provide them on a `LaserstreamClient`; in Go they are methods on `Client`. See each SDK's README.
+
+Use `subscribeReplayInfo` to find the oldest slot an endpoint can replay from before subscribing with `from_slot`. A `from_slot` below it may fail (e.g. `OUT_OF_RANGE`) instead of streaming.
+
 ### Stream Write
 Dynamically update subscriptions without reconnecting:
 - Add new filters to existing streams

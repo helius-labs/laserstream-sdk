@@ -126,6 +126,43 @@ async fn default_client_still_retries_out_of_range() {
     }
 }
 
+#[tokio::test]
+async fn unary_methods_round_trip() {
+    let server = TestServer::start(Reply::Data).await;
+    let mut config = server.config();
+    config.api_key = "secret".into();
+    let client = crate::LaserstreamClient::connect(config).await.unwrap();
+
+    assert_eq!(client.get_slot(None).await.unwrap().slot, 999);
+    assert_eq!(
+        client.get_slot(Some(CommitmentLevel::Finalized)).await.unwrap().slot,
+        1002
+    );
+    assert_eq!(client.get_block_height(None).await.unwrap().block_height, 900);
+    let bh = client
+        .get_latest_blockhash(Some(CommitmentLevel::Confirmed))
+        .await
+        .unwrap();
+    assert_eq!((bh.slot, bh.blockhash.as_str(), bh.last_valid_block_height), (1001, "hash", 7));
+    assert!(client.is_blockhash_valid(&bh.blockhash, None).await.unwrap().valid);
+    assert!(!client.is_blockhash_valid("other", None).await.unwrap().valid);
+    assert_eq!(client.ping(7).await.unwrap().count, 7);
+    assert_eq!(
+        client.subscribe_replay_info().await.unwrap().first_available,
+        Some(42)
+    );
+    assert_eq!(
+        client.get_version().await.unwrap().version,
+        format!("secret|{SDK_NAME}")
+    );
+}
+
+#[tokio::test]
+async fn unary_connect_fails_for_unreachable_endpoint() {
+    let config = LaserstreamConfig::new("http://127.0.0.1:1".into(), String::new());
+    assert!(crate::LaserstreamClient::connect(config).await.is_err());
+}
+
 #[derive(Clone, Copy, Debug)]
 enum Reply {
     StreamOutOfRange,
@@ -205,40 +242,55 @@ impl geyser_server::Geyser for TestGeyser {
         &self,
         _: Request<SubscribeReplayInfoRequest>,
     ) -> Result<Response<SubscribeReplayInfoResponse>, Status> {
-        Err(Status::unimplemented("unused"))
+        Ok(Response::new(SubscribeReplayInfoResponse { first_available: Some(42) }))
     }
-    async fn ping(&self, _: Request<PingRequest>) -> Result<Response<PongResponse>, Status> {
-        Err(Status::unimplemented("unused"))
+    async fn ping(&self, req: Request<PingRequest>) -> Result<Response<PongResponse>, Status> {
+        Ok(Response::new(PongResponse { count: req.into_inner().count }))
     }
     async fn get_latest_blockhash(
         &self,
-        _: Request<GetLatestBlockhashRequest>,
+        req: Request<GetLatestBlockhashRequest>,
     ) -> Result<Response<GetLatestBlockhashResponse>, Status> {
-        Err(Status::unimplemented("unused"))
+        Ok(Response::new(GetLatestBlockhashResponse {
+            slot: 1000 + req.into_inner().commitment.unwrap_or(-1) as u64,
+            blockhash: "hash".into(),
+            last_valid_block_height: 7,
+        }))
     }
     async fn get_block_height(
         &self,
         _: Request<GetBlockHeightRequest>,
     ) -> Result<Response<GetBlockHeightResponse>, Status> {
-        Err(Status::unimplemented("unused"))
+        Ok(Response::new(GetBlockHeightResponse { block_height: 900 }))
     }
     async fn get_slot(
         &self,
-        _: Request<GetSlotRequest>,
+        req: Request<GetSlotRequest>,
     ) -> Result<Response<GetSlotResponse>, Status> {
-        Err(Status::unimplemented("unused"))
+        // Encode the commitment into the slot so tests can verify it was sent.
+        let slot = match req.into_inner().commitment {
+            Some(c) => 1000 + c as u64,
+            None => 999,
+        };
+        Ok(Response::new(GetSlotResponse { slot }))
     }
     async fn is_blockhash_valid(
         &self,
-        _: Request<IsBlockhashValidRequest>,
+        req: Request<IsBlockhashValidRequest>,
     ) -> Result<Response<IsBlockhashValidResponse>, Status> {
-        Err(Status::unimplemented("unused"))
+        let valid = req.into_inner().blockhash == "hash";
+        Ok(Response::new(IsBlockhashValidResponse { slot: 5, valid }))
     }
     async fn get_version(
         &self,
-        _: Request<GetVersionRequest>,
+        req: Request<GetVersionRequest>,
     ) -> Result<Response<GetVersionResponse>, Status> {
-        Err(Status::unimplemented("unused"))
+        // Echo auth + SDK headers so tests can verify the interceptor ran.
+        let md = req.metadata();
+        let get = |k: &str| md.get(k).and_then(|v| v.to_str().ok()).unwrap_or("").to_owned();
+        Ok(Response::new(GetVersionResponse {
+            version: format!("{}|{}", get("x-token"), get("x-sdk-name")),
+        }))
     }
 }
 
