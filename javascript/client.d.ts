@@ -112,7 +112,7 @@ export interface SubscribeReplayInfoResponse { firstAvailable?: string }
  * `commitment` defaults to the server default when omitted.
  */
 export interface LaserstreamClientConfig extends Pick<LaserstreamConfig, 'endpoint' | 'apiKey' | 'channelOptions'> {
-  /** Per-call deadline in milliseconds (default 30000). */
+  /** Per-call deadline in milliseconds, including connecting (default 30000). */
   timeoutMs?: number;
 }
 

@@ -119,7 +119,7 @@ async function subscribePreprocessed(config, request, onData, onError) {
 // Client for unary (request/response) RPCs. Create once and reuse: all calls
 // share one HTTP/2 connection, opened lazily on the first call.
 // uint64 fields are returned as decimal strings (same as subscribe updates).
-// `timeoutMs` is the per-call deadline (default 30000).
+// `timeoutMs` is the per-call deadline, including connecting (default 30000).
 class LaserstreamClient {
   constructor(config) {
     if (!config || !config.endpoint) {

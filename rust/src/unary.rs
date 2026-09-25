@@ -30,7 +30,7 @@ use laserstream_core_proto::geyser::{
 /// `channel_options.timeout_secs` (default 30s).
 #[derive(Clone)]
 pub struct LaserstreamClient {
-    inner: SdkGeyserClient,
+    shared_grpc_client: SdkGeyserClient,
 }
 
 impl LaserstreamClient {
@@ -38,8 +38,20 @@ impl LaserstreamClient {
     /// options as [`crate::subscribe`].
     pub async fn connect(config: LaserstreamConfig) -> Result<Self, LaserstreamError> {
         let api_key = config.api_key.clone();
-        let inner = build_geyser_client(&config, api_key).await?;
-        Ok(Self { inner })
+        let shared_grpc_client = build_geyser_client(&config, api_key).await?;
+        Ok(Self { shared_grpc_client })
+    }
+
+    /// Returns a handle to the shared gRPC client for one call.
+    ///
+    /// The generated tonic methods take `&mut self`; handing each call its own
+    /// clone lets our methods take `&self`, so one `LaserstreamClient` can be
+    /// used from many tasks at once without a `Mutex`. The clone is cheap: the
+    /// channel is a handle to the same shared connection (tonic: "cloning the
+    /// `Channel` type is cheap and encouraged"), and the auth token in the
+    /// interceptor is reference-counted. No new connection is opened.
+    fn grpc_client(&self) -> SdkGeyserClient {
+        self.shared_grpc_client.clone()
     }
 
     /// Current slot at the given commitment (server default when `None`).
@@ -48,7 +60,7 @@ impl LaserstreamClient {
         commitment: Option<CommitmentLevel>,
     ) -> Result<GetSlotResponse, LaserstreamError> {
         let req = GetSlotRequest { commitment: commitment.map(|c| c as i32) };
-        Ok(self.inner.clone().get_slot(req).await?.into_inner())
+        Ok(self.grpc_client().get_slot(req).await?.into_inner())
     }
 
     /// Current block height at the given commitment.
@@ -57,7 +69,7 @@ impl LaserstreamClient {
         commitment: Option<CommitmentLevel>,
     ) -> Result<GetBlockHeightResponse, LaserstreamError> {
         let req = GetBlockHeightRequest { commitment: commitment.map(|c| c as i32) };
-        Ok(self.inner.clone().get_block_height(req).await?.into_inner())
+        Ok(self.grpc_client().get_block_height(req).await?.into_inner())
     }
 
     /// Latest blockhash, its slot, and last valid block height.
@@ -66,7 +78,7 @@ impl LaserstreamClient {
         commitment: Option<CommitmentLevel>,
     ) -> Result<GetLatestBlockhashResponse, LaserstreamError> {
         let req = GetLatestBlockhashRequest { commitment: commitment.map(|c| c as i32) };
-        Ok(self.inner.clone().get_latest_blockhash(req).await?.into_inner())
+        Ok(self.grpc_client().get_latest_blockhash(req).await?.into_inner())
     }
 
     /// Whether `blockhash` (base58) is still valid.
@@ -79,17 +91,17 @@ impl LaserstreamClient {
             blockhash: blockhash.into(),
             commitment: commitment.map(|c| c as i32),
         };
-        Ok(self.inner.clone().is_blockhash_valid(req).await?.into_inner())
+        Ok(self.grpc_client().is_blockhash_valid(req).await?.into_inner())
     }
 
     /// Server version info (JSON string).
     pub async fn get_version(&self) -> Result<GetVersionResponse, LaserstreamError> {
-        Ok(self.inner.clone().get_version(GetVersionRequest {}).await?.into_inner())
+        Ok(self.grpc_client().get_version(GetVersionRequest {}).await?.into_inner())
     }
 
     /// Round-trip ping; the server echoes `count`.
     pub async fn ping(&self, count: i32) -> Result<PongResponse, LaserstreamError> {
-        Ok(self.inner.clone().ping(PingRequest { count }).await?.into_inner())
+        Ok(self.grpc_client().ping(PingRequest { count }).await?.into_inner())
     }
 
     /// Oldest slot this endpoint can replay from: the smallest usable
@@ -108,8 +120,7 @@ impl LaserstreamClient {
         &self,
     ) -> Result<SubscribeReplayInfoResponse, LaserstreamError> {
         Ok(self
-            .inner
-            .clone()
+            .grpc_client()
             .subscribe_replay_info(SubscribeReplayInfoRequest {})
             .await?
             .into_inner())

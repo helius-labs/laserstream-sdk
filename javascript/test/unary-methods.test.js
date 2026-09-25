@@ -2,6 +2,7 @@
 // (node:http2 + protobufjs; no network or extra deps). Run: npm run test:unary
 const assert = require('assert');
 const http2 = require('http2');
+const net = require('net');
 const path = require('path');
 const protobuf = require('protobufjs');
 const { LaserstreamClient, CommitmentLevel } = require('../client');
@@ -73,6 +74,12 @@ async function startServer() {
 }
 
 async function main() {
+  // A deadline regression makes calls hang rather than fail; fail fast instead.
+  setTimeout(() => {
+    console.error('unary-methods: timed out after 30s (a call ignored its deadline?)');
+    process.exit(1);
+  }, 30_000).unref();
+
   const server = await startServer();
   const endpoint = `http://127.0.0.1:${server.address().port}`;
   const client = new LaserstreamClient({ endpoint, apiKey: 'secret' });
@@ -96,8 +103,27 @@ async function main() {
 
   // Connection failures reject (and don't poison the client for later calls).
   const bad = new LaserstreamClient({ endpoint: 'http://127.0.0.1:1' });
-  await assert.rejects(bad.getSlot(), /Connection failed/);
-  await assert.rejects(bad.getSlot(), /Connection failed/);
+  await assert.rejects(bad.getSlot(), /Unavailable/);
+  await assert.rejects(bad.getSlot(), /Unavailable/);
+
+  // timeoutMs also bounds connecting, and concurrent calls don't queue behind
+  // one connection attempt. The server accepts TCP but never answers, so the
+  // TLS handshake hangs (without the per-call deadline this never returned).
+  const silentSockets = [];
+  const silent = net.createServer((sock) => silentSockets.push(sock));
+  await new Promise((r) => silent.listen(0, '127.0.0.1', r));
+  const hung = new LaserstreamClient({ endpoint: `https://127.0.0.1:${silent.address().port}`, timeoutMs: 1000 });
+  const tHung = Date.now();
+  const hungResults = await Promise.allSettled([0, 1, 2, 3].map(() => hung.getSlot()));
+  const hungElapsed = Date.now() - tHung;
+  for (const r of hungResults) {
+    assert.strictEqual(r.status, 'rejected');
+    assert.match(r.reason.message, /DeadlineExceeded: call timed out after 1000 ms/);
+  }
+  assert.ok(hungElapsed < 2500, `4 concurrent calls took ${hungElapsed} ms, want ~1000`);
+  hung.close();
+  for (const sock of silentSockets) sock.destroy();
+  silent.close();
 
   assert.throws(() => new LaserstreamClient({}), /endpoint is required/);
   assert.throws(() => new LaserstreamClient({ endpoint, timeoutMs: 0 }), /timeoutMs/);

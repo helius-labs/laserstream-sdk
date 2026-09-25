@@ -102,18 +102,7 @@ pub(crate) fn configure_endpoint(
     endpoint_str: &str,
     channel_options: &Option<ChannelOptions>,
 ) -> std::result::Result<Endpoint, Box<dyn std::error::Error + Send + Sync>> {
-    // Performance defaults first, so explicit channel options below override them.
-    // tcp_nodelay disables Nagle's algorithm (critical for H2 WINDOW_UPDATE latency).
-    // Adaptive windows and large initial window sizes prevent H2 flow control
-    // from throttling high-throughput streams (default 65KB window is far too small).
-    let default_timeout = if channel_options.is_some() { 30 } else { 10 };
-    let mut endpoint = Endpoint::from_shared(endpoint_str.to_string())?
-        .connect_timeout(Duration::from_secs(10))
-        .timeout(Duration::from_secs(default_timeout))
-        .http2_adaptive_window(true)
-        .tcp_nodelay(true)
-        .initial_stream_window_size(Some(4 * 1024 * 1024))
-        .initial_connection_window_size(Some(8 * 1024 * 1024));
+    let mut endpoint = Endpoint::from_shared(endpoint_str.to_string())?;
 
     if let Some(ref opts) = channel_options {
         // Keep-alive options
@@ -163,6 +152,27 @@ pub(crate) fn configure_endpoint(
                 _ => {}
             }
         }
+
+        // Apply sensible defaults for options not specified
+        endpoint = endpoint
+            .connect_timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(30))
+            .http2_adaptive_window(true)
+            .tcp_nodelay(true)
+            .initial_stream_window_size(Some(4 * 1024 * 1024))
+            .initial_connection_window_size(Some(8 * 1024 * 1024));
+    } else {
+        // Apply performance defaults even without explicit channel_options.
+        // tcp_nodelay disables Nagle's algorithm (critical for H2 WINDOW_UPDATE latency).
+        // Adaptive windows and large initial window sizes prevent H2 flow control
+        // from throttling high-throughput streams (default 65KB window is far too small).
+        endpoint = endpoint
+            .connect_timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(10))
+            .http2_adaptive_window(true)
+            .tcp_nodelay(true)
+            .initial_stream_window_size(Some(4 * 1024 * 1024))
+            .initial_connection_window_size(Some(8 * 1024 * 1024));
     }
 
     // Configure TLS

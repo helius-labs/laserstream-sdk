@@ -275,7 +275,7 @@ client.close(); // release the connection when done
 
 If you omit `commitment`, the server default is used. uint64 values (slots, heights) are returned as decimal strings, the same as in `subscribe` updates.
 
-Each call has a deadline of `timeoutMs` (default `30000`), e.g. `new LaserstreamClient({ apiKey, endpoint, timeoutMs: 5000 })`. `close()` releases the connection; calls already in flight complete, and a later call opens a new connection.
+Each call has a deadline of `timeoutMs` (default `30000`), which includes connecting if the connection isn't open yet, e.g. `new LaserstreamClient({ apiKey, endpoint, timeoutMs: 5000 })`. `close()` releases the connection; calls already in flight complete, and a later call opens a new connection.
 
 **Picking a valid `fromSlot`:** `subscribeReplayInfo()` returns the oldest slot the endpoint can replay from. A `fromSlot` below it may not be servable, and the subscription can fail (e.g. `OUT_OF_RANGE`) instead of streaming. Clamp before subscribing, and treat the skipped slots as missed:
 

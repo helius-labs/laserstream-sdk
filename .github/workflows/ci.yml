@@ -41,6 +41,8 @@ jobs:
       - run: cargo test --locked --lib --no-default-features
       - run: cargo test --locked --lib --features internal
       - run: cargo test --locked --lib --no-default-features --features internal
+      # Compile-checks doc examples (e.g. the `no_run` example in src/unary.rs).
+      - run: cargo test --locked --doc
 
   go-tests:
     name: Go SDK tests

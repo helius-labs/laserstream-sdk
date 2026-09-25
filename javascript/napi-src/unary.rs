@@ -5,10 +5,14 @@
 
 use laserstream_core_proto::geyser;
 use laserstream_core_proto::prelude::geyser_client::GeyserClient;
-use laserstream_core_proto::tonic::{service::interceptor::InterceptedService, transport::Channel};
+use laserstream_core_proto::tonic::{
+    service::interceptor::InterceptedService, transport::Channel, Response as TonicResponse,
+    Status as TonicStatus,
+};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use std::sync::Mutex;
+use std::future::Future;
+use std::sync::{Mutex, PoisonError};
 use std::time::Duration;
 
 use crate::client::ChannelOptions;
@@ -18,14 +22,6 @@ type SdkGeyserClient = GeyserClient<InterceptedService<Channel, SdkMetadataInter
 
 /// Per-call deadline when `timeoutMs` is not given (matches the Rust and Go SDKs).
 const DEFAULT_TIMEOUT_MS: u32 = 30_000;
-
-/// Cached connection plus an epoch that `close()` bumps, so a dial that was in
-/// flight when `close()` ran does not re-cache its connection.
-#[derive(Default)]
-struct ClientSlot {
-    client: Option<SdkGeyserClient>,
-    epoch: u64,
-}
 
 #[napi(object)]
 pub struct GetSlotResponse {
@@ -65,67 +61,77 @@ pub struct SubscribeReplayInfoResponse {
     pub first_available: Option<String>,
 }
 
-fn status_err(s: laserstream_core_proto::tonic::Status) -> Error {
+fn status_err(s: TonicStatus) -> Error {
     Error::new(Status::GenericFailure, format!("gRPC {:?}: {}", s.code(), s.message()))
 }
 
-/// Native client for unary RPCs. One HTTP/2 connection, opened on first call
-/// and shared by all subsequent calls (reconnects transparently).
+/// Native client for unary RPCs. All calls share one HTTP/2 connection, opened
+/// on the first call and re-opened automatically if it drops.
 #[napi]
 pub struct UnaryClient {
     endpoint: String,
     token: Option<String>,
     channel_options: Option<ChannelOptions>,
+    /// Deadline for each whole call, including connecting.
     timeout: Duration,
-    slot: Mutex<ClientSlot>,
-    /// Serializes dials so concurrent first calls share one connection.
-    dial_lock: tokio::sync::Mutex<()>,
+    /// Shared gRPC client: created on the first call, cleared by `close()`.
+    grpc_client: Mutex<Option<SdkGeyserClient>>,
 }
 
 impl UnaryClient {
-    fn cached(&self) -> (Option<SdkGeyserClient>, u64) {
-        let slot = self.slot.lock().unwrap();
-        (slot.client.clone(), slot.epoch)
+    /// Returns the shared gRPC client, creating it on first use.
+    ///
+    /// Creating it does no network I/O (see `build_lazy_grpc_client`), so the
+    /// lock is only held briefly and calls never wait behind a connection attempt.
+    fn get_or_create_grpc_client(&self) -> Result<SdkGeyserClient> {
+        let mut grpc_client = self.grpc_client.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(existing) = grpc_client.as_ref() {
+            return Ok(existing.clone());
+        }
+        let created = self.build_lazy_grpc_client()?;
+        *grpc_client = Some(created.clone());
+        Ok(created)
     }
 
-    async fn client(&self) -> Result<SdkGeyserClient> {
-        if let (Some(c), _) = self.cached() {
-            return Ok(c);
-        }
-        let _dial = self.dial_lock.lock().await;
-        let (cached, epoch) = self.cached();
-        if let Some(c) = cached {
-            return Ok(c);
-        }
-        let c = self.dial().await?;
-        let mut slot = self.slot.lock().unwrap();
-        if slot.epoch == epoch {
-            slot.client = Some(c.clone());
-        }
-        Ok(c)
-    }
-
-    async fn dial(&self) -> Result<SdkGeyserClient> {
+    /// Builds a gRPC client on a lazily-connected channel: the connection is
+    /// opened by the first request (and re-opened by tonic if it drops), so
+    /// connecting counts against that request's deadline.
+    fn build_lazy_grpc_client(&self) -> Result<SdkGeyserClient> {
         let interceptor = SdkMetadataInterceptor::new(&self.token).map_err(status_err)?;
         let cfg = ChannelConfig::from_options(&self.channel_options);
-        // `timeoutMs` is the per-call deadline for unary RPCs; it takes
-        // precedence over any timeout derived from channel options.
+        // Also set the channel's own request timeout to `timeoutMs`, otherwise
+        // the endpoint default (10s or 30s) would cut off longer deadlines.
         let channel = configure_endpoint(&self.endpoint, &self.channel_options)
             .map_err(|e| Error::from_reason(format!("Invalid endpoint: {e}")))?
             .timeout(self.timeout)
-            .connect()
-            .await
-            .map_err(|e| Error::from_reason(format!("Connection failed: {e}")))?;
-        let mut c = GeyserClient::with_interceptor(channel, interceptor)
+            .connect_lazy();
+        let mut grpc_client = GeyserClient::with_interceptor(channel, interceptor)
             .max_decoding_message_size(cfg.max_recv_msg_size)
             .max_encoding_message_size(cfg.max_send_msg_size);
         if let Some(enc) = cfg.send_compression {
-            c = c.send_compressed(enc);
+            grpc_client = grpc_client.send_compressed(enc);
         }
         if let Some(enc) = cfg.accept_compression {
-            c = c.accept_compressed(enc);
+            grpc_client = grpc_client.accept_compressed(enc);
         }
-        Ok(c)
+        Ok(grpc_client)
+    }
+
+    /// Runs one RPC on the shared client. `timeoutMs` bounds the whole call,
+    /// including connecting, so a call never waits longer than its deadline.
+    async fn call_with_deadline<T, F, Fut>(&self, rpc: F) -> Result<T>
+    where
+        F: FnOnce(SdkGeyserClient) -> Fut,
+        Fut: Future<Output = std::result::Result<TonicResponse<T>, TonicStatus>>,
+    {
+        let grpc_client = self.get_or_create_grpc_client()?;
+        match tokio::time::timeout(self.timeout, rpc(grpc_client)).await {
+            Ok(result) => result.map(TonicResponse::into_inner).map_err(status_err),
+            Err(_elapsed) => Err(Error::new(
+                Status::GenericFailure,
+                format!("gRPC DeadlineExceeded: call timed out after {} ms", self.timeout.as_millis()),
+            )),
+        }
     }
 }
 
@@ -153,8 +159,7 @@ impl UnaryClient {
             token,
             channel_options,
             timeout: Duration::from_millis(timeout_ms as u64),
-            slot: Mutex::new(ClientSlot::default()),
-            dial_lock: tokio::sync::Mutex::new(()),
+            grpc_client: Mutex::new(None),
         })
     }
 
@@ -162,32 +167,26 @@ impl UnaryClient {
     /// a later call opens a new connection.
     #[napi]
     pub fn close(&self) {
-        let mut slot = self.slot.lock().unwrap();
-        slot.client = None;
-        slot.epoch += 1;
+        self.grpc_client.lock().unwrap_or_else(PoisonError::into_inner).take();
     }
 
     #[napi]
     pub async fn get_slot(&self, commitment: Option<i32>) -> Result<GetSlotResponse> {
         let r = self
-            .client()
-            .await?
-            .get_slot(geyser::GetSlotRequest { commitment })
-            .await
-            .map_err(status_err)?
-            .into_inner();
+            .call_with_deadline(|mut c| async move {
+                c.get_slot(geyser::GetSlotRequest { commitment }).await
+            })
+            .await?;
         Ok(GetSlotResponse { slot: r.slot.to_string() })
     }
 
     #[napi]
     pub async fn get_block_height(&self, commitment: Option<i32>) -> Result<GetBlockHeightResponse> {
         let r = self
-            .client()
-            .await?
-            .get_block_height(geyser::GetBlockHeightRequest { commitment })
-            .await
-            .map_err(status_err)?
-            .into_inner();
+            .call_with_deadline(|mut c| async move {
+                c.get_block_height(geyser::GetBlockHeightRequest { commitment }).await
+            })
+            .await?;
         Ok(GetBlockHeightResponse { block_height: r.block_height.to_string() })
     }
 
@@ -197,12 +196,10 @@ impl UnaryClient {
         commitment: Option<i32>,
     ) -> Result<GetLatestBlockhashResponse> {
         let r = self
-            .client()
-            .await?
-            .get_latest_blockhash(geyser::GetLatestBlockhashRequest { commitment })
-            .await
-            .map_err(status_err)?
-            .into_inner();
+            .call_with_deadline(|mut c| async move {
+                c.get_latest_blockhash(geyser::GetLatestBlockhashRequest { commitment }).await
+            })
+            .await?;
         Ok(GetLatestBlockhashResponse {
             slot: r.slot.to_string(),
             blockhash: r.blockhash,
@@ -217,36 +214,31 @@ impl UnaryClient {
         commitment: Option<i32>,
     ) -> Result<IsBlockhashValidResponse> {
         let r = self
-            .client()
-            .await?
-            .is_blockhash_valid(geyser::IsBlockhashValidRequest { blockhash, commitment })
-            .await
-            .map_err(status_err)?
-            .into_inner();
+            .call_with_deadline(|mut c| async move {
+                c.is_blockhash_valid(geyser::IsBlockhashValidRequest { blockhash, commitment }).await
+            })
+            .await?;
         Ok(IsBlockhashValidResponse { slot: r.slot.to_string(), valid: r.valid })
     }
 
     #[napi]
     pub async fn get_version(&self) -> Result<GetVersionResponse> {
         let r = self
-            .client()
-            .await?
-            .get_version(geyser::GetVersionRequest {})
-            .await
-            .map_err(status_err)?
-            .into_inner();
+            .call_with_deadline(|mut c| async move {
+                c.get_version(geyser::GetVersionRequest {}).await
+            })
+            .await?;
         Ok(GetVersionResponse { version: r.version })
     }
 
     #[napi]
     pub async fn ping(&self, count: Option<i32>) -> Result<PongResponse> {
+        let count = count.unwrap_or(1);
         let r = self
-            .client()
-            .await?
-            .ping(geyser::PingRequest { count: count.unwrap_or(1) })
-            .await
-            .map_err(status_err)?
-            .into_inner();
+            .call_with_deadline(|mut c| async move {
+                c.ping(geyser::PingRequest { count }).await
+            })
+            .await?;
         Ok(PongResponse { count: r.count })
     }
 
@@ -255,12 +247,10 @@ impl UnaryClient {
     #[napi]
     pub async fn subscribe_replay_info(&self) -> Result<SubscribeReplayInfoResponse> {
         let r = self
-            .client()
-            .await?
-            .subscribe_replay_info(geyser::SubscribeReplayInfoRequest {})
-            .await
-            .map_err(status_err)?
-            .into_inner();
+            .call_with_deadline(|mut c| async move {
+                c.subscribe_replay_info(geyser::SubscribeReplayInfoRequest {}).await
+            })
+            .await?;
         Ok(SubscribeReplayInfoResponse { first_available: r.first_available.map(|s| s.to_string()) })
     }
 }

@@ -35,8 +35,8 @@ export const enum CommitmentLevel {
   FINALIZED = 2
 }
 /**
- * Native client for unary RPCs. One HTTP/2 connection, opened on first call
- * and shared by all subsequent calls (reconnects transparently).
+ * Native client for unary RPCs. All calls share one HTTP/2 connection, opened
+ * on the first call and re-opened automatically if it drops.
  */
 export declare class UnaryClient {
   constructor(endpoint: string, token?: string | undefined | null, channelOptions?: object | undefined | null, timeoutMs?: number | undefined | null)
