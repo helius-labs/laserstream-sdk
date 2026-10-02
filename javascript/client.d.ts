@@ -1,6 +1,20 @@
 // TypeScript declarations for Laserstream client
 import type { CommitmentLevel } from 'laserstream-core-proto-js/generated';
 
+import type { geyser } from 'laserstream-core-proto-js/generated';
+
+// The generated package exports a namespace, not these top-level aliases.
+// Bind update outputs locally so callback/decoder types carry bank IDs.
+export type SubscribeUpdate = geyser.ISubscribeUpdate;
+export type SubscribeUpdateAccount = geyser.ISubscribeUpdateAccount;
+export type SubscribeUpdateAccountInfo = geyser.ISubscribeUpdateAccountInfo;
+export type SubscribeUpdateBlock = geyser.ISubscribeUpdateBlock;
+export type SubscribeUpdateSlot = geyser.ISubscribeUpdateSlot;
+export type SubscribeUpdateTransaction = geyser.ISubscribeUpdateTransaction;
+export type SubscribeUpdateTransactionStatus = geyser.ISubscribeUpdateTransactionStatus;
+export type SubscribeUpdateBlockMeta = geyser.ISubscribeUpdateBlockMeta;
+export type SubscribeUpdateEntry = geyser.ISubscribeUpdateEntry;
+
 // Re-export gRPC types
 export { ChannelOptions } from '@grpc/grpc-js';
 
@@ -13,16 +27,7 @@ export {
   SubscribePreprocessedTransaction,
   SubscribePreprocessedTransactionInfo,
   // Regular subscription types
-  SubscribeUpdate,
-  SubscribeUpdateAccount,
-  SubscribeUpdateAccountInfo,
-  SubscribeUpdateSlot,
-  SubscribeUpdateTransaction,
   SubscribeUpdateTransactionInfo,
-  SubscribeUpdateTransactionStatus,
-  SubscribeUpdateBlock,
-  SubscribeUpdateBlockMeta,
-  SubscribeUpdateEntry,
   SubscribeUpdatePing,
   SubscribeUpdatePong,
   // Request types
@@ -187,11 +192,73 @@ export {
  */
 export type TokenAccountsFilterMode = 'none' | 'balanceChanged' | 'all';
 
+export interface SubscribeRequestFilterBlockFooter {}
+
+export interface SubscribeUpdateBlockFooter {
+  slot: string;
+  bankId: string;
+  bankHash: Uint8Array | Buffer;
+  blockProducerTimeNanos: string;
+  blockUserAgent: Uint8Array | Buffer;
+}
+
+/**
+ * Reports a bank cleared by an Alpenglow UpdateParent marker. Updates already
+ * delivered for `clearedBankId` describe a bank that no longer exists: replay
+ * restarts from the marker's FEC set and the new bank carries a different id.
+ */
+export interface SubscribeUpdateEntryUpdateParent {
+  slot: string;
+  clearedBankId: string;
+  parentSlot: string;
+  parentBlockId: Uint8Array | Buffer;
+}
+
 // Augment the generated proto type so `tokenAccounts` is accepted on
 // transaction filters without forking the generated bindings. Removed once a
 // core-proto-js release ships field #30 natively.
 declare module 'laserstream-core-proto-js/generated' {
   namespace geyser {
+    interface ISubscribeRequest {
+      /** Triton-compatible footer subscription map (proto field #12). */
+      blockFooter?: ({ [key: string]: SubscribeRequestFilterBlockFooter } | null);
+    }
+
+    interface SubscribeRequest {
+      blockFooter?: ({ [key: string]: SubscribeRequestFilterBlockFooter } | null);
+    }
+
+    interface ISubscribeUpdate {
+      /** Triton-compatible footer update (proto field #12). */
+      blockFooter?: (SubscribeUpdateBlockFooter | null);
+      /** Alpenglow UpdateParent notice (proto field #13). */
+      entryUpdateParent?: (SubscribeUpdateEntryUpdateParent | null);
+    }
+
+    interface SubscribeUpdate {
+      blockFooter?: (SubscribeUpdateBlockFooter | null);
+      entryUpdateParent?: (SubscribeUpdateEntryUpdateParent | null);
+    }
+
+    interface ISubscribeUpdateAccount { bankId?: (string | null); }
+    interface ISubscribeUpdateSlot { bankId?: (string | null); }
+    interface ISubscribeUpdateTransaction { bankId?: (string | null); }
+    interface ISubscribeUpdateTransactionStatus { bankId?: (string | null); }
+    interface ISubscribeUpdateBlock { bankId?: (string | null); }
+    interface ISubscribeUpdateBlockMeta { bankId?: (string | null); }
+    interface ISubscribeUpdateEntry { bankId?: (string | null); }
+    interface ISubscribeRequestFilterEntry {
+      /**
+       * Include {@link SubscribeUpdateEntryUpdateParent} updates (proto field #1).
+       * Omitted or false sends entries only.
+       */
+      includeUpdateParent?: (boolean | null);
+    }
+
+    interface SubscribeRequestFilterEntry {
+      includeUpdateParent?: (boolean | null);
+    }
+
     interface ISubscribeRequestFilterTransactions {
       /** Helius ATA expansion control (proto field #30). */
       tokenAccounts?: (TokenAccountsFilterMode | string | null);

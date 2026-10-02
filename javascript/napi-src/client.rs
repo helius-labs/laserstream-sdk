@@ -9,7 +9,7 @@ use base64::{Engine as _, engine::general_purpose};
 use laserstream_core_proto::geyser::{
     SubscribeRequest, SubscribeRequestFilterAccounts, SubscribeRequestFilterBlocks,
     SubscribeRequestFilterSlots, SubscribeRequestFilterTransactions,
-    SubscribeRequestFilterBlocksMeta, SubscribeRequestFilterEntry,
+    SubscribeRequestFilterBlocksMeta, SubscribeRequestFilterEntry, SubscribeRequestFilterBlockFooter,
     SubscribeRequestAccountsDataSlice, SubscribeRequestPing,
     SubscribeRequestFilterAccountsFilter, SubscribeRequestFilterAccountsFilterMemcmp,
     SubscribeRequestFilterAccountsFilterLamports,
@@ -80,6 +80,8 @@ pub struct JsSubscribeRequest {
     pub blocks: Option<HashMap<String, JsBlockFilter>>,
     #[serde(alias = "blocksMeta")]
     pub blocks_meta: Option<HashMap<String, JsBlockMetaFilter>>,
+    #[serde(alias = "blockFooter")]
+    pub block_footer: Option<HashMap<String, JsBlockFooterFilter>>,
     pub entry: Option<HashMap<String, JsEntryFilter>>,
     pub commitment: Option<i32>,
     #[serde(alias = "accountsDataSlice")]
@@ -200,6 +202,12 @@ pub struct JsBlockMetaFilter {
 
 #[derive(Deserialize, Debug)]
 pub struct JsEntryFilter {
+    #[serde(default, rename = "includeUpdateParent")]
+    pub include_update_parent: Option<bool>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct JsBlockFooterFilter {
     // Empty struct as per proto
 }
 
@@ -257,7 +265,13 @@ impl ClientInner {
     // Complete automatic deserialization matching yellowstone-grpc proto exactly
     pub fn js_to_subscribe_request(&self, env: &Env, js_obj: Object) -> Result<SubscribeRequest> {
         let js_request: JsSubscribeRequest = env.from_js_value(js_obj)?;
-        
+        self.convert_js_subscribe_request(js_request)
+    }
+
+    fn convert_js_subscribe_request(
+        &self,
+        js_request: JsSubscribeRequest,
+    ) -> Result<SubscribeRequest> {
         let mut request = SubscribeRequest::default();
         
         // Handle accounts with complete filter support
@@ -499,11 +513,25 @@ impl ClientInner {
             request.blocks_meta = blocks_meta_map;
         }
         
+        // Handle block_footer
+        if let Some(block_footer) = js_request.block_footer {
+            let mut block_footer_map = HashMap::new();
+            for (key, _filter) in block_footer {
+                block_footer_map.insert(key, SubscribeRequestFilterBlockFooter::default());
+            }
+            request.block_footer = block_footer_map;
+        }
+
         // Handle entry
         if let Some(entry) = js_request.entry {
             let mut entry_map = HashMap::new();
-            for (key, _filter) in entry {
-                entry_map.insert(key, SubscribeRequestFilterEntry::default());
+            for (key, filter) in entry {
+                entry_map.insert(
+                    key,
+                    SubscribeRequestFilterEntry {
+                        include_update_parent: filter.include_update_parent,
+                    },
+                );
             }
             request.entry = entry_map;
         }
@@ -634,5 +662,38 @@ impl ClientInner {
             id: stream_id,
             inner: stream_inner,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn test_client() -> ClientInner {
+        ClientInner::new(
+            "http://127.0.0.1:1".to_owned(),
+            None,
+            None,
+            None,
+            Some(true),
+        )
+        .expect("client")
+    }
+
+    #[test]
+    fn convert_js_request_accepts_named_empty_block_footer_filter() {
+        let js_request: JsSubscribeRequest = serde_json::from_value(json!({
+            "blockFooter": {
+                "footer-filter": {}
+            }
+        }))
+        .expect("deserialize request");
+
+        let request = test_client()
+            .convert_js_subscribe_request(js_request)
+            .expect("convert request");
+
+        assert!(request.block_footer.contains_key("footer-filter"));
     }
 }
