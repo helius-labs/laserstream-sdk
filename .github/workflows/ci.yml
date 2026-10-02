@@ -95,6 +95,7 @@ jobs:
       - run: npm run test:unary
       - run: npm run test:cuckoo
       - run: npm run test:v1-config
+      - run: npm run test:update-parent
 
   build:
     strategy:
