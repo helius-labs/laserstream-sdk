@@ -230,7 +230,8 @@ impl codec::Codec for SubscribeRawCodec {
 
 /// Peek at raw protobuf bytes to determine the SubscribeUpdate oneof field number.
 /// Returns the field number (2=account, 3=slot, 4=transaction, 5=block, 6=ping,
-/// 7=block_meta, 8=entry, 9=pong, 10=transaction_status, 12=block_footer).
+/// 7=block_meta, 8=entry, 9=pong, 10=transaction_status, 12=block_footer,
+/// 13=entry_update_parent).
 ///
 /// NOTE: This assumes all field tags are single-byte (field numbers 1-15, which encode
 /// as one byte in protobuf wire format). This is correct for the current SubscribeUpdate
@@ -245,7 +246,7 @@ fn peek_update_type(data: &[u8]) -> Option<u8> {
         let wire_type = tag & 0x07;
 
         // Single-byte oneof field tags we care about.
-        if matches!(field_number, 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 12) {
+        if matches!(field_number, 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 12 | 13) {
             return Some(field_number);
         }
 
@@ -665,7 +666,8 @@ impl StreamInner {
                                     }
                                 }
                                 // All other messages (account=2, transaction=4, block=5, block_meta=7,
-                                // entry=8, transaction_status=10): forward raw bytes directly.
+                                // entry=8, transaction_status=10, entry_update_parent=13): forward
+                                // raw bytes directly.
                                 // No prost decode or re-encode needed - just one memcpy.
                                 _ => {
                                     let bytes_wrapper = crate::SubscribeUpdateBytes(raw_bytes);

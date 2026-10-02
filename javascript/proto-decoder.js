@@ -70,7 +70,7 @@ function processYellowstoneUpdate(obj) {
   // Initialize all update type fields to undefined (matching Yellowstone)
   const updateFields = [
     'account', 'slot', 'transaction', 'transactionStatus', 
-    'block', 'blockMeta', 'entry', 'ping', 'pong', 'blockFooter'
+    'block', 'blockMeta', 'entry', 'ping', 'pong', 'blockFooter', 'entryUpdateParent'
   ];
   
   updateFields.forEach(field => {
@@ -121,6 +121,7 @@ function processYellowstoneUpdate(obj) {
     ping: obj.ping,
     pong: obj.pong,
     blockFooter: obj.blockFooter,
+    entryUpdateParent: obj.entryUpdateParent,
     createdAt: obj.createdAt,
   };
   

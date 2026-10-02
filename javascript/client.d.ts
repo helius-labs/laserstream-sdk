@@ -202,6 +202,18 @@ export interface SubscribeUpdateBlockFooter {
   blockUserAgent: Uint8Array | Buffer;
 }
 
+/**
+ * Reports a bank cleared by an Alpenglow UpdateParent marker. Updates already
+ * delivered for `clearedBankId` describe a bank that no longer exists: replay
+ * restarts from the marker's FEC set and the new bank carries a different id.
+ */
+export interface SubscribeUpdateEntryUpdateParent {
+  slot: string;
+  clearedBankId: string;
+  parentSlot: string;
+  parentBlockId: Uint8Array | Buffer;
+}
+
 // Augment the generated proto type so `tokenAccounts` is accepted on
 // transaction filters without forking the generated bindings. Removed once a
 // core-proto-js release ships field #30 natively.
@@ -219,10 +231,13 @@ declare module 'laserstream-core-proto-js/generated' {
     interface ISubscribeUpdate {
       /** Triton-compatible footer update (proto field #12). */
       blockFooter?: (SubscribeUpdateBlockFooter | null);
+      /** Alpenglow UpdateParent notice (proto field #13). */
+      entryUpdateParent?: (SubscribeUpdateEntryUpdateParent | null);
     }
 
     interface SubscribeUpdate {
       blockFooter?: (SubscribeUpdateBlockFooter | null);
+      entryUpdateParent?: (SubscribeUpdateEntryUpdateParent | null);
     }
 
     interface ISubscribeUpdateAccount { bankId?: (string | null); }
@@ -232,6 +247,18 @@ declare module 'laserstream-core-proto-js/generated' {
     interface ISubscribeUpdateBlock { bankId?: (string | null); }
     interface ISubscribeUpdateBlockMeta { bankId?: (string | null); }
     interface ISubscribeUpdateEntry { bankId?: (string | null); }
+    interface ISubscribeRequestFilterEntry {
+      /**
+       * Include {@link SubscribeUpdateEntryUpdateParent} updates (proto field #1).
+       * Omitted or false sends entries only.
+       */
+      includeUpdateParent?: (boolean | null);
+    }
+
+    interface SubscribeRequestFilterEntry {
+      includeUpdateParent?: (boolean | null);
+    }
+
     interface ISubscribeRequestFilterTransactions {
       /** Helius ATA expansion control (proto field #30). */
       tokenAccounts?: (TokenAccountsFilterMode | string | null);
