@@ -159,7 +159,10 @@ message SubscribeRequestFilterBlocks {
 
 message SubscribeRequestFilterBlocksMeta {}
 
-message SubscribeRequestFilterEntry {}
+message SubscribeRequestFilterEntry {
+  // Include SubscribeUpdateEntryUpdateParent updates. Omitted or false sends entries only.
+  optional bool include_update_parent = 1;
+}
 
 message SubscribeRequestFilterBlockFooter {}
 
@@ -185,6 +188,7 @@ message SubscribeUpdate {
     SubscribeUpdateBlockMeta block_meta = 7;
     SubscribeUpdateEntry entry = 8;
     SubscribeUpdateBlockFooter block_footer = 12;
+    SubscribeUpdateEntryUpdateParent entry_update_parent = 13;
   }
   google.protobuf.Timestamp created_at = 11;
 }
@@ -270,6 +274,17 @@ message SubscribeUpdateBlockMeta {
   uint64 executed_transaction_count = 8;
   uint64 entries_count = 9;
   uint64 bank_id = 10;
+}
+
+// Reports a bank cleared by an Alpenglow UpdateParent marker. Messages already
+// delivered for cleared_bank_id describe a bank that no longer exists: replay
+// restarts from the marker's FEC set and the new bank carries a different id.
+// Field numbers match rpcpool/yellowstone-grpc.
+message SubscribeUpdateEntryUpdateParent {
+  uint64 slot = 1;
+  uint64 cleared_bank_id = 2;
+  uint64 parent_slot = 3;
+  bytes parent_block_id = 4;
 }
 
 message SubscribeUpdateBlockFooter {

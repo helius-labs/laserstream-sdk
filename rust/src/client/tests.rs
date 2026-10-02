@@ -12,6 +12,35 @@ use std::{
 const SLOT_TOO_OLD_MESSAGE: &str = "Requested slot 95 is older than the oldest available slot 100. Please request a more recent slot.";
 
 #[test]
+fn update_parent_proto_is_available() {
+    let filter = SubscribeRequestFilterEntry {
+        include_update_parent: Some(true),
+    };
+    assert_eq!(filter.include_update_parent, Some(true));
+
+    let parent_block_id = vec![0xab; 32];
+    let update = SubscribeUpdate {
+        update_oneof: Some(UpdateOneof::EntryUpdateParent(
+            SubscribeUpdateEntryUpdateParent {
+                slot: 42,
+                cleared_bank_id: 7,
+                parent_slot: 41,
+                parent_block_id: parent_block_id.clone(),
+            },
+        )),
+        ..Default::default()
+    };
+    let Some(UpdateOneof::EntryUpdateParent(parent)) = update.update_oneof else {
+        panic!("expected entry update parent");
+    };
+    assert_eq!(
+        (parent.slot, parent.cleared_bank_id, parent.parent_slot),
+        (42, 7, 41)
+    );
+    assert_eq!(parent.parent_block_id, parent_block_id);
+}
+
+#[test]
 fn default_config_has_no_terminal_errors() {
     let config = LaserstreamConfig::default();
     for value in 1..=16 {

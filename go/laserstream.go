@@ -842,6 +842,7 @@ type (
 	SubscribeUpdate_Block             = pb.SubscribeUpdate_Block
 	SubscribeUpdate_BlockMeta         = pb.SubscribeUpdate_BlockMeta
 	SubscribeUpdate_BlockFooter       = pb.SubscribeUpdate_BlockFooter
+	SubscribeUpdate_EntryUpdateParent = pb.SubscribeUpdate_EntryUpdateParent
 	SubscribeUpdate_Entry             = pb.SubscribeUpdate_Entry
 	SubscribeUpdate_Ping              = pb.SubscribeUpdate_Ping
 	SubscribeUpdate_Pong              = pb.SubscribeUpdate_Pong
@@ -856,6 +857,7 @@ type (
 	SubscribeUpdateBlock             = pb.SubscribeUpdateBlock
 	SubscribeUpdateBlockMeta         = pb.SubscribeUpdateBlockMeta
 	SubscribeUpdateBlockFooter       = pb.SubscribeUpdateBlockFooter
+	SubscribeUpdateEntryUpdateParent = pb.SubscribeUpdateEntryUpdateParent
 	SubscribeUpdateEntry             = pb.SubscribeUpdateEntry
 	SubscribeUpdatePing              = pb.SubscribeUpdatePing
 	SubscribeUpdatePong              = pb.SubscribeUpdatePong

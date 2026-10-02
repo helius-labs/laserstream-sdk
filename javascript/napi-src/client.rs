@@ -202,7 +202,8 @@ pub struct JsBlockMetaFilter {
 
 #[derive(Deserialize, Debug)]
 pub struct JsEntryFilter {
-    // Empty struct as per proto
+    #[serde(default, rename = "includeUpdateParent")]
+    pub include_update_parent: Option<bool>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -524,8 +525,13 @@ impl ClientInner {
         // Handle entry
         if let Some(entry) = js_request.entry {
             let mut entry_map = HashMap::new();
-            for (key, _filter) in entry {
-                entry_map.insert(key, SubscribeRequestFilterEntry::default());
+            for (key, filter) in entry {
+                entry_map.insert(
+                    key,
+                    SubscribeRequestFilterEntry {
+                        include_update_parent: filter.include_update_parent,
+                    },
+                );
             }
             request.entry = entry_map;
         }
