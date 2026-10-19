@@ -20,12 +20,6 @@ export { ChannelOptions } from '@grpc/grpc-js';
 
 // Re-export all proto types from laserstream-core-proto-js
 export {
-  // Preprocessed subscription types
-  SubscribePreprocessedRequest,
-  SubscribePreprocessedRequestFilterTransactions,
-  SubscribePreprocessedUpdate,
-  SubscribePreprocessedTransaction,
-  SubscribePreprocessedTransactionInfo,
   // Regular subscription types
   SubscribeUpdateTransactionInfo,
   SubscribeUpdatePing,
@@ -90,14 +84,6 @@ export declare function subscribe(
   onError?: (error: Error) => void | Promise<void>
 ): Promise<StreamHandle>;
 
-// Preprocessed subscribe function
-export declare function subscribePreprocessed(
-  config: LaserstreamConfig,
-  request: SubscribePreprocessedRequest,
-  onData: (update: SubscribePreprocessedUpdate) => void | Promise<void>,
-  onError?: (error: Error) => void | Promise<void>
-): Promise<StreamHandle>;
-
 // ============================================================================
 // Unary RPCs
 // ============================================================================
@@ -154,7 +140,6 @@ export declare class LaserstreamClient {
 
 export declare function initProtobuf(): Promise<void>;
 export declare function decodeSubscribeUpdate(bytes: Uint8Array): SubscribeUpdate;
-export declare function decodeSubscribePreprocessedUpdate(bytes: Uint8Array): SubscribePreprocessedUpdate;
 export declare function shutdownAllStreams(): void;
 export declare function getActiveStreamCount(): number;
 

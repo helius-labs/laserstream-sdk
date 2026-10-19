@@ -26,10 +26,7 @@ use std::collections::HashMap;
 use parking_lot::Mutex;
 use std::sync::LazyLock;
 use laserstream_core_proto;
-use laserstream_core_proto::geyser::{
-    SubscribeUpdate as YellowstoneSubscribeUpdate,
-    SubscribePreprocessedUpdate as YellowstoneSubscribePreprocessedUpdate,
-};
+use laserstream_core_proto::geyser::SubscribeUpdate as YellowstoneSubscribeUpdate;
 use prost::Message;
 
 // Re-export the generated protobuf types
@@ -54,17 +51,6 @@ impl ToNapiValue for SubscribeUpdateBytes {
     }
 }
 
-// Wrapper for preprocessed update bytes
-pub struct SubscribePreprocessedUpdateBytes(pub Vec<u8>);
-
-impl ToNapiValue for SubscribePreprocessedUpdateBytes {
-    unsafe fn to_napi_value(env: napi::sys::napi_env, val: Self) -> napi::Result<napi::sys::napi_value> {
-        // Create a Uint8Array from the protobuf bytes (zero-copy)
-        let env = unsafe { napi::Env::from_raw(env) };
-        let buffer = env.create_buffer_with_data(val.0)?;
-        unsafe { Ok(buffer.into_unknown().raw()) }
-    }
-}
 
 // Internal function to register a stream in the global registry
 pub fn register_stream(id: String, stream: Arc<stream::StreamInner>) {
@@ -123,15 +109,6 @@ pub fn subscribe_update_to_bytes(update: YellowstoneSubscribeUpdate) -> Result<V
     Ok(buf)
 }
 
-// Convert SubscribePreprocessedUpdate to bytes for zero-copy transfer to JS
-pub fn subscribe_preprocessed_update_to_bytes(update: YellowstoneSubscribePreprocessedUpdate) -> Result<Vec<u8>> {
-    // Serialize the protobuf message back to bytes
-    let mut buf = Vec::new();
-    update.encode(&mut buf).map_err(|e| {
-        Error::new(Status::GenericFailure, format!("Failed to encode protobuf: {}", e))
-    })?;
-    Ok(buf)
-}
 
 // Commitment levels enum (keeping for API compatibility)
 #[napi]
@@ -203,32 +180,6 @@ impl LaserstreamClient {
         })
     }
 
-    #[napi(
-        ts_args_type = "request: any, callback: (error: Error | null, updateBytes: Uint8Array) => void",
-        ts_return_type = "Promise<StreamHandle>"
-    )]
-    pub fn subscribe_preprocessed(&self, env: Env, request: Object, callback: JsFunction) -> Result<JsObject> {
-        // Setup global lifecycle management on first use
-        setup_global_lifecycle_management(&env)?;
-
-        let subscribe_request = self.inner.js_to_subscribe_preprocessed_request(&env, request)?;
-
-        // Threadsafe function that forwards protobuf bytes to JS
-        let ts_callback: ThreadsafeFunction<SubscribePreprocessedUpdateBytes, ErrorStrategy::CalleeHandled> =
-            callback.create_threadsafe_function(1000, |ctx| {
-                let bytes_wrapper: SubscribePreprocessedUpdateBytes = ctx.value;
-                let js_uint8array = unsafe { SubscribePreprocessedUpdateBytes::to_napi_value(ctx.env.raw(), bytes_wrapper)? };
-                Ok(vec![unsafe { napi::JsUnknown::from_raw(ctx.env.raw(), js_uint8array)? }])
-            })?;
-
-        let client_inner = self.inner.clone();
-
-        env.spawn_future(async move {
-            client_inner
-                .subscribe_preprocessed_internal_bytes(subscribe_request, ts_callback)
-                .await
-        })
-    }
 }
 
 // Stream handle
