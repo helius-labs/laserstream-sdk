@@ -182,361 +182,6 @@ func (TokenAccountExpansionControlFlag) EnumDescriptor() ([]byte, []int) {
 	return file_geyser_proto_rawDescGZIP(), []int{2}
 }
 
-// Subscriptions to Preprocessed transactions
-type SubscribePreprocessedRequest struct {
-	state         protoimpl.MessageState                                     `protogen:"open.v1"`
-	Transactions  map[string]*SubscribePreprocessedRequestFilterTransactions `protobuf:"bytes,1,rep,name=transactions,proto3" json:"transactions,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Ping          *SubscribeRequestPing                                      `protobuf:"bytes,2,opt,name=ping,proto3,oneof" json:"ping,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SubscribePreprocessedRequest) Reset() {
-	*x = SubscribePreprocessedRequest{}
-	mi := &file_geyser_proto_msgTypes[0]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SubscribePreprocessedRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SubscribePreprocessedRequest) ProtoMessage() {}
-
-func (x *SubscribePreprocessedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[0]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SubscribePreprocessedRequest.ProtoReflect.Descriptor instead.
-func (*SubscribePreprocessedRequest) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *SubscribePreprocessedRequest) GetTransactions() map[string]*SubscribePreprocessedRequestFilterTransactions {
-	if x != nil {
-		return x.Transactions
-	}
-	return nil
-}
-
-func (x *SubscribePreprocessedRequest) GetPing() *SubscribeRequestPing {
-	if x != nil {
-		return x.Ping
-	}
-	return nil
-}
-
-type SubscribePreprocessedRequestFilterTransactions struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Vote            *bool                  `protobuf:"varint,1,opt,name=vote,proto3,oneof" json:"vote,omitempty"`
-	Signature       *string                `protobuf:"bytes,2,opt,name=signature,proto3,oneof" json:"signature,omitempty"`
-	AccountInclude  []string               `protobuf:"bytes,3,rep,name=account_include,json=accountInclude,proto3" json:"account_include,omitempty"`
-	AccountExclude  []string               `protobuf:"bytes,4,rep,name=account_exclude,json=accountExclude,proto3" json:"account_exclude,omitempty"`
-	AccountRequired []string               `protobuf:"bytes,5,rep,name=account_required,json=accountRequired,proto3" json:"account_required,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
-}
-
-func (x *SubscribePreprocessedRequestFilterTransactions) Reset() {
-	*x = SubscribePreprocessedRequestFilterTransactions{}
-	mi := &file_geyser_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SubscribePreprocessedRequestFilterTransactions) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SubscribePreprocessedRequestFilterTransactions) ProtoMessage() {}
-
-func (x *SubscribePreprocessedRequestFilterTransactions) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SubscribePreprocessedRequestFilterTransactions.ProtoReflect.Descriptor instead.
-func (*SubscribePreprocessedRequestFilterTransactions) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *SubscribePreprocessedRequestFilterTransactions) GetVote() bool {
-	if x != nil && x.Vote != nil {
-		return *x.Vote
-	}
-	return false
-}
-
-func (x *SubscribePreprocessedRequestFilterTransactions) GetSignature() string {
-	if x != nil && x.Signature != nil {
-		return *x.Signature
-	}
-	return ""
-}
-
-func (x *SubscribePreprocessedRequestFilterTransactions) GetAccountInclude() []string {
-	if x != nil {
-		return x.AccountInclude
-	}
-	return nil
-}
-
-func (x *SubscribePreprocessedRequestFilterTransactions) GetAccountExclude() []string {
-	if x != nil {
-		return x.AccountExclude
-	}
-	return nil
-}
-
-func (x *SubscribePreprocessedRequestFilterTransactions) GetAccountRequired() []string {
-	if x != nil {
-		return x.AccountRequired
-	}
-	return nil
-}
-
-type SubscribePreprocessedUpdate struct {
-	state   protoimpl.MessageState `protogen:"open.v1"`
-	Filters []string               `protobuf:"bytes,1,rep,name=filters,proto3" json:"filters,omitempty"`
-	// Types that are valid to be assigned to UpdateOneof:
-	//
-	//	*SubscribePreprocessedUpdate_Transaction
-	//	*SubscribePreprocessedUpdate_Ping
-	//	*SubscribePreprocessedUpdate_Pong
-	UpdateOneof   isSubscribePreprocessedUpdate_UpdateOneof `protobuf_oneof:"update_oneof"`
-	CreatedAt     *timestamppb.Timestamp                    `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SubscribePreprocessedUpdate) Reset() {
-	*x = SubscribePreprocessedUpdate{}
-	mi := &file_geyser_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SubscribePreprocessedUpdate) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SubscribePreprocessedUpdate) ProtoMessage() {}
-
-func (x *SubscribePreprocessedUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SubscribePreprocessedUpdate.ProtoReflect.Descriptor instead.
-func (*SubscribePreprocessedUpdate) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *SubscribePreprocessedUpdate) GetFilters() []string {
-	if x != nil {
-		return x.Filters
-	}
-	return nil
-}
-
-func (x *SubscribePreprocessedUpdate) GetUpdateOneof() isSubscribePreprocessedUpdate_UpdateOneof {
-	if x != nil {
-		return x.UpdateOneof
-	}
-	return nil
-}
-
-func (x *SubscribePreprocessedUpdate) GetTransaction() *SubscribePreprocessedTransaction {
-	if x != nil {
-		if x, ok := x.UpdateOneof.(*SubscribePreprocessedUpdate_Transaction); ok {
-			return x.Transaction
-		}
-	}
-	return nil
-}
-
-func (x *SubscribePreprocessedUpdate) GetPing() *SubscribeUpdatePing {
-	if x != nil {
-		if x, ok := x.UpdateOneof.(*SubscribePreprocessedUpdate_Ping); ok {
-			return x.Ping
-		}
-	}
-	return nil
-}
-
-func (x *SubscribePreprocessedUpdate) GetPong() *SubscribeUpdatePong {
-	if x != nil {
-		if x, ok := x.UpdateOneof.(*SubscribePreprocessedUpdate_Pong); ok {
-			return x.Pong
-		}
-	}
-	return nil
-}
-
-func (x *SubscribePreprocessedUpdate) GetCreatedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.CreatedAt
-	}
-	return nil
-}
-
-type isSubscribePreprocessedUpdate_UpdateOneof interface {
-	isSubscribePreprocessedUpdate_UpdateOneof()
-}
-
-type SubscribePreprocessedUpdate_Transaction struct {
-	Transaction *SubscribePreprocessedTransaction `protobuf:"bytes,2,opt,name=transaction,proto3,oneof"`
-}
-
-type SubscribePreprocessedUpdate_Ping struct {
-	Ping *SubscribeUpdatePing `protobuf:"bytes,3,opt,name=ping,proto3,oneof"`
-}
-
-type SubscribePreprocessedUpdate_Pong struct {
-	Pong *SubscribeUpdatePong `protobuf:"bytes,4,opt,name=pong,proto3,oneof"`
-}
-
-func (*SubscribePreprocessedUpdate_Transaction) isSubscribePreprocessedUpdate_UpdateOneof() {}
-
-func (*SubscribePreprocessedUpdate_Ping) isSubscribePreprocessedUpdate_UpdateOneof() {}
-
-func (*SubscribePreprocessedUpdate_Pong) isSubscribePreprocessedUpdate_UpdateOneof() {}
-
-type SubscribePreprocessedTransaction struct {
-	state         protoimpl.MessageState                `protogen:"open.v1"`
-	Transaction   *SubscribePreprocessedTransactionInfo `protobuf:"bytes,1,opt,name=transaction,proto3" json:"transaction,omitempty"`
-	Slot          uint64                                `protobuf:"varint,2,opt,name=slot,proto3" json:"slot,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SubscribePreprocessedTransaction) Reset() {
-	*x = SubscribePreprocessedTransaction{}
-	mi := &file_geyser_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SubscribePreprocessedTransaction) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SubscribePreprocessedTransaction) ProtoMessage() {}
-
-func (x *SubscribePreprocessedTransaction) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SubscribePreprocessedTransaction.ProtoReflect.Descriptor instead.
-func (*SubscribePreprocessedTransaction) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *SubscribePreprocessedTransaction) GetTransaction() *SubscribePreprocessedTransactionInfo {
-	if x != nil {
-		return x.Transaction
-	}
-	return nil
-}
-
-func (x *SubscribePreprocessedTransaction) GetSlot() uint64 {
-	if x != nil {
-		return x.Slot
-	}
-	return 0
-}
-
-type SubscribePreprocessedTransactionInfo struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Signature     []byte                 `protobuf:"bytes,1,opt,name=signature,proto3" json:"signature,omitempty"`
-	IsVote        bool                   `protobuf:"varint,2,opt,name=is_vote,json=isVote,proto3" json:"is_vote,omitempty"`
-	Transaction   *Transaction           `protobuf:"bytes,3,opt,name=transaction,proto3" json:"transaction,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SubscribePreprocessedTransactionInfo) Reset() {
-	*x = SubscribePreprocessedTransactionInfo{}
-	mi := &file_geyser_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SubscribePreprocessedTransactionInfo) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SubscribePreprocessedTransactionInfo) ProtoMessage() {}
-
-func (x *SubscribePreprocessedTransactionInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[4]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SubscribePreprocessedTransactionInfo.ProtoReflect.Descriptor instead.
-func (*SubscribePreprocessedTransactionInfo) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *SubscribePreprocessedTransactionInfo) GetSignature() []byte {
-	if x != nil {
-		return x.Signature
-	}
-	return nil
-}
-
-func (x *SubscribePreprocessedTransactionInfo) GetIsVote() bool {
-	if x != nil {
-		return x.IsVote
-	}
-	return false
-}
-
-func (x *SubscribePreprocessedTransactionInfo) GetTransaction() *Transaction {
-	if x != nil {
-		return x.Transaction
-	}
-	return nil
-}
-
 type SubscribeRequest struct {
 	state              protoimpl.MessageState                         `protogen:"open.v1"`
 	Accounts           map[string]*SubscribeRequestFilterAccounts     `protobuf:"bytes,1,rep,name=accounts,proto3" json:"accounts,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
@@ -557,7 +202,7 @@ type SubscribeRequest struct {
 
 func (x *SubscribeRequest) Reset() {
 	*x = SubscribeRequest{}
-	mi := &file_geyser_proto_msgTypes[5]
+	mi := &file_geyser_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -569,7 +214,7 @@ func (x *SubscribeRequest) String() string {
 func (*SubscribeRequest) ProtoMessage() {}
 
 func (x *SubscribeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[5]
+	mi := &file_geyser_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -582,7 +227,7 @@ func (x *SubscribeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeRequest.ProtoReflect.Descriptor instead.
 func (*SubscribeRequest) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{5}
+	return file_geyser_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *SubscribeRequest) GetAccounts() map[string]*SubscribeRequestFilterAccounts {
@@ -681,7 +326,7 @@ type SubscribeRequestFilterAccounts struct {
 
 func (x *SubscribeRequestFilterAccounts) Reset() {
 	*x = SubscribeRequestFilterAccounts{}
-	mi := &file_geyser_proto_msgTypes[6]
+	mi := &file_geyser_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -693,7 +338,7 @@ func (x *SubscribeRequestFilterAccounts) String() string {
 func (*SubscribeRequestFilterAccounts) ProtoMessage() {}
 
 func (x *SubscribeRequestFilterAccounts) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[6]
+	mi := &file_geyser_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -706,7 +351,7 @@ func (x *SubscribeRequestFilterAccounts) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeRequestFilterAccounts.ProtoReflect.Descriptor instead.
 func (*SubscribeRequestFilterAccounts) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{6}
+	return file_geyser_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *SubscribeRequestFilterAccounts) GetAccount() []string {
@@ -752,7 +397,7 @@ type SubscribeRequestFilterAccountsFilter struct {
 
 func (x *SubscribeRequestFilterAccountsFilter) Reset() {
 	*x = SubscribeRequestFilterAccountsFilter{}
-	mi := &file_geyser_proto_msgTypes[7]
+	mi := &file_geyser_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -764,7 +409,7 @@ func (x *SubscribeRequestFilterAccountsFilter) String() string {
 func (*SubscribeRequestFilterAccountsFilter) ProtoMessage() {}
 
 func (x *SubscribeRequestFilterAccountsFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[7]
+	mi := &file_geyser_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -777,7 +422,7 @@ func (x *SubscribeRequestFilterAccountsFilter) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use SubscribeRequestFilterAccountsFilter.ProtoReflect.Descriptor instead.
 func (*SubscribeRequestFilterAccountsFilter) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{7}
+	return file_geyser_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *SubscribeRequestFilterAccountsFilter) GetFilter() isSubscribeRequestFilterAccountsFilter_Filter {
@@ -869,7 +514,7 @@ type SubscribeRequestFilterAccountsFilterMemcmp struct {
 
 func (x *SubscribeRequestFilterAccountsFilterMemcmp) Reset() {
 	*x = SubscribeRequestFilterAccountsFilterMemcmp{}
-	mi := &file_geyser_proto_msgTypes[8]
+	mi := &file_geyser_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -881,7 +526,7 @@ func (x *SubscribeRequestFilterAccountsFilterMemcmp) String() string {
 func (*SubscribeRequestFilterAccountsFilterMemcmp) ProtoMessage() {}
 
 func (x *SubscribeRequestFilterAccountsFilterMemcmp) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[8]
+	mi := &file_geyser_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -894,7 +539,7 @@ func (x *SubscribeRequestFilterAccountsFilterMemcmp) ProtoReflect() protoreflect
 
 // Deprecated: Use SubscribeRequestFilterAccountsFilterMemcmp.ProtoReflect.Descriptor instead.
 func (*SubscribeRequestFilterAccountsFilterMemcmp) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{8}
+	return file_geyser_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *SubscribeRequestFilterAccountsFilterMemcmp) GetOffset() uint64 {
@@ -978,7 +623,7 @@ type SubscribeRequestFilterAccountsFilterLamports struct {
 
 func (x *SubscribeRequestFilterAccountsFilterLamports) Reset() {
 	*x = SubscribeRequestFilterAccountsFilterLamports{}
-	mi := &file_geyser_proto_msgTypes[9]
+	mi := &file_geyser_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -990,7 +635,7 @@ func (x *SubscribeRequestFilterAccountsFilterLamports) String() string {
 func (*SubscribeRequestFilterAccountsFilterLamports) ProtoMessage() {}
 
 func (x *SubscribeRequestFilterAccountsFilterLamports) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[9]
+	mi := &file_geyser_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1003,7 +648,7 @@ func (x *SubscribeRequestFilterAccountsFilterLamports) ProtoReflect() protorefle
 
 // Deprecated: Use SubscribeRequestFilterAccountsFilterLamports.ProtoReflect.Descriptor instead.
 func (*SubscribeRequestFilterAccountsFilterLamports) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{9}
+	return file_geyser_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *SubscribeRequestFilterAccountsFilterLamports) GetCmp() isSubscribeRequestFilterAccountsFilterLamports_Cmp {
@@ -1091,7 +736,7 @@ type SubscribeRequestFilterSlots struct {
 
 func (x *SubscribeRequestFilterSlots) Reset() {
 	*x = SubscribeRequestFilterSlots{}
-	mi := &file_geyser_proto_msgTypes[10]
+	mi := &file_geyser_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1103,7 +748,7 @@ func (x *SubscribeRequestFilterSlots) String() string {
 func (*SubscribeRequestFilterSlots) ProtoMessage() {}
 
 func (x *SubscribeRequestFilterSlots) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[10]
+	mi := &file_geyser_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1116,7 +761,7 @@ func (x *SubscribeRequestFilterSlots) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeRequestFilterSlots.ProtoReflect.Descriptor instead.
 func (*SubscribeRequestFilterSlots) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{10}
+	return file_geyser_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SubscribeRequestFilterSlots) GetFilterByCommitment() bool {
@@ -1154,7 +799,7 @@ type SubscribeRequestFilterTransactions struct {
 
 func (x *SubscribeRequestFilterTransactions) Reset() {
 	*x = SubscribeRequestFilterTransactions{}
-	mi := &file_geyser_proto_msgTypes[11]
+	mi := &file_geyser_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1166,7 +811,7 @@ func (x *SubscribeRequestFilterTransactions) String() string {
 func (*SubscribeRequestFilterTransactions) ProtoMessage() {}
 
 func (x *SubscribeRequestFilterTransactions) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[11]
+	mi := &file_geyser_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1179,7 +824,7 @@ func (x *SubscribeRequestFilterTransactions) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use SubscribeRequestFilterTransactions.ProtoReflect.Descriptor instead.
 func (*SubscribeRequestFilterTransactions) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{11}
+	return file_geyser_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *SubscribeRequestFilterTransactions) GetVote() bool {
@@ -1250,7 +895,7 @@ type SubscribeRequestFilterBlocks struct {
 
 func (x *SubscribeRequestFilterBlocks) Reset() {
 	*x = SubscribeRequestFilterBlocks{}
-	mi := &file_geyser_proto_msgTypes[12]
+	mi := &file_geyser_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1262,7 +907,7 @@ func (x *SubscribeRequestFilterBlocks) String() string {
 func (*SubscribeRequestFilterBlocks) ProtoMessage() {}
 
 func (x *SubscribeRequestFilterBlocks) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[12]
+	mi := &file_geyser_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1275,7 +920,7 @@ func (x *SubscribeRequestFilterBlocks) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeRequestFilterBlocks.ProtoReflect.Descriptor instead.
 func (*SubscribeRequestFilterBlocks) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{12}
+	return file_geyser_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SubscribeRequestFilterBlocks) GetAccountInclude() []string {
@@ -1314,7 +959,7 @@ type SubscribeRequestFilterBlocksMeta struct {
 
 func (x *SubscribeRequestFilterBlocksMeta) Reset() {
 	*x = SubscribeRequestFilterBlocksMeta{}
-	mi := &file_geyser_proto_msgTypes[13]
+	mi := &file_geyser_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1326,7 +971,7 @@ func (x *SubscribeRequestFilterBlocksMeta) String() string {
 func (*SubscribeRequestFilterBlocksMeta) ProtoMessage() {}
 
 func (x *SubscribeRequestFilterBlocksMeta) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[13]
+	mi := &file_geyser_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1339,7 +984,7 @@ func (x *SubscribeRequestFilterBlocksMeta) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeRequestFilterBlocksMeta.ProtoReflect.Descriptor instead.
 func (*SubscribeRequestFilterBlocksMeta) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{13}
+	return file_geyser_proto_rawDescGZIP(), []int{8}
 }
 
 type SubscribeRequestFilterEntry struct {
@@ -1352,7 +997,7 @@ type SubscribeRequestFilterEntry struct {
 
 func (x *SubscribeRequestFilterEntry) Reset() {
 	*x = SubscribeRequestFilterEntry{}
-	mi := &file_geyser_proto_msgTypes[14]
+	mi := &file_geyser_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1364,7 +1009,7 @@ func (x *SubscribeRequestFilterEntry) String() string {
 func (*SubscribeRequestFilterEntry) ProtoMessage() {}
 
 func (x *SubscribeRequestFilterEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[14]
+	mi := &file_geyser_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1377,7 +1022,7 @@ func (x *SubscribeRequestFilterEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeRequestFilterEntry.ProtoReflect.Descriptor instead.
 func (*SubscribeRequestFilterEntry) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{14}
+	return file_geyser_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *SubscribeRequestFilterEntry) GetIncludeUpdateParent() bool {
@@ -1395,7 +1040,7 @@ type SubscribeRequestFilterBlockFooter struct {
 
 func (x *SubscribeRequestFilterBlockFooter) Reset() {
 	*x = SubscribeRequestFilterBlockFooter{}
-	mi := &file_geyser_proto_msgTypes[15]
+	mi := &file_geyser_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1407,7 +1052,7 @@ func (x *SubscribeRequestFilterBlockFooter) String() string {
 func (*SubscribeRequestFilterBlockFooter) ProtoMessage() {}
 
 func (x *SubscribeRequestFilterBlockFooter) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[15]
+	mi := &file_geyser_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1420,7 +1065,7 @@ func (x *SubscribeRequestFilterBlockFooter) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use SubscribeRequestFilterBlockFooter.ProtoReflect.Descriptor instead.
 func (*SubscribeRequestFilterBlockFooter) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{15}
+	return file_geyser_proto_rawDescGZIP(), []int{10}
 }
 
 type SubscribeRequestAccountsDataSlice struct {
@@ -1433,7 +1078,7 @@ type SubscribeRequestAccountsDataSlice struct {
 
 func (x *SubscribeRequestAccountsDataSlice) Reset() {
 	*x = SubscribeRequestAccountsDataSlice{}
-	mi := &file_geyser_proto_msgTypes[16]
+	mi := &file_geyser_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1445,7 +1090,7 @@ func (x *SubscribeRequestAccountsDataSlice) String() string {
 func (*SubscribeRequestAccountsDataSlice) ProtoMessage() {}
 
 func (x *SubscribeRequestAccountsDataSlice) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[16]
+	mi := &file_geyser_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1458,7 +1103,7 @@ func (x *SubscribeRequestAccountsDataSlice) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use SubscribeRequestAccountsDataSlice.ProtoReflect.Descriptor instead.
 func (*SubscribeRequestAccountsDataSlice) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{16}
+	return file_geyser_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *SubscribeRequestAccountsDataSlice) GetOffset() uint64 {
@@ -1484,7 +1129,7 @@ type SubscribeRequestPing struct {
 
 func (x *SubscribeRequestPing) Reset() {
 	*x = SubscribeRequestPing{}
-	mi := &file_geyser_proto_msgTypes[17]
+	mi := &file_geyser_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1496,7 +1141,7 @@ func (x *SubscribeRequestPing) String() string {
 func (*SubscribeRequestPing) ProtoMessage() {}
 
 func (x *SubscribeRequestPing) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[17]
+	mi := &file_geyser_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1509,7 +1154,7 @@ func (x *SubscribeRequestPing) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeRequestPing.ProtoReflect.Descriptor instead.
 func (*SubscribeRequestPing) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{17}
+	return file_geyser_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *SubscribeRequestPing) GetId() int32 {
@@ -1543,7 +1188,7 @@ type SubscribeUpdate struct {
 
 func (x *SubscribeUpdate) Reset() {
 	*x = SubscribeUpdate{}
-	mi := &file_geyser_proto_msgTypes[18]
+	mi := &file_geyser_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1555,7 +1200,7 @@ func (x *SubscribeUpdate) String() string {
 func (*SubscribeUpdate) ProtoMessage() {}
 
 func (x *SubscribeUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[18]
+	mi := &file_geyser_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1568,7 +1213,7 @@ func (x *SubscribeUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeUpdate.ProtoReflect.Descriptor instead.
 func (*SubscribeUpdate) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{18}
+	return file_geyser_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *SubscribeUpdate) GetFilters() []string {
@@ -1770,7 +1415,7 @@ type SubscribeUpdateBatch struct {
 
 func (x *SubscribeUpdateBatch) Reset() {
 	*x = SubscribeUpdateBatch{}
-	mi := &file_geyser_proto_msgTypes[19]
+	mi := &file_geyser_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1782,7 +1427,7 @@ func (x *SubscribeUpdateBatch) String() string {
 func (*SubscribeUpdateBatch) ProtoMessage() {}
 
 func (x *SubscribeUpdateBatch) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[19]
+	mi := &file_geyser_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1795,7 +1440,7 @@ func (x *SubscribeUpdateBatch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeUpdateBatch.ProtoReflect.Descriptor instead.
 func (*SubscribeUpdateBatch) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{19}
+	return file_geyser_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *SubscribeUpdateBatch) GetUpdates() []*SubscribeUpdate {
@@ -1817,7 +1462,7 @@ type SubscribeUpdateAccount struct {
 
 func (x *SubscribeUpdateAccount) Reset() {
 	*x = SubscribeUpdateAccount{}
-	mi := &file_geyser_proto_msgTypes[20]
+	mi := &file_geyser_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1829,7 +1474,7 @@ func (x *SubscribeUpdateAccount) String() string {
 func (*SubscribeUpdateAccount) ProtoMessage() {}
 
 func (x *SubscribeUpdateAccount) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[20]
+	mi := &file_geyser_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1842,7 +1487,7 @@ func (x *SubscribeUpdateAccount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeUpdateAccount.ProtoReflect.Descriptor instead.
 func (*SubscribeUpdateAccount) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{20}
+	return file_geyser_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *SubscribeUpdateAccount) GetAccount() *SubscribeUpdateAccountInfo {
@@ -1889,7 +1534,7 @@ type SubscribeUpdateAccountInfo struct {
 
 func (x *SubscribeUpdateAccountInfo) Reset() {
 	*x = SubscribeUpdateAccountInfo{}
-	mi := &file_geyser_proto_msgTypes[21]
+	mi := &file_geyser_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1901,7 +1546,7 @@ func (x *SubscribeUpdateAccountInfo) String() string {
 func (*SubscribeUpdateAccountInfo) ProtoMessage() {}
 
 func (x *SubscribeUpdateAccountInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[21]
+	mi := &file_geyser_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1914,7 +1559,7 @@ func (x *SubscribeUpdateAccountInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeUpdateAccountInfo.ProtoReflect.Descriptor instead.
 func (*SubscribeUpdateAccountInfo) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{21}
+	return file_geyser_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *SubscribeUpdateAccountInfo) GetPubkey() []byte {
@@ -1986,7 +1631,7 @@ type SubscribeUpdateSlot struct {
 
 func (x *SubscribeUpdateSlot) Reset() {
 	*x = SubscribeUpdateSlot{}
-	mi := &file_geyser_proto_msgTypes[22]
+	mi := &file_geyser_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1998,7 +1643,7 @@ func (x *SubscribeUpdateSlot) String() string {
 func (*SubscribeUpdateSlot) ProtoMessage() {}
 
 func (x *SubscribeUpdateSlot) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[22]
+	mi := &file_geyser_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2011,7 +1656,7 @@ func (x *SubscribeUpdateSlot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeUpdateSlot.ProtoReflect.Descriptor instead.
 func (*SubscribeUpdateSlot) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{22}
+	return file_geyser_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *SubscribeUpdateSlot) GetSlot() uint64 {
@@ -2060,7 +1705,7 @@ type SubscribeUpdateTransaction struct {
 
 func (x *SubscribeUpdateTransaction) Reset() {
 	*x = SubscribeUpdateTransaction{}
-	mi := &file_geyser_proto_msgTypes[23]
+	mi := &file_geyser_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2072,7 +1717,7 @@ func (x *SubscribeUpdateTransaction) String() string {
 func (*SubscribeUpdateTransaction) ProtoMessage() {}
 
 func (x *SubscribeUpdateTransaction) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[23]
+	mi := &file_geyser_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2085,7 +1730,7 @@ func (x *SubscribeUpdateTransaction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeUpdateTransaction.ProtoReflect.Descriptor instead.
 func (*SubscribeUpdateTransaction) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{23}
+	return file_geyser_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *SubscribeUpdateTransaction) GetTransaction() *SubscribeUpdateTransactionInfo {
@@ -2122,7 +1767,7 @@ type SubscribeUpdateTransactionInfo struct {
 
 func (x *SubscribeUpdateTransactionInfo) Reset() {
 	*x = SubscribeUpdateTransactionInfo{}
-	mi := &file_geyser_proto_msgTypes[24]
+	mi := &file_geyser_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2134,7 +1779,7 @@ func (x *SubscribeUpdateTransactionInfo) String() string {
 func (*SubscribeUpdateTransactionInfo) ProtoMessage() {}
 
 func (x *SubscribeUpdateTransactionInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[24]
+	mi := &file_geyser_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2147,7 +1792,7 @@ func (x *SubscribeUpdateTransactionInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeUpdateTransactionInfo.ProtoReflect.Descriptor instead.
 func (*SubscribeUpdateTransactionInfo) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{24}
+	return file_geyser_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *SubscribeUpdateTransactionInfo) GetSignature() []byte {
@@ -2199,7 +1844,7 @@ type SubscribeUpdateTransactionStatus struct {
 
 func (x *SubscribeUpdateTransactionStatus) Reset() {
 	*x = SubscribeUpdateTransactionStatus{}
-	mi := &file_geyser_proto_msgTypes[25]
+	mi := &file_geyser_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2211,7 +1856,7 @@ func (x *SubscribeUpdateTransactionStatus) String() string {
 func (*SubscribeUpdateTransactionStatus) ProtoMessage() {}
 
 func (x *SubscribeUpdateTransactionStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[25]
+	mi := &file_geyser_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2224,7 +1869,7 @@ func (x *SubscribeUpdateTransactionStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeUpdateTransactionStatus.ProtoReflect.Descriptor instead.
 func (*SubscribeUpdateTransactionStatus) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{25}
+	return file_geyser_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *SubscribeUpdateTransactionStatus) GetSlot() uint64 {
@@ -2291,7 +1936,7 @@ type SubscribeUpdateBlock struct {
 
 func (x *SubscribeUpdateBlock) Reset() {
 	*x = SubscribeUpdateBlock{}
-	mi := &file_geyser_proto_msgTypes[26]
+	mi := &file_geyser_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2303,7 +1948,7 @@ func (x *SubscribeUpdateBlock) String() string {
 func (*SubscribeUpdateBlock) ProtoMessage() {}
 
 func (x *SubscribeUpdateBlock) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[26]
+	mi := &file_geyser_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2316,7 +1961,7 @@ func (x *SubscribeUpdateBlock) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeUpdateBlock.ProtoReflect.Descriptor instead.
 func (*SubscribeUpdateBlock) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{26}
+	return file_geyser_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *SubscribeUpdateBlock) GetSlot() uint64 {
@@ -2435,7 +2080,7 @@ type SubscribeUpdateBlockMeta struct {
 
 func (x *SubscribeUpdateBlockMeta) Reset() {
 	*x = SubscribeUpdateBlockMeta{}
-	mi := &file_geyser_proto_msgTypes[27]
+	mi := &file_geyser_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2447,7 +2092,7 @@ func (x *SubscribeUpdateBlockMeta) String() string {
 func (*SubscribeUpdateBlockMeta) ProtoMessage() {}
 
 func (x *SubscribeUpdateBlockMeta) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[27]
+	mi := &file_geyser_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2460,7 +2105,7 @@ func (x *SubscribeUpdateBlockMeta) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeUpdateBlockMeta.ProtoReflect.Descriptor instead.
 func (*SubscribeUpdateBlockMeta) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{27}
+	return file_geyser_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *SubscribeUpdateBlockMeta) GetSlot() uint64 {
@@ -2549,7 +2194,7 @@ type SubscribeUpdateEntryUpdateParent struct {
 
 func (x *SubscribeUpdateEntryUpdateParent) Reset() {
 	*x = SubscribeUpdateEntryUpdateParent{}
-	mi := &file_geyser_proto_msgTypes[28]
+	mi := &file_geyser_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2561,7 +2206,7 @@ func (x *SubscribeUpdateEntryUpdateParent) String() string {
 func (*SubscribeUpdateEntryUpdateParent) ProtoMessage() {}
 
 func (x *SubscribeUpdateEntryUpdateParent) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[28]
+	mi := &file_geyser_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2574,7 +2219,7 @@ func (x *SubscribeUpdateEntryUpdateParent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeUpdateEntryUpdateParent.ProtoReflect.Descriptor instead.
 func (*SubscribeUpdateEntryUpdateParent) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{28}
+	return file_geyser_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *SubscribeUpdateEntryUpdateParent) GetSlot() uint64 {
@@ -2618,7 +2263,7 @@ type SubscribeUpdateBlockFooter struct {
 
 func (x *SubscribeUpdateBlockFooter) Reset() {
 	*x = SubscribeUpdateBlockFooter{}
-	mi := &file_geyser_proto_msgTypes[29]
+	mi := &file_geyser_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2630,7 +2275,7 @@ func (x *SubscribeUpdateBlockFooter) String() string {
 func (*SubscribeUpdateBlockFooter) ProtoMessage() {}
 
 func (x *SubscribeUpdateBlockFooter) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[29]
+	mi := &file_geyser_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2643,7 +2288,7 @@ func (x *SubscribeUpdateBlockFooter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeUpdateBlockFooter.ProtoReflect.Descriptor instead.
 func (*SubscribeUpdateBlockFooter) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{29}
+	return file_geyser_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *SubscribeUpdateBlockFooter) GetSlot() uint64 {
@@ -2696,7 +2341,7 @@ type SubscribeUpdateEntry struct {
 
 func (x *SubscribeUpdateEntry) Reset() {
 	*x = SubscribeUpdateEntry{}
-	mi := &file_geyser_proto_msgTypes[30]
+	mi := &file_geyser_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2708,7 +2353,7 @@ func (x *SubscribeUpdateEntry) String() string {
 func (*SubscribeUpdateEntry) ProtoMessage() {}
 
 func (x *SubscribeUpdateEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[30]
+	mi := &file_geyser_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2721,7 +2366,7 @@ func (x *SubscribeUpdateEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeUpdateEntry.ProtoReflect.Descriptor instead.
 func (*SubscribeUpdateEntry) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{30}
+	return file_geyser_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *SubscribeUpdateEntry) GetSlot() uint64 {
@@ -2781,7 +2426,7 @@ type SubscribeUpdatePing struct {
 
 func (x *SubscribeUpdatePing) Reset() {
 	*x = SubscribeUpdatePing{}
-	mi := &file_geyser_proto_msgTypes[31]
+	mi := &file_geyser_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2793,7 +2438,7 @@ func (x *SubscribeUpdatePing) String() string {
 func (*SubscribeUpdatePing) ProtoMessage() {}
 
 func (x *SubscribeUpdatePing) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[31]
+	mi := &file_geyser_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2806,7 +2451,7 @@ func (x *SubscribeUpdatePing) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeUpdatePing.ProtoReflect.Descriptor instead.
 func (*SubscribeUpdatePing) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{31}
+	return file_geyser_proto_rawDescGZIP(), []int{26}
 }
 
 type SubscribeUpdatePong struct {
@@ -2818,7 +2463,7 @@ type SubscribeUpdatePong struct {
 
 func (x *SubscribeUpdatePong) Reset() {
 	*x = SubscribeUpdatePong{}
-	mi := &file_geyser_proto_msgTypes[32]
+	mi := &file_geyser_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2830,7 +2475,7 @@ func (x *SubscribeUpdatePong) String() string {
 func (*SubscribeUpdatePong) ProtoMessage() {}
 
 func (x *SubscribeUpdatePong) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[32]
+	mi := &file_geyser_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2843,7 +2488,7 @@ func (x *SubscribeUpdatePong) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeUpdatePong.ProtoReflect.Descriptor instead.
 func (*SubscribeUpdatePong) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{32}
+	return file_geyser_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *SubscribeUpdatePong) GetId() int32 {
@@ -2861,7 +2506,7 @@ type SubscribeReplayInfoRequest struct {
 
 func (x *SubscribeReplayInfoRequest) Reset() {
 	*x = SubscribeReplayInfoRequest{}
-	mi := &file_geyser_proto_msgTypes[33]
+	mi := &file_geyser_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2873,7 +2518,7 @@ func (x *SubscribeReplayInfoRequest) String() string {
 func (*SubscribeReplayInfoRequest) ProtoMessage() {}
 
 func (x *SubscribeReplayInfoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[33]
+	mi := &file_geyser_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2886,7 +2531,7 @@ func (x *SubscribeReplayInfoRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeReplayInfoRequest.ProtoReflect.Descriptor instead.
 func (*SubscribeReplayInfoRequest) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{33}
+	return file_geyser_proto_rawDescGZIP(), []int{28}
 }
 
 type SubscribeReplayInfoResponse struct {
@@ -2898,7 +2543,7 @@ type SubscribeReplayInfoResponse struct {
 
 func (x *SubscribeReplayInfoResponse) Reset() {
 	*x = SubscribeReplayInfoResponse{}
-	mi := &file_geyser_proto_msgTypes[34]
+	mi := &file_geyser_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2910,7 +2555,7 @@ func (x *SubscribeReplayInfoResponse) String() string {
 func (*SubscribeReplayInfoResponse) ProtoMessage() {}
 
 func (x *SubscribeReplayInfoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[34]
+	mi := &file_geyser_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2923,7 +2568,7 @@ func (x *SubscribeReplayInfoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeReplayInfoResponse.ProtoReflect.Descriptor instead.
 func (*SubscribeReplayInfoResponse) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{34}
+	return file_geyser_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *SubscribeReplayInfoResponse) GetFirstAvailable() uint64 {
@@ -2942,7 +2587,7 @@ type PingRequest struct {
 
 func (x *PingRequest) Reset() {
 	*x = PingRequest{}
-	mi := &file_geyser_proto_msgTypes[35]
+	mi := &file_geyser_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2954,7 +2599,7 @@ func (x *PingRequest) String() string {
 func (*PingRequest) ProtoMessage() {}
 
 func (x *PingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[35]
+	mi := &file_geyser_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2967,7 +2612,7 @@ func (x *PingRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PingRequest.ProtoReflect.Descriptor instead.
 func (*PingRequest) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{35}
+	return file_geyser_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *PingRequest) GetCount() int32 {
@@ -2986,7 +2631,7 @@ type PongResponse struct {
 
 func (x *PongResponse) Reset() {
 	*x = PongResponse{}
-	mi := &file_geyser_proto_msgTypes[36]
+	mi := &file_geyser_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2998,7 +2643,7 @@ func (x *PongResponse) String() string {
 func (*PongResponse) ProtoMessage() {}
 
 func (x *PongResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[36]
+	mi := &file_geyser_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3011,7 +2656,7 @@ func (x *PongResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PongResponse.ProtoReflect.Descriptor instead.
 func (*PongResponse) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{36}
+	return file_geyser_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *PongResponse) GetCount() int32 {
@@ -3030,7 +2675,7 @@ type GetLatestBlockhashRequest struct {
 
 func (x *GetLatestBlockhashRequest) Reset() {
 	*x = GetLatestBlockhashRequest{}
-	mi := &file_geyser_proto_msgTypes[37]
+	mi := &file_geyser_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3042,7 +2687,7 @@ func (x *GetLatestBlockhashRequest) String() string {
 func (*GetLatestBlockhashRequest) ProtoMessage() {}
 
 func (x *GetLatestBlockhashRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[37]
+	mi := &file_geyser_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3055,7 +2700,7 @@ func (x *GetLatestBlockhashRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetLatestBlockhashRequest.ProtoReflect.Descriptor instead.
 func (*GetLatestBlockhashRequest) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{37}
+	return file_geyser_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *GetLatestBlockhashRequest) GetCommitment() CommitmentLevel {
@@ -3076,7 +2721,7 @@ type GetLatestBlockhashResponse struct {
 
 func (x *GetLatestBlockhashResponse) Reset() {
 	*x = GetLatestBlockhashResponse{}
-	mi := &file_geyser_proto_msgTypes[38]
+	mi := &file_geyser_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3088,7 +2733,7 @@ func (x *GetLatestBlockhashResponse) String() string {
 func (*GetLatestBlockhashResponse) ProtoMessage() {}
 
 func (x *GetLatestBlockhashResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[38]
+	mi := &file_geyser_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3101,7 +2746,7 @@ func (x *GetLatestBlockhashResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetLatestBlockhashResponse.ProtoReflect.Descriptor instead.
 func (*GetLatestBlockhashResponse) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{38}
+	return file_geyser_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *GetLatestBlockhashResponse) GetSlot() uint64 {
@@ -3134,7 +2779,7 @@ type GetBlockHeightRequest struct {
 
 func (x *GetBlockHeightRequest) Reset() {
 	*x = GetBlockHeightRequest{}
-	mi := &file_geyser_proto_msgTypes[39]
+	mi := &file_geyser_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3146,7 +2791,7 @@ func (x *GetBlockHeightRequest) String() string {
 func (*GetBlockHeightRequest) ProtoMessage() {}
 
 func (x *GetBlockHeightRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[39]
+	mi := &file_geyser_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3159,7 +2804,7 @@ func (x *GetBlockHeightRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBlockHeightRequest.ProtoReflect.Descriptor instead.
 func (*GetBlockHeightRequest) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{39}
+	return file_geyser_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *GetBlockHeightRequest) GetCommitment() CommitmentLevel {
@@ -3178,7 +2823,7 @@ type GetBlockHeightResponse struct {
 
 func (x *GetBlockHeightResponse) Reset() {
 	*x = GetBlockHeightResponse{}
-	mi := &file_geyser_proto_msgTypes[40]
+	mi := &file_geyser_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3190,7 +2835,7 @@ func (x *GetBlockHeightResponse) String() string {
 func (*GetBlockHeightResponse) ProtoMessage() {}
 
 func (x *GetBlockHeightResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[40]
+	mi := &file_geyser_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3203,7 +2848,7 @@ func (x *GetBlockHeightResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBlockHeightResponse.ProtoReflect.Descriptor instead.
 func (*GetBlockHeightResponse) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{40}
+	return file_geyser_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *GetBlockHeightResponse) GetBlockHeight() uint64 {
@@ -3222,7 +2867,7 @@ type GetSlotRequest struct {
 
 func (x *GetSlotRequest) Reset() {
 	*x = GetSlotRequest{}
-	mi := &file_geyser_proto_msgTypes[41]
+	mi := &file_geyser_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3234,7 +2879,7 @@ func (x *GetSlotRequest) String() string {
 func (*GetSlotRequest) ProtoMessage() {}
 
 func (x *GetSlotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[41]
+	mi := &file_geyser_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3247,7 +2892,7 @@ func (x *GetSlotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSlotRequest.ProtoReflect.Descriptor instead.
 func (*GetSlotRequest) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{41}
+	return file_geyser_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *GetSlotRequest) GetCommitment() CommitmentLevel {
@@ -3266,7 +2911,7 @@ type GetSlotResponse struct {
 
 func (x *GetSlotResponse) Reset() {
 	*x = GetSlotResponse{}
-	mi := &file_geyser_proto_msgTypes[42]
+	mi := &file_geyser_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3278,7 +2923,7 @@ func (x *GetSlotResponse) String() string {
 func (*GetSlotResponse) ProtoMessage() {}
 
 func (x *GetSlotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[42]
+	mi := &file_geyser_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3291,7 +2936,7 @@ func (x *GetSlotResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSlotResponse.ProtoReflect.Descriptor instead.
 func (*GetSlotResponse) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{42}
+	return file_geyser_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *GetSlotResponse) GetSlot() uint64 {
@@ -3309,7 +2954,7 @@ type GetVersionRequest struct {
 
 func (x *GetVersionRequest) Reset() {
 	*x = GetVersionRequest{}
-	mi := &file_geyser_proto_msgTypes[43]
+	mi := &file_geyser_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3321,7 +2966,7 @@ func (x *GetVersionRequest) String() string {
 func (*GetVersionRequest) ProtoMessage() {}
 
 func (x *GetVersionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[43]
+	mi := &file_geyser_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3334,7 +2979,7 @@ func (x *GetVersionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetVersionRequest.ProtoReflect.Descriptor instead.
 func (*GetVersionRequest) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{43}
+	return file_geyser_proto_rawDescGZIP(), []int{38}
 }
 
 type GetVersionResponse struct {
@@ -3346,7 +2991,7 @@ type GetVersionResponse struct {
 
 func (x *GetVersionResponse) Reset() {
 	*x = GetVersionResponse{}
-	mi := &file_geyser_proto_msgTypes[44]
+	mi := &file_geyser_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3358,7 +3003,7 @@ func (x *GetVersionResponse) String() string {
 func (*GetVersionResponse) ProtoMessage() {}
 
 func (x *GetVersionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[44]
+	mi := &file_geyser_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3371,7 +3016,7 @@ func (x *GetVersionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetVersionResponse.ProtoReflect.Descriptor instead.
 func (*GetVersionResponse) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{44}
+	return file_geyser_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *GetVersionResponse) GetVersion() string {
@@ -3391,7 +3036,7 @@ type IsBlockhashValidRequest struct {
 
 func (x *IsBlockhashValidRequest) Reset() {
 	*x = IsBlockhashValidRequest{}
-	mi := &file_geyser_proto_msgTypes[45]
+	mi := &file_geyser_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3403,7 +3048,7 @@ func (x *IsBlockhashValidRequest) String() string {
 func (*IsBlockhashValidRequest) ProtoMessage() {}
 
 func (x *IsBlockhashValidRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[45]
+	mi := &file_geyser_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3416,7 +3061,7 @@ func (x *IsBlockhashValidRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IsBlockhashValidRequest.ProtoReflect.Descriptor instead.
 func (*IsBlockhashValidRequest) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{45}
+	return file_geyser_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *IsBlockhashValidRequest) GetBlockhash() string {
@@ -3443,7 +3088,7 @@ type IsBlockhashValidResponse struct {
 
 func (x *IsBlockhashValidResponse) Reset() {
 	*x = IsBlockhashValidResponse{}
-	mi := &file_geyser_proto_msgTypes[46]
+	mi := &file_geyser_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3455,7 +3100,7 @@ func (x *IsBlockhashValidResponse) String() string {
 func (*IsBlockhashValidResponse) ProtoMessage() {}
 
 func (x *IsBlockhashValidResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_geyser_proto_msgTypes[46]
+	mi := &file_geyser_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3468,7 +3113,7 @@ func (x *IsBlockhashValidResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IsBlockhashValidResponse.ProtoReflect.Descriptor instead.
 func (*IsBlockhashValidResponse) Descriptor() ([]byte, []int) {
-	return file_geyser_proto_rawDescGZIP(), []int{46}
+	return file_geyser_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *IsBlockhashValidResponse) GetSlot() uint64 {
@@ -3489,38 +3134,7 @@ var File_geyser_proto protoreflect.FileDescriptor
 
 const file_geyser_proto_rawDesc = "" +
 	"\n" +
-	"\fgeyser.proto\x12\x06geyser\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x14solana-storage.proto\"\xb3\x02\n" +
-	"\x1cSubscribePreprocessedRequest\x12Z\n" +
-	"\ftransactions\x18\x01 \x03(\v26.geyser.SubscribePreprocessedRequest.TransactionsEntryR\ftransactions\x125\n" +
-	"\x04ping\x18\x02 \x01(\v2\x1c.geyser.SubscribeRequestPingH\x00R\x04ping\x88\x01\x01\x1aw\n" +
-	"\x11TransactionsEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12L\n" +
-	"\x05value\x18\x02 \x01(\v26.geyser.SubscribePreprocessedRequestFilterTransactionsR\x05value:\x028\x01B\a\n" +
-	"\x05_ping\"\x80\x02\n" +
-	".SubscribePreprocessedRequestFilterTransactions\x12\x17\n" +
-	"\x04vote\x18\x01 \x01(\bH\x00R\x04vote\x88\x01\x01\x12!\n" +
-	"\tsignature\x18\x02 \x01(\tH\x01R\tsignature\x88\x01\x01\x12'\n" +
-	"\x0faccount_include\x18\x03 \x03(\tR\x0eaccountInclude\x12'\n" +
-	"\x0faccount_exclude\x18\x04 \x03(\tR\x0eaccountExclude\x12)\n" +
-	"\x10account_required\x18\x05 \x03(\tR\x0faccountRequiredB\a\n" +
-	"\x05_voteB\f\n" +
-	"\n" +
-	"_signature\"\xb6\x02\n" +
-	"\x1bSubscribePreprocessedUpdate\x12\x18\n" +
-	"\afilters\x18\x01 \x03(\tR\afilters\x12L\n" +
-	"\vtransaction\x18\x02 \x01(\v2(.geyser.SubscribePreprocessedTransactionH\x00R\vtransaction\x121\n" +
-	"\x04ping\x18\x03 \x01(\v2\x1b.geyser.SubscribeUpdatePingH\x00R\x04ping\x121\n" +
-	"\x04pong\x18\x04 \x01(\v2\x1b.geyser.SubscribeUpdatePongH\x00R\x04pong\x129\n" +
-	"\n" +
-	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAtB\x0e\n" +
-	"\fupdate_oneof\"\x86\x01\n" +
-	" SubscribePreprocessedTransaction\x12N\n" +
-	"\vtransaction\x18\x01 \x01(\v2,.geyser.SubscribePreprocessedTransactionInfoR\vtransaction\x12\x12\n" +
-	"\x04slot\x18\x02 \x01(\x04R\x04slot\"\xab\x01\n" +
-	"$SubscribePreprocessedTransactionInfo\x12\x1c\n" +
-	"\tsignature\x18\x01 \x01(\fR\tsignature\x12\x17\n" +
-	"\ais_vote\x18\x02 \x01(\bR\x06isVote\x12L\n" +
-	"\vtransaction\x18\x03 \x01(\v2*.solana.storage.ConfirmedBlock.TransactionR\vtransaction\"\xa6\r\n" +
+	"\fgeyser.proto\x12\x06geyser\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x14solana-storage.proto\"\xa6\r\n" +
 	"\x10SubscribeRequest\x12B\n" +
 	"\baccounts\x18\x01 \x03(\v2&.geyser.SubscribeRequest.AccountsEntryR\baccounts\x129\n" +
 	"\x05slots\x18\x02 \x03(\v2#.geyser.SubscribeRequest.SlotsEntryR\x05slots\x12N\n" +
@@ -3813,10 +3427,9 @@ const file_geyser_proto_rawDesc = "" +
 	"\tSLOT_DEAD\x10\x06*@\n" +
 	" TokenAccountExpansionControlFlag\x12\a\n" +
 	"\x03ALL\x10\x00\x12\x13\n" +
-	"\x0fBALANCE_CHANGED\x10\x012\xdf\x05\n" +
+	"\x0fBALANCE_CHANGED\x10\x012\xf5\x04\n" +
 	"\x06Geyser\x12D\n" +
-	"\tSubscribe\x12\x18.geyser.SubscribeRequest\x1a\x17.geyser.SubscribeUpdate\"\x00(\x010\x01\x12h\n" +
-	"\x15SubscribePreprocessed\x12$.geyser.SubscribePreprocessedRequest\x1a#.geyser.SubscribePreprocessedUpdate\"\x00(\x010\x01\x12`\n" +
+	"\tSubscribe\x12\x18.geyser.SubscribeRequest\x1a\x17.geyser.SubscribeUpdate\"\x00(\x010\x01\x12`\n" +
 	"\x13SubscribeReplayInfo\x12\".geyser.SubscribeReplayInfoRequest\x1a#.geyser.SubscribeReplayInfoResponse\"\x00\x123\n" +
 	"\x04Ping\x12\x13.geyser.PingRequest\x1a\x14.geyser.PongResponse\"\x00\x12]\n" +
 	"\x12GetLatestBlockhash\x12!.geyser.GetLatestBlockhashRequest\x1a\".geyser.GetLatestBlockhashResponse\"\x00\x12Q\n" +
@@ -3839,163 +3452,146 @@ func file_geyser_proto_rawDescGZIP() []byte {
 }
 
 var file_geyser_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_geyser_proto_msgTypes = make([]protoimpl.MessageInfo, 56)
+var file_geyser_proto_msgTypes = make([]protoimpl.MessageInfo, 50)
 var file_geyser_proto_goTypes = []any{
-	(CommitmentLevel)(0),                                   // 0: geyser.CommitmentLevel
-	(SlotStatus)(0),                                        // 1: geyser.SlotStatus
-	(TokenAccountExpansionControlFlag)(0),                  // 2: geyser.TokenAccountExpansionControlFlag
-	(*SubscribePreprocessedRequest)(nil),                   // 3: geyser.SubscribePreprocessedRequest
-	(*SubscribePreprocessedRequestFilterTransactions)(nil), // 4: geyser.SubscribePreprocessedRequestFilterTransactions
-	(*SubscribePreprocessedUpdate)(nil),                    // 5: geyser.SubscribePreprocessedUpdate
-	(*SubscribePreprocessedTransaction)(nil),               // 6: geyser.SubscribePreprocessedTransaction
-	(*SubscribePreprocessedTransactionInfo)(nil),           // 7: geyser.SubscribePreprocessedTransactionInfo
-	(*SubscribeRequest)(nil),                               // 8: geyser.SubscribeRequest
-	(*SubscribeRequestFilterAccounts)(nil),                 // 9: geyser.SubscribeRequestFilterAccounts
-	(*SubscribeRequestFilterAccountsFilter)(nil),           // 10: geyser.SubscribeRequestFilterAccountsFilter
-	(*SubscribeRequestFilterAccountsFilterMemcmp)(nil),     // 11: geyser.SubscribeRequestFilterAccountsFilterMemcmp
-	(*SubscribeRequestFilterAccountsFilterLamports)(nil),   // 12: geyser.SubscribeRequestFilterAccountsFilterLamports
-	(*SubscribeRequestFilterSlots)(nil),                    // 13: geyser.SubscribeRequestFilterSlots
-	(*SubscribeRequestFilterTransactions)(nil),             // 14: geyser.SubscribeRequestFilterTransactions
-	(*SubscribeRequestFilterBlocks)(nil),                   // 15: geyser.SubscribeRequestFilterBlocks
-	(*SubscribeRequestFilterBlocksMeta)(nil),               // 16: geyser.SubscribeRequestFilterBlocksMeta
-	(*SubscribeRequestFilterEntry)(nil),                    // 17: geyser.SubscribeRequestFilterEntry
-	(*SubscribeRequestFilterBlockFooter)(nil),              // 18: geyser.SubscribeRequestFilterBlockFooter
-	(*SubscribeRequestAccountsDataSlice)(nil),              // 19: geyser.SubscribeRequestAccountsDataSlice
-	(*SubscribeRequestPing)(nil),                           // 20: geyser.SubscribeRequestPing
-	(*SubscribeUpdate)(nil),                                // 21: geyser.SubscribeUpdate
-	(*SubscribeUpdateBatch)(nil),                           // 22: geyser.SubscribeUpdateBatch
-	(*SubscribeUpdateAccount)(nil),                         // 23: geyser.SubscribeUpdateAccount
-	(*SubscribeUpdateAccountInfo)(nil),                     // 24: geyser.SubscribeUpdateAccountInfo
-	(*SubscribeUpdateSlot)(nil),                            // 25: geyser.SubscribeUpdateSlot
-	(*SubscribeUpdateTransaction)(nil),                     // 26: geyser.SubscribeUpdateTransaction
-	(*SubscribeUpdateTransactionInfo)(nil),                 // 27: geyser.SubscribeUpdateTransactionInfo
-	(*SubscribeUpdateTransactionStatus)(nil),               // 28: geyser.SubscribeUpdateTransactionStatus
-	(*SubscribeUpdateBlock)(nil),                           // 29: geyser.SubscribeUpdateBlock
-	(*SubscribeUpdateBlockMeta)(nil),                       // 30: geyser.SubscribeUpdateBlockMeta
-	(*SubscribeUpdateEntryUpdateParent)(nil),               // 31: geyser.SubscribeUpdateEntryUpdateParent
-	(*SubscribeUpdateBlockFooter)(nil),                     // 32: geyser.SubscribeUpdateBlockFooter
-	(*SubscribeUpdateEntry)(nil),                           // 33: geyser.SubscribeUpdateEntry
-	(*SubscribeUpdatePing)(nil),                            // 34: geyser.SubscribeUpdatePing
-	(*SubscribeUpdatePong)(nil),                            // 35: geyser.SubscribeUpdatePong
-	(*SubscribeReplayInfoRequest)(nil),                     // 36: geyser.SubscribeReplayInfoRequest
-	(*SubscribeReplayInfoResponse)(nil),                    // 37: geyser.SubscribeReplayInfoResponse
-	(*PingRequest)(nil),                                    // 38: geyser.PingRequest
-	(*PongResponse)(nil),                                   // 39: geyser.PongResponse
-	(*GetLatestBlockhashRequest)(nil),                      // 40: geyser.GetLatestBlockhashRequest
-	(*GetLatestBlockhashResponse)(nil),                     // 41: geyser.GetLatestBlockhashResponse
-	(*GetBlockHeightRequest)(nil),                          // 42: geyser.GetBlockHeightRequest
-	(*GetBlockHeightResponse)(nil),                         // 43: geyser.GetBlockHeightResponse
-	(*GetSlotRequest)(nil),                                 // 44: geyser.GetSlotRequest
-	(*GetSlotResponse)(nil),                                // 45: geyser.GetSlotResponse
-	(*GetVersionRequest)(nil),                              // 46: geyser.GetVersionRequest
-	(*GetVersionResponse)(nil),                             // 47: geyser.GetVersionResponse
-	(*IsBlockhashValidRequest)(nil),                        // 48: geyser.IsBlockhashValidRequest
-	(*IsBlockhashValidResponse)(nil),                       // 49: geyser.IsBlockhashValidResponse
-	nil,                                                    // 50: geyser.SubscribePreprocessedRequest.TransactionsEntry
-	nil,                                                    // 51: geyser.SubscribeRequest.AccountsEntry
-	nil,                                                    // 52: geyser.SubscribeRequest.SlotsEntry
-	nil,                                                    // 53: geyser.SubscribeRequest.TransactionsEntry
-	nil,                                                    // 54: geyser.SubscribeRequest.TransactionsStatusEntry
-	nil,                                                    // 55: geyser.SubscribeRequest.BlocksEntry
-	nil,                                                    // 56: geyser.SubscribeRequest.BlocksMetaEntry
-	nil,                                                    // 57: geyser.SubscribeRequest.EntryEntry
-	nil,                                                    // 58: geyser.SubscribeRequest.BlockFooterEntry
-	(*timestamppb.Timestamp)(nil),                          // 59: google.protobuf.Timestamp
-	(*Transaction)(nil),                                    // 60: solana.storage.ConfirmedBlock.Transaction
-	(*TransactionStatusMeta)(nil),                          // 61: solana.storage.ConfirmedBlock.TransactionStatusMeta
-	(*TransactionError)(nil),                               // 62: solana.storage.ConfirmedBlock.TransactionError
-	(*Rewards)(nil),                                        // 63: solana.storage.ConfirmedBlock.Rewards
-	(*UnixTimestamp)(nil),                                  // 64: solana.storage.ConfirmedBlock.UnixTimestamp
-	(*BlockHeight)(nil),                                    // 65: solana.storage.ConfirmedBlock.BlockHeight
+	(CommitmentLevel)(0),                                 // 0: geyser.CommitmentLevel
+	(SlotStatus)(0),                                      // 1: geyser.SlotStatus
+	(TokenAccountExpansionControlFlag)(0),                // 2: geyser.TokenAccountExpansionControlFlag
+	(*SubscribeRequest)(nil),                             // 3: geyser.SubscribeRequest
+	(*SubscribeRequestFilterAccounts)(nil),               // 4: geyser.SubscribeRequestFilterAccounts
+	(*SubscribeRequestFilterAccountsFilter)(nil),         // 5: geyser.SubscribeRequestFilterAccountsFilter
+	(*SubscribeRequestFilterAccountsFilterMemcmp)(nil),   // 6: geyser.SubscribeRequestFilterAccountsFilterMemcmp
+	(*SubscribeRequestFilterAccountsFilterLamports)(nil), // 7: geyser.SubscribeRequestFilterAccountsFilterLamports
+	(*SubscribeRequestFilterSlots)(nil),                  // 8: geyser.SubscribeRequestFilterSlots
+	(*SubscribeRequestFilterTransactions)(nil),           // 9: geyser.SubscribeRequestFilterTransactions
+	(*SubscribeRequestFilterBlocks)(nil),                 // 10: geyser.SubscribeRequestFilterBlocks
+	(*SubscribeRequestFilterBlocksMeta)(nil),             // 11: geyser.SubscribeRequestFilterBlocksMeta
+	(*SubscribeRequestFilterEntry)(nil),                  // 12: geyser.SubscribeRequestFilterEntry
+	(*SubscribeRequestFilterBlockFooter)(nil),            // 13: geyser.SubscribeRequestFilterBlockFooter
+	(*SubscribeRequestAccountsDataSlice)(nil),            // 14: geyser.SubscribeRequestAccountsDataSlice
+	(*SubscribeRequestPing)(nil),                         // 15: geyser.SubscribeRequestPing
+	(*SubscribeUpdate)(nil),                              // 16: geyser.SubscribeUpdate
+	(*SubscribeUpdateBatch)(nil),                         // 17: geyser.SubscribeUpdateBatch
+	(*SubscribeUpdateAccount)(nil),                       // 18: geyser.SubscribeUpdateAccount
+	(*SubscribeUpdateAccountInfo)(nil),                   // 19: geyser.SubscribeUpdateAccountInfo
+	(*SubscribeUpdateSlot)(nil),                          // 20: geyser.SubscribeUpdateSlot
+	(*SubscribeUpdateTransaction)(nil),                   // 21: geyser.SubscribeUpdateTransaction
+	(*SubscribeUpdateTransactionInfo)(nil),               // 22: geyser.SubscribeUpdateTransactionInfo
+	(*SubscribeUpdateTransactionStatus)(nil),             // 23: geyser.SubscribeUpdateTransactionStatus
+	(*SubscribeUpdateBlock)(nil),                         // 24: geyser.SubscribeUpdateBlock
+	(*SubscribeUpdateBlockMeta)(nil),                     // 25: geyser.SubscribeUpdateBlockMeta
+	(*SubscribeUpdateEntryUpdateParent)(nil),             // 26: geyser.SubscribeUpdateEntryUpdateParent
+	(*SubscribeUpdateBlockFooter)(nil),                   // 27: geyser.SubscribeUpdateBlockFooter
+	(*SubscribeUpdateEntry)(nil),                         // 28: geyser.SubscribeUpdateEntry
+	(*SubscribeUpdatePing)(nil),                          // 29: geyser.SubscribeUpdatePing
+	(*SubscribeUpdatePong)(nil),                          // 30: geyser.SubscribeUpdatePong
+	(*SubscribeReplayInfoRequest)(nil),                   // 31: geyser.SubscribeReplayInfoRequest
+	(*SubscribeReplayInfoResponse)(nil),                  // 32: geyser.SubscribeReplayInfoResponse
+	(*PingRequest)(nil),                                  // 33: geyser.PingRequest
+	(*PongResponse)(nil),                                 // 34: geyser.PongResponse
+	(*GetLatestBlockhashRequest)(nil),                    // 35: geyser.GetLatestBlockhashRequest
+	(*GetLatestBlockhashResponse)(nil),                   // 36: geyser.GetLatestBlockhashResponse
+	(*GetBlockHeightRequest)(nil),                        // 37: geyser.GetBlockHeightRequest
+	(*GetBlockHeightResponse)(nil),                       // 38: geyser.GetBlockHeightResponse
+	(*GetSlotRequest)(nil),                               // 39: geyser.GetSlotRequest
+	(*GetSlotResponse)(nil),                              // 40: geyser.GetSlotResponse
+	(*GetVersionRequest)(nil),                            // 41: geyser.GetVersionRequest
+	(*GetVersionResponse)(nil),                           // 42: geyser.GetVersionResponse
+	(*IsBlockhashValidRequest)(nil),                      // 43: geyser.IsBlockhashValidRequest
+	(*IsBlockhashValidResponse)(nil),                     // 44: geyser.IsBlockhashValidResponse
+	nil,                                                  // 45: geyser.SubscribeRequest.AccountsEntry
+	nil,                                                  // 46: geyser.SubscribeRequest.SlotsEntry
+	nil,                                                  // 47: geyser.SubscribeRequest.TransactionsEntry
+	nil,                                                  // 48: geyser.SubscribeRequest.TransactionsStatusEntry
+	nil,                                                  // 49: geyser.SubscribeRequest.BlocksEntry
+	nil,                                                  // 50: geyser.SubscribeRequest.BlocksMetaEntry
+	nil,                                                  // 51: geyser.SubscribeRequest.EntryEntry
+	nil,                                                  // 52: geyser.SubscribeRequest.BlockFooterEntry
+	(*timestamppb.Timestamp)(nil),                        // 53: google.protobuf.Timestamp
+	(*Transaction)(nil),                                  // 54: solana.storage.ConfirmedBlock.Transaction
+	(*TransactionStatusMeta)(nil),                        // 55: solana.storage.ConfirmedBlock.TransactionStatusMeta
+	(*TransactionError)(nil),                             // 56: solana.storage.ConfirmedBlock.TransactionError
+	(*Rewards)(nil),                                      // 57: solana.storage.ConfirmedBlock.Rewards
+	(*UnixTimestamp)(nil),                                // 58: solana.storage.ConfirmedBlock.UnixTimestamp
+	(*BlockHeight)(nil),                                  // 59: solana.storage.ConfirmedBlock.BlockHeight
 }
 var file_geyser_proto_depIdxs = []int32{
-	50, // 0: geyser.SubscribePreprocessedRequest.transactions:type_name -> geyser.SubscribePreprocessedRequest.TransactionsEntry
-	20, // 1: geyser.SubscribePreprocessedRequest.ping:type_name -> geyser.SubscribeRequestPing
-	6,  // 2: geyser.SubscribePreprocessedUpdate.transaction:type_name -> geyser.SubscribePreprocessedTransaction
-	34, // 3: geyser.SubscribePreprocessedUpdate.ping:type_name -> geyser.SubscribeUpdatePing
-	35, // 4: geyser.SubscribePreprocessedUpdate.pong:type_name -> geyser.SubscribeUpdatePong
-	59, // 5: geyser.SubscribePreprocessedUpdate.created_at:type_name -> google.protobuf.Timestamp
-	7,  // 6: geyser.SubscribePreprocessedTransaction.transaction:type_name -> geyser.SubscribePreprocessedTransactionInfo
-	60, // 7: geyser.SubscribePreprocessedTransactionInfo.transaction:type_name -> solana.storage.ConfirmedBlock.Transaction
-	51, // 8: geyser.SubscribeRequest.accounts:type_name -> geyser.SubscribeRequest.AccountsEntry
-	52, // 9: geyser.SubscribeRequest.slots:type_name -> geyser.SubscribeRequest.SlotsEntry
-	53, // 10: geyser.SubscribeRequest.transactions:type_name -> geyser.SubscribeRequest.TransactionsEntry
-	54, // 11: geyser.SubscribeRequest.transactions_status:type_name -> geyser.SubscribeRequest.TransactionsStatusEntry
-	55, // 12: geyser.SubscribeRequest.blocks:type_name -> geyser.SubscribeRequest.BlocksEntry
-	56, // 13: geyser.SubscribeRequest.blocks_meta:type_name -> geyser.SubscribeRequest.BlocksMetaEntry
-	57, // 14: geyser.SubscribeRequest.entry:type_name -> geyser.SubscribeRequest.EntryEntry
-	0,  // 15: geyser.SubscribeRequest.commitment:type_name -> geyser.CommitmentLevel
-	19, // 16: geyser.SubscribeRequest.accounts_data_slice:type_name -> geyser.SubscribeRequestAccountsDataSlice
-	20, // 17: geyser.SubscribeRequest.ping:type_name -> geyser.SubscribeRequestPing
-	58, // 18: geyser.SubscribeRequest.block_footer:type_name -> geyser.SubscribeRequest.BlockFooterEntry
-	10, // 19: geyser.SubscribeRequestFilterAccounts.filters:type_name -> geyser.SubscribeRequestFilterAccountsFilter
-	11, // 20: geyser.SubscribeRequestFilterAccountsFilter.memcmp:type_name -> geyser.SubscribeRequestFilterAccountsFilterMemcmp
-	12, // 21: geyser.SubscribeRequestFilterAccountsFilter.lamports:type_name -> geyser.SubscribeRequestFilterAccountsFilterLamports
-	2,  // 22: geyser.SubscribeRequestFilterTransactions.token_accounts:type_name -> geyser.TokenAccountExpansionControlFlag
-	23, // 23: geyser.SubscribeUpdate.account:type_name -> geyser.SubscribeUpdateAccount
-	25, // 24: geyser.SubscribeUpdate.slot:type_name -> geyser.SubscribeUpdateSlot
-	26, // 25: geyser.SubscribeUpdate.transaction:type_name -> geyser.SubscribeUpdateTransaction
-	28, // 26: geyser.SubscribeUpdate.transaction_status:type_name -> geyser.SubscribeUpdateTransactionStatus
-	29, // 27: geyser.SubscribeUpdate.block:type_name -> geyser.SubscribeUpdateBlock
-	34, // 28: geyser.SubscribeUpdate.ping:type_name -> geyser.SubscribeUpdatePing
-	35, // 29: geyser.SubscribeUpdate.pong:type_name -> geyser.SubscribeUpdatePong
-	30, // 30: geyser.SubscribeUpdate.block_meta:type_name -> geyser.SubscribeUpdateBlockMeta
-	33, // 31: geyser.SubscribeUpdate.entry:type_name -> geyser.SubscribeUpdateEntry
-	32, // 32: geyser.SubscribeUpdate.block_footer:type_name -> geyser.SubscribeUpdateBlockFooter
-	31, // 33: geyser.SubscribeUpdate.entry_update_parent:type_name -> geyser.SubscribeUpdateEntryUpdateParent
-	59, // 34: geyser.SubscribeUpdate.created_at:type_name -> google.protobuf.Timestamp
-	21, // 35: geyser.SubscribeUpdateBatch.updates:type_name -> geyser.SubscribeUpdate
-	24, // 36: geyser.SubscribeUpdateAccount.account:type_name -> geyser.SubscribeUpdateAccountInfo
-	1,  // 37: geyser.SubscribeUpdateSlot.status:type_name -> geyser.SlotStatus
-	27, // 38: geyser.SubscribeUpdateTransaction.transaction:type_name -> geyser.SubscribeUpdateTransactionInfo
-	60, // 39: geyser.SubscribeUpdateTransactionInfo.transaction:type_name -> solana.storage.ConfirmedBlock.Transaction
-	61, // 40: geyser.SubscribeUpdateTransactionInfo.meta:type_name -> solana.storage.ConfirmedBlock.TransactionStatusMeta
-	62, // 41: geyser.SubscribeUpdateTransactionStatus.err:type_name -> solana.storage.ConfirmedBlock.TransactionError
-	63, // 42: geyser.SubscribeUpdateBlock.rewards:type_name -> solana.storage.ConfirmedBlock.Rewards
-	64, // 43: geyser.SubscribeUpdateBlock.block_time:type_name -> solana.storage.ConfirmedBlock.UnixTimestamp
-	65, // 44: geyser.SubscribeUpdateBlock.block_height:type_name -> solana.storage.ConfirmedBlock.BlockHeight
-	27, // 45: geyser.SubscribeUpdateBlock.transactions:type_name -> geyser.SubscribeUpdateTransactionInfo
-	24, // 46: geyser.SubscribeUpdateBlock.accounts:type_name -> geyser.SubscribeUpdateAccountInfo
-	33, // 47: geyser.SubscribeUpdateBlock.entries:type_name -> geyser.SubscribeUpdateEntry
-	63, // 48: geyser.SubscribeUpdateBlockMeta.rewards:type_name -> solana.storage.ConfirmedBlock.Rewards
-	64, // 49: geyser.SubscribeUpdateBlockMeta.block_time:type_name -> solana.storage.ConfirmedBlock.UnixTimestamp
-	65, // 50: geyser.SubscribeUpdateBlockMeta.block_height:type_name -> solana.storage.ConfirmedBlock.BlockHeight
-	0,  // 51: geyser.GetLatestBlockhashRequest.commitment:type_name -> geyser.CommitmentLevel
-	0,  // 52: geyser.GetBlockHeightRequest.commitment:type_name -> geyser.CommitmentLevel
-	0,  // 53: geyser.GetSlotRequest.commitment:type_name -> geyser.CommitmentLevel
-	0,  // 54: geyser.IsBlockhashValidRequest.commitment:type_name -> geyser.CommitmentLevel
-	4,  // 55: geyser.SubscribePreprocessedRequest.TransactionsEntry.value:type_name -> geyser.SubscribePreprocessedRequestFilterTransactions
-	9,  // 56: geyser.SubscribeRequest.AccountsEntry.value:type_name -> geyser.SubscribeRequestFilterAccounts
-	13, // 57: geyser.SubscribeRequest.SlotsEntry.value:type_name -> geyser.SubscribeRequestFilterSlots
-	14, // 58: geyser.SubscribeRequest.TransactionsEntry.value:type_name -> geyser.SubscribeRequestFilterTransactions
-	14, // 59: geyser.SubscribeRequest.TransactionsStatusEntry.value:type_name -> geyser.SubscribeRequestFilterTransactions
-	15, // 60: geyser.SubscribeRequest.BlocksEntry.value:type_name -> geyser.SubscribeRequestFilterBlocks
-	16, // 61: geyser.SubscribeRequest.BlocksMetaEntry.value:type_name -> geyser.SubscribeRequestFilterBlocksMeta
-	17, // 62: geyser.SubscribeRequest.EntryEntry.value:type_name -> geyser.SubscribeRequestFilterEntry
-	18, // 63: geyser.SubscribeRequest.BlockFooterEntry.value:type_name -> geyser.SubscribeRequestFilterBlockFooter
-	8,  // 64: geyser.Geyser.Subscribe:input_type -> geyser.SubscribeRequest
-	3,  // 65: geyser.Geyser.SubscribePreprocessed:input_type -> geyser.SubscribePreprocessedRequest
-	36, // 66: geyser.Geyser.SubscribeReplayInfo:input_type -> geyser.SubscribeReplayInfoRequest
-	38, // 67: geyser.Geyser.Ping:input_type -> geyser.PingRequest
-	40, // 68: geyser.Geyser.GetLatestBlockhash:input_type -> geyser.GetLatestBlockhashRequest
-	42, // 69: geyser.Geyser.GetBlockHeight:input_type -> geyser.GetBlockHeightRequest
-	44, // 70: geyser.Geyser.GetSlot:input_type -> geyser.GetSlotRequest
-	48, // 71: geyser.Geyser.IsBlockhashValid:input_type -> geyser.IsBlockhashValidRequest
-	46, // 72: geyser.Geyser.GetVersion:input_type -> geyser.GetVersionRequest
-	21, // 73: geyser.Geyser.Subscribe:output_type -> geyser.SubscribeUpdate
-	5,  // 74: geyser.Geyser.SubscribePreprocessed:output_type -> geyser.SubscribePreprocessedUpdate
-	37, // 75: geyser.Geyser.SubscribeReplayInfo:output_type -> geyser.SubscribeReplayInfoResponse
-	39, // 76: geyser.Geyser.Ping:output_type -> geyser.PongResponse
-	41, // 77: geyser.Geyser.GetLatestBlockhash:output_type -> geyser.GetLatestBlockhashResponse
-	43, // 78: geyser.Geyser.GetBlockHeight:output_type -> geyser.GetBlockHeightResponse
-	45, // 79: geyser.Geyser.GetSlot:output_type -> geyser.GetSlotResponse
-	49, // 80: geyser.Geyser.IsBlockhashValid:output_type -> geyser.IsBlockhashValidResponse
-	47, // 81: geyser.Geyser.GetVersion:output_type -> geyser.GetVersionResponse
-	73, // [73:82] is the sub-list for method output_type
-	64, // [64:73] is the sub-list for method input_type
-	64, // [64:64] is the sub-list for extension type_name
-	64, // [64:64] is the sub-list for extension extendee
-	0,  // [0:64] is the sub-list for field type_name
+	45, // 0: geyser.SubscribeRequest.accounts:type_name -> geyser.SubscribeRequest.AccountsEntry
+	46, // 1: geyser.SubscribeRequest.slots:type_name -> geyser.SubscribeRequest.SlotsEntry
+	47, // 2: geyser.SubscribeRequest.transactions:type_name -> geyser.SubscribeRequest.TransactionsEntry
+	48, // 3: geyser.SubscribeRequest.transactions_status:type_name -> geyser.SubscribeRequest.TransactionsStatusEntry
+	49, // 4: geyser.SubscribeRequest.blocks:type_name -> geyser.SubscribeRequest.BlocksEntry
+	50, // 5: geyser.SubscribeRequest.blocks_meta:type_name -> geyser.SubscribeRequest.BlocksMetaEntry
+	51, // 6: geyser.SubscribeRequest.entry:type_name -> geyser.SubscribeRequest.EntryEntry
+	0,  // 7: geyser.SubscribeRequest.commitment:type_name -> geyser.CommitmentLevel
+	14, // 8: geyser.SubscribeRequest.accounts_data_slice:type_name -> geyser.SubscribeRequestAccountsDataSlice
+	15, // 9: geyser.SubscribeRequest.ping:type_name -> geyser.SubscribeRequestPing
+	52, // 10: geyser.SubscribeRequest.block_footer:type_name -> geyser.SubscribeRequest.BlockFooterEntry
+	5,  // 11: geyser.SubscribeRequestFilterAccounts.filters:type_name -> geyser.SubscribeRequestFilterAccountsFilter
+	6,  // 12: geyser.SubscribeRequestFilterAccountsFilter.memcmp:type_name -> geyser.SubscribeRequestFilterAccountsFilterMemcmp
+	7,  // 13: geyser.SubscribeRequestFilterAccountsFilter.lamports:type_name -> geyser.SubscribeRequestFilterAccountsFilterLamports
+	2,  // 14: geyser.SubscribeRequestFilterTransactions.token_accounts:type_name -> geyser.TokenAccountExpansionControlFlag
+	18, // 15: geyser.SubscribeUpdate.account:type_name -> geyser.SubscribeUpdateAccount
+	20, // 16: geyser.SubscribeUpdate.slot:type_name -> geyser.SubscribeUpdateSlot
+	21, // 17: geyser.SubscribeUpdate.transaction:type_name -> geyser.SubscribeUpdateTransaction
+	23, // 18: geyser.SubscribeUpdate.transaction_status:type_name -> geyser.SubscribeUpdateTransactionStatus
+	24, // 19: geyser.SubscribeUpdate.block:type_name -> geyser.SubscribeUpdateBlock
+	29, // 20: geyser.SubscribeUpdate.ping:type_name -> geyser.SubscribeUpdatePing
+	30, // 21: geyser.SubscribeUpdate.pong:type_name -> geyser.SubscribeUpdatePong
+	25, // 22: geyser.SubscribeUpdate.block_meta:type_name -> geyser.SubscribeUpdateBlockMeta
+	28, // 23: geyser.SubscribeUpdate.entry:type_name -> geyser.SubscribeUpdateEntry
+	27, // 24: geyser.SubscribeUpdate.block_footer:type_name -> geyser.SubscribeUpdateBlockFooter
+	26, // 25: geyser.SubscribeUpdate.entry_update_parent:type_name -> geyser.SubscribeUpdateEntryUpdateParent
+	53, // 26: geyser.SubscribeUpdate.created_at:type_name -> google.protobuf.Timestamp
+	16, // 27: geyser.SubscribeUpdateBatch.updates:type_name -> geyser.SubscribeUpdate
+	19, // 28: geyser.SubscribeUpdateAccount.account:type_name -> geyser.SubscribeUpdateAccountInfo
+	1,  // 29: geyser.SubscribeUpdateSlot.status:type_name -> geyser.SlotStatus
+	22, // 30: geyser.SubscribeUpdateTransaction.transaction:type_name -> geyser.SubscribeUpdateTransactionInfo
+	54, // 31: geyser.SubscribeUpdateTransactionInfo.transaction:type_name -> solana.storage.ConfirmedBlock.Transaction
+	55, // 32: geyser.SubscribeUpdateTransactionInfo.meta:type_name -> solana.storage.ConfirmedBlock.TransactionStatusMeta
+	56, // 33: geyser.SubscribeUpdateTransactionStatus.err:type_name -> solana.storage.ConfirmedBlock.TransactionError
+	57, // 34: geyser.SubscribeUpdateBlock.rewards:type_name -> solana.storage.ConfirmedBlock.Rewards
+	58, // 35: geyser.SubscribeUpdateBlock.block_time:type_name -> solana.storage.ConfirmedBlock.UnixTimestamp
+	59, // 36: geyser.SubscribeUpdateBlock.block_height:type_name -> solana.storage.ConfirmedBlock.BlockHeight
+	22, // 37: geyser.SubscribeUpdateBlock.transactions:type_name -> geyser.SubscribeUpdateTransactionInfo
+	19, // 38: geyser.SubscribeUpdateBlock.accounts:type_name -> geyser.SubscribeUpdateAccountInfo
+	28, // 39: geyser.SubscribeUpdateBlock.entries:type_name -> geyser.SubscribeUpdateEntry
+	57, // 40: geyser.SubscribeUpdateBlockMeta.rewards:type_name -> solana.storage.ConfirmedBlock.Rewards
+	58, // 41: geyser.SubscribeUpdateBlockMeta.block_time:type_name -> solana.storage.ConfirmedBlock.UnixTimestamp
+	59, // 42: geyser.SubscribeUpdateBlockMeta.block_height:type_name -> solana.storage.ConfirmedBlock.BlockHeight
+	0,  // 43: geyser.GetLatestBlockhashRequest.commitment:type_name -> geyser.CommitmentLevel
+	0,  // 44: geyser.GetBlockHeightRequest.commitment:type_name -> geyser.CommitmentLevel
+	0,  // 45: geyser.GetSlotRequest.commitment:type_name -> geyser.CommitmentLevel
+	0,  // 46: geyser.IsBlockhashValidRequest.commitment:type_name -> geyser.CommitmentLevel
+	4,  // 47: geyser.SubscribeRequest.AccountsEntry.value:type_name -> geyser.SubscribeRequestFilterAccounts
+	8,  // 48: geyser.SubscribeRequest.SlotsEntry.value:type_name -> geyser.SubscribeRequestFilterSlots
+	9,  // 49: geyser.SubscribeRequest.TransactionsEntry.value:type_name -> geyser.SubscribeRequestFilterTransactions
+	9,  // 50: geyser.SubscribeRequest.TransactionsStatusEntry.value:type_name -> geyser.SubscribeRequestFilterTransactions
+	10, // 51: geyser.SubscribeRequest.BlocksEntry.value:type_name -> geyser.SubscribeRequestFilterBlocks
+	11, // 52: geyser.SubscribeRequest.BlocksMetaEntry.value:type_name -> geyser.SubscribeRequestFilterBlocksMeta
+	12, // 53: geyser.SubscribeRequest.EntryEntry.value:type_name -> geyser.SubscribeRequestFilterEntry
+	13, // 54: geyser.SubscribeRequest.BlockFooterEntry.value:type_name -> geyser.SubscribeRequestFilterBlockFooter
+	3,  // 55: geyser.Geyser.Subscribe:input_type -> geyser.SubscribeRequest
+	31, // 56: geyser.Geyser.SubscribeReplayInfo:input_type -> geyser.SubscribeReplayInfoRequest
+	33, // 57: geyser.Geyser.Ping:input_type -> geyser.PingRequest
+	35, // 58: geyser.Geyser.GetLatestBlockhash:input_type -> geyser.GetLatestBlockhashRequest
+	37, // 59: geyser.Geyser.GetBlockHeight:input_type -> geyser.GetBlockHeightRequest
+	39, // 60: geyser.Geyser.GetSlot:input_type -> geyser.GetSlotRequest
+	43, // 61: geyser.Geyser.IsBlockhashValid:input_type -> geyser.IsBlockhashValidRequest
+	41, // 62: geyser.Geyser.GetVersion:input_type -> geyser.GetVersionRequest
+	16, // 63: geyser.Geyser.Subscribe:output_type -> geyser.SubscribeUpdate
+	32, // 64: geyser.Geyser.SubscribeReplayInfo:output_type -> geyser.SubscribeReplayInfoResponse
+	34, // 65: geyser.Geyser.Ping:output_type -> geyser.PongResponse
+	36, // 66: geyser.Geyser.GetLatestBlockhash:output_type -> geyser.GetLatestBlockhashResponse
+	38, // 67: geyser.Geyser.GetBlockHeight:output_type -> geyser.GetBlockHeightResponse
+	40, // 68: geyser.Geyser.GetSlot:output_type -> geyser.GetSlotResponse
+	44, // 69: geyser.Geyser.IsBlockhashValid:output_type -> geyser.IsBlockhashValidResponse
+	42, // 70: geyser.Geyser.GetVersion:output_type -> geyser.GetVersionResponse
+	63, // [63:71] is the sub-list for method output_type
+	55, // [55:63] is the sub-list for method input_type
+	55, // [55:55] is the sub-list for extension type_name
+	55, // [55:55] is the sub-list for extension extendee
+	0,  // [0:55] is the sub-list for field type_name
 }
 
 func init() { file_geyser_proto_init() }
@@ -4007,34 +3603,27 @@ func file_geyser_proto_init() {
 	file_geyser_proto_msgTypes[0].OneofWrappers = []any{}
 	file_geyser_proto_msgTypes[1].OneofWrappers = []any{}
 	file_geyser_proto_msgTypes[2].OneofWrappers = []any{
-		(*SubscribePreprocessedUpdate_Transaction)(nil),
-		(*SubscribePreprocessedUpdate_Ping)(nil),
-		(*SubscribePreprocessedUpdate_Pong)(nil),
-	}
-	file_geyser_proto_msgTypes[5].OneofWrappers = []any{}
-	file_geyser_proto_msgTypes[6].OneofWrappers = []any{}
-	file_geyser_proto_msgTypes[7].OneofWrappers = []any{
 		(*SubscribeRequestFilterAccountsFilter_Memcmp)(nil),
 		(*SubscribeRequestFilterAccountsFilter_Datasize)(nil),
 		(*SubscribeRequestFilterAccountsFilter_TokenAccountState)(nil),
 		(*SubscribeRequestFilterAccountsFilter_Lamports)(nil),
 	}
-	file_geyser_proto_msgTypes[8].OneofWrappers = []any{
+	file_geyser_proto_msgTypes[3].OneofWrappers = []any{
 		(*SubscribeRequestFilterAccountsFilterMemcmp_Bytes)(nil),
 		(*SubscribeRequestFilterAccountsFilterMemcmp_Base58)(nil),
 		(*SubscribeRequestFilterAccountsFilterMemcmp_Base64)(nil),
 	}
-	file_geyser_proto_msgTypes[9].OneofWrappers = []any{
+	file_geyser_proto_msgTypes[4].OneofWrappers = []any{
 		(*SubscribeRequestFilterAccountsFilterLamports_Eq)(nil),
 		(*SubscribeRequestFilterAccountsFilterLamports_Ne)(nil),
 		(*SubscribeRequestFilterAccountsFilterLamports_Lt)(nil),
 		(*SubscribeRequestFilterAccountsFilterLamports_Gt)(nil),
 	}
-	file_geyser_proto_msgTypes[10].OneofWrappers = []any{}
-	file_geyser_proto_msgTypes[11].OneofWrappers = []any{}
-	file_geyser_proto_msgTypes[12].OneofWrappers = []any{}
-	file_geyser_proto_msgTypes[14].OneofWrappers = []any{}
-	file_geyser_proto_msgTypes[18].OneofWrappers = []any{
+	file_geyser_proto_msgTypes[5].OneofWrappers = []any{}
+	file_geyser_proto_msgTypes[6].OneofWrappers = []any{}
+	file_geyser_proto_msgTypes[7].OneofWrappers = []any{}
+	file_geyser_proto_msgTypes[9].OneofWrappers = []any{}
+	file_geyser_proto_msgTypes[13].OneofWrappers = []any{
 		(*SubscribeUpdate_Account)(nil),
 		(*SubscribeUpdate_Slot)(nil),
 		(*SubscribeUpdate_Transaction)(nil),
@@ -4047,21 +3636,21 @@ func file_geyser_proto_init() {
 		(*SubscribeUpdate_BlockFooter)(nil),
 		(*SubscribeUpdate_EntryUpdateParent)(nil),
 	}
-	file_geyser_proto_msgTypes[20].OneofWrappers = []any{}
-	file_geyser_proto_msgTypes[21].OneofWrappers = []any{}
-	file_geyser_proto_msgTypes[22].OneofWrappers = []any{}
+	file_geyser_proto_msgTypes[15].OneofWrappers = []any{}
+	file_geyser_proto_msgTypes[16].OneofWrappers = []any{}
+	file_geyser_proto_msgTypes[17].OneofWrappers = []any{}
+	file_geyser_proto_msgTypes[29].OneofWrappers = []any{}
+	file_geyser_proto_msgTypes[32].OneofWrappers = []any{}
 	file_geyser_proto_msgTypes[34].OneofWrappers = []any{}
-	file_geyser_proto_msgTypes[37].OneofWrappers = []any{}
-	file_geyser_proto_msgTypes[39].OneofWrappers = []any{}
-	file_geyser_proto_msgTypes[41].OneofWrappers = []any{}
-	file_geyser_proto_msgTypes[45].OneofWrappers = []any{}
+	file_geyser_proto_msgTypes[36].OneofWrappers = []any{}
+	file_geyser_proto_msgTypes[40].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_geyser_proto_rawDesc), len(file_geyser_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   56,
+			NumMessages:   50,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

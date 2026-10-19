@@ -6,7 +6,7 @@ pub mod config;
 pub mod error;
 pub mod unary;
 
-pub use client::{subscribe, subscribe_preprocessed, StreamHandle, PreprocessedStreamHandle};
+pub use client::{subscribe, StreamHandle};
 pub use unary::LaserstreamClient;
 pub use config::{ChannelOptions, LaserstreamConfig, CompressionEncoding};
 pub use error::LaserstreamError;

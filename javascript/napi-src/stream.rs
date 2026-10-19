@@ -9,7 +9,6 @@ use std::time::Duration;
 use tokio::sync::oneshot;
 use bytes::Buf;
 use laserstream_core_client::{ClientTlsConfig, Interceptor};
-use laserstream_core_proto::prelude::{geyser_client::GeyserClient};
 use laserstream_core_proto::geyser;
 use laserstream_core_proto::tonic::{codec::{self, CompressionEncoding}, transport::Endpoint, Request, Status, metadata::MetadataValue};
 use uuid;
@@ -376,7 +375,7 @@ fn block_footer_slot(data: &[u8], replay: bool) -> std::io::Result<Option<u64>> 
 
 pub struct StreamInner {
     cancel_tx: Mutex<Option<oneshot::Sender<()>>>,
-    write_tx: Mutex<Option<mpsc::UnboundedSender<geyser::SubscribeRequest>>>,
+    write_tx: Mutex<mpsc::UnboundedSender<geyser::SubscribeRequest>>,
 }
 
 impl StreamInner {
@@ -520,7 +519,7 @@ impl StreamInner {
 
         Ok(Self {
             cancel_tx: Mutex::new(Some(cancel_tx)),
-            write_tx: Mutex::new(Some(write_tx)),
+            write_tx: Mutex::new(write_tx),
         })
     }
 
@@ -713,162 +712,6 @@ impl StreamInner {
         Ok(())
     }
 
-    pub fn new_preprocessed_bytes(
-        id: String,
-        endpoint: String,
-        token: Option<String>,
-        initial_request: geyser::SubscribePreprocessedRequest,
-        ts_callback: ThreadsafeFunction<crate::SubscribePreprocessedUpdateBytes, ErrorStrategy::CalleeHandled>,
-        max_reconnect_attempts: u32,
-        channel_options: Option<ChannelOptions>,
-    ) -> Result<Self> {
-        let (cancel_tx, mut cancel_rx) = oneshot::channel();
-        // Preprocessed subscriptions don't support write(), so we don't create the channel
-
-        let id_for_cleanup = id.clone();
-
-        tokio::spawn(async move {
-            let mut reconnect_attempts = 0u32;
-            let effective_max_attempts = max_reconnect_attempts.min(HARD_CAP_RECONNECT_ATTEMPTS);
-
-            loop {
-                let ts_callback_clone = ts_callback.clone();
-
-                tokio::select! {
-                    _ = &mut cancel_rx => {
-                        break;
-                    }
-
-                    result = Self::connect_and_stream_preprocessed_bytes(
-                        &endpoint,
-                        &token,
-                        &initial_request,
-                        ts_callback_clone,
-                        &channel_options,
-                    ) => {
-                        match result {
-                            Ok(()) => {
-                                reconnect_attempts = 0;
-                            }
-                            Err(e) => {
-                                reconnect_attempts += 1;
-                                eprintln!("RECONNECT: Preprocessed connection failed (attempt {}/{}): {}", reconnect_attempts, effective_max_attempts, e);
-
-                                if reconnect_attempts >= effective_max_attempts {
-                                    let error_msg = format!("Preprocessed connection failed after {} attempts: {}", effective_max_attempts, e);
-                                    let _ = ts_callback.call(Err(napi::Error::from_reason(error_msg)), ThreadsafeFunctionCallMode::Blocking);
-                                    break;
-                                }
-                            }
-                        }
-
-                        tokio::time::sleep(Duration::from_millis(FIXED_RECONNECT_INTERVAL_MS)).await;
-                    }
-                }
-            }
-
-            crate::unregister_stream(&id_for_cleanup);
-        });
-
-        Ok(Self {
-            cancel_tx: Mutex::new(Some(cancel_tx)),
-            write_tx: Mutex::new(None), // None indicates write() is not supported for preprocessed
-        })
-    }
-
-    async fn connect_and_stream_preprocessed_bytes(
-        endpoint: &str,
-        token: &Option<String>,
-        request: &geyser::SubscribePreprocessedRequest,
-        ts_callback: ThreadsafeFunction<crate::SubscribePreprocessedUpdateBytes, ErrorStrategy::CalleeHandled>,
-        channel_options: &Option<ChannelOptions>,
-    ) -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        // Create our custom interceptor with SDK metadata
-        let interceptor = SdkMetadataInterceptor::new(token)?;
-
-        // Configure endpoint using helper function
-        let endpoint_configured = configure_endpoint(endpoint, channel_options)?;
-        let channel_config = ChannelConfig::from_options(channel_options);
-
-        // Connect to create channel
-        let channel = endpoint_configured.connect().await?;
-
-        // Create geyser client with our custom interceptor and channel config
-        let mut geyser_client = GeyserClient::with_interceptor(channel, interceptor)
-            .max_decoding_message_size(channel_config.max_recv_msg_size)
-            .max_encoding_message_size(channel_config.max_send_msg_size);
-
-        // Configure compression if specified
-        if let Some(encoding) = channel_config.send_compression {
-            geyser_client = geyser_client.send_compressed(encoding);
-        }
-        if let Some(encoding) = channel_config.accept_compression {
-            geyser_client = geyser_client.accept_compressed(encoding);
-        }
-
-        // Create bidirectional stream for preprocessed
-        let (mut sender, mut stream) = {
-            use futures_channel::mpsc as futures_mpsc;
-            let (mut subscribe_tx, subscribe_rx) = futures_mpsc::unbounded();
-            subscribe_tx.send(request.clone()).await?;
-            let response = geyser_client.subscribe_preprocessed(subscribe_rx).await?;
-            (subscribe_tx, response.into_inner())
-        };
-
-        let mut ping_interval = tokio::time::interval(Duration::from_secs(30));
-        ping_interval.tick().await;
-        let mut ping_id = 0i32;
-
-        loop {
-            tokio::select! {
-                _ = ping_interval.tick() => {
-                    ping_id = ping_id.wrapping_add(1);
-                    let ping_request = geyser::SubscribePreprocessedRequest {
-                        ping: Some(geyser::SubscribeRequestPing { id: ping_id }),
-                        ..Default::default()
-                    };
-                    let _ = sender.send(ping_request).await;
-                },
-                Some(result) = stream.next() => {
-                    match result {
-                        Ok(message) => {
-                            // Handle ping/pong
-                            if let Some(geyser::subscribe_preprocessed_update::UpdateOneof::Ping(_)) = &message.update_oneof {
-                                let pong_request = geyser::SubscribePreprocessedRequest {
-                                    ping: Some(geyser::SubscribeRequestPing { id: 1 }),
-                                    ..Default::default()
-                                };
-                                let _ = sender.send(pong_request).await;
-                                continue;
-                            }
-                            if let Some(geyser::subscribe_preprocessed_update::UpdateOneof::Pong(_)) = &message.update_oneof {
-                                continue;
-                            }
-
-                            // Convert to bytes and send to JavaScript
-                            match crate::subscribe_preprocessed_update_to_bytes(message) {
-                                Ok(bytes) => {
-                                    let _ = ts_callback.call(Ok(crate::SubscribePreprocessedUpdateBytes(bytes)), ThreadsafeFunctionCallMode::NonBlocking);
-                                }
-                                Err(e) => {
-                                    eprintln!("Failed to encode preprocessed update: {}", e);
-                                }
-                            }
-                        }
-                        Err(status) => {
-                            return Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, status.to_string())));
-                        }
-                    }
-                }
-                else => {
-                    break;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     /// Replaces the current subscription request with a new one.
     /// This ensures modifications made via write() are preserved across reconnections.
     fn merge_subscribe_requests(
@@ -913,12 +756,9 @@ impl StreamInner {
 
     pub fn write(&self, request: geyser::SubscribeRequest) -> Result<()> {
         let tx_guard = self.write_tx.lock();
-        if let Some(ref tx) = *tx_guard {
-            tx.send(request)
-                .map_err(|_| napi::Error::from_reason("Failed to send write request: channel closed"))?;
-        } else {
-            return Err(napi::Error::from_reason("write() is not supported for preprocessed subscriptions. Use subscribe() instead of subscribePreprocessed() if you need dynamic subscription updates."));
-        }
+        tx_guard
+            .send(request)
+            .map_err(|_| napi::Error::from_reason("Failed to send write request: channel closed"))?;
         Ok(())
     }
 }
