@@ -30,7 +30,7 @@ pub struct LaserstreamConfig {
     #[cfg(feature = "internal")]
     #[doc(hidden)]
     pub internal_disable_geyser_archive_fallback: bool,
-    /// Every write of each bank at confirmed and finalized, without Geyser Archive replay. Default: false
+    /// Every write of each bank at confirmed and finalized; retention is limited. Default: false
     pub intra_slot_updates: bool,
 }
 
@@ -142,7 +142,7 @@ impl LaserstreamConfig {
         self
     }
 
-    /// Delivers every write of each bank at confirmed and finalized; a `from_slot` older than in-memory retention fails with OUT_OF_RANGE instead of replaying from Geyser Archive.
+    /// Delivers every write of each bank at confirmed and finalized; retention is limited, so a `from_slot` older than it fails with OUT_OF_RANGE.
     pub fn with_intra_slot_updates(mut self, intra_slot_updates: bool) -> Self {
         self.intra_slot_updates = intra_slot_updates;
         self

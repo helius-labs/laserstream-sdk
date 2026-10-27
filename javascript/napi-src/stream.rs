@@ -25,7 +25,7 @@ const SDK_NAME: &str = "laserstream-javascript";
 const SDK_VERSION: &str = env!("CARGO_PKG_VERSION");
 const INTRA_SLOT_UPDATES_HEADER: &str = "x-intra-slot-updates";
 
-/// OUT_OF_RANGE with intra-slot updates, which have no Geyser Archive replay to fall back on, ends the stream.
+/// OUT_OF_RANGE with intra-slot updates, whose retention is limited, ends the stream.
 fn is_terminal(intra_slot_updates: bool, error: &(dyn std::error::Error + Send + Sync + 'static)) -> bool {
     intra_slot_updates
         && error

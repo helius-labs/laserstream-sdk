@@ -53,7 +53,7 @@ type LaserstreamConfig struct {
 	MaxReconnectAttempts *int            // nil uses default (240 attempts)
 	ChannelOptions       *ChannelOptions // nil uses defaults
 	Replay               *bool           // nil => default true; set to pointer false to disable
-	IntraSlotUpdates     bool            // every write of each bank at confirmed/finalized; no Geyser Archive replay, so OUT_OF_RANGE is returned without retrying
+	IntraSlotUpdates     bool            // every write of each bank at confirmed/finalized; retention is limited, so OUT_OF_RANGE is returned without retrying
 }
 
 // ChannelOptions configures gRPC channel behavior
@@ -135,7 +135,7 @@ func NewClient(config LaserstreamConfig) *Client {
 	}
 }
 
-// isTerminal reports whether err ends the subscription instead of reconnecting: OUT_OF_RANGE with intra-slot updates, which have no Geyser Archive replay to fall back on.
+// isTerminal reports whether err ends the subscription instead of reconnecting: OUT_OF_RANGE with intra-slot updates, whose retention is limited.
 func (c *Client) isTerminal(err error) bool {
 	st, ok := status.FromError(err)
 	return ok && c.config.IntraSlotUpdates && st.Code() == codes.OutOfRange

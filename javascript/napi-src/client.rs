@@ -45,7 +45,7 @@ pub struct ClientInner {
     // When true, enable replay behavior (internal slot tracking + from_slot on reconnects)
     // When false, disable replay (no internal slot tracking and no from_slot on reconnects)
     replay: bool,
-    // Every write of each bank at confirmed and finalized, with no Geyser Archive replay
+    // Every write of each bank at confirmed and finalized, retention is limited
     intra_slot_updates: bool,
 }
 

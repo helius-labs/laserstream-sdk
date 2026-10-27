@@ -60,7 +60,7 @@ export interface LaserstreamConfig {
   channelOptions?: ChannelOptions;
   // When true, enable replay on reconnects (uses fromSlot and internal slot tracking). When false, no replay.
   replay?: boolean;
-  // When true, confirmed and finalized deliver every write of each bank, with no Geyser Archive replay: a fromSlot older than in-memory retention fails with OUT_OF_RANGE. Default: false.
+  // When true, confirmed and finalized deliver every write of each bank. Retention is limited, so a fromSlot older than it fails with OUT_OF_RANGE. Default: false.
   intraSlotUpdates?: boolean;
 }
 
