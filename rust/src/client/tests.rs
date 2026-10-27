@@ -52,26 +52,34 @@ fn default_config_has_no_terminal_errors() {
     }
 }
 
-#[cfg(feature = "internal")]
 #[test]
 fn only_opted_in_out_of_range_is_terminal() {
-    for config in [
-        LaserstreamConfig::default(),
-        LaserstreamConfig::default().internal_disable_geyser_archive_fallback(),
-    ] {
+    let opted_in = archive_opt_outs().into_iter().map(|(opt_in, _)| (opt_in(LaserstreamConfig::default()), true));
+    for (config, opted_in) in std::iter::once((LaserstreamConfig::default(), false)).chain(opted_in) {
         for value in 1..=16 {
             let code = Code::from_i32(value);
             assert_eq!(
                 is_terminal_error(&config, &Status::new(code, "test")),
-                config.internal_disable_geyser_archive_fallback && code == Code::OutOfRange,
+                opted_in && code == Code::OutOfRange,
                 "{code:?}"
             );
         }
     }
 }
 
+#[test]
+fn intra_slot_updates_are_off_by_default_and_independent_of_replay() {
+    assert!(!LaserstreamConfig::default().intra_slot_updates);
+    assert!(!LaserstreamConfig::new(String::new(), String::new()).intra_slot_updates);
+    let config = LaserstreamConfig::default().with_intra_slot_updates(true);
+    assert!(config.replay);
+    assert!(config.intra_slot_updates);
+    assert!(!config.with_intra_slot_updates(false).intra_slot_updates);
+}
+
 #[cfg(feature = "internal")]
 #[test]
+#[allow(deprecated)]
 fn fallback_is_enabled_by_default_and_independent_of_replay() {
     assert!(!LaserstreamConfig::default().internal_disable_geyser_archive_fallback);
     assert!(
@@ -88,20 +96,21 @@ fn fallback_is_enabled_by_default_and_independent_of_replay() {
     );
 }
 
-#[cfg(feature = "internal")]
 #[tokio::test]
 async fn stream_out_of_range_is_terminal() {
     assert_terminal(Reply::StreamOutOfRange, Code::OutOfRange, 1).await;
 }
-#[cfg(feature = "internal")]
 #[tokio::test]
 async fn initial_out_of_range_preserves_status() {
     assert_terminal(Reply::InitialOutOfRange, Code::OutOfRange, 1).await;
 }
 #[cfg(feature = "internal")]
 #[tokio::test]
+#[allow(deprecated)]
 async fn retryable_error_reconnects_and_retains_requested_slot() {
-    assert_terminal(Reply::TransientThenOutOfRange, Code::OutOfRange, 2).await;
+    let server = TestServer::start(Reply::TransientThenOutOfRange).await;
+    let config = server.config().internal_disable_geyser_archive_fallback();
+    assert_terminal_with_config(&server, config, Code::OutOfRange, 2, (Some("true"), Some("true"))).await;
 }
 
 #[tokio::test]
@@ -115,30 +124,23 @@ async fn default_client_omits_internal_header() {
         .unwrap()
         .unwrap();
     assert!(matches!(update.update_oneof, Some(UpdateOneof::Account(_))));
-    assert!(server.requests.lock().unwrap()[0].disable_archive.is_none());
+    assert_eq!(server.requests.lock().unwrap()[0].headers(), (None, None));
 }
 
 #[cfg(feature = "internal")]
 #[tokio::test]
-async fn disabled_client_delivers_data_without_acknowledgement() {
+#[allow(deprecated)]
+async fn disabled_client_sends_both_headers_and_delivers_data_without_acknowledgement() {
     let server = TestServer::start(Reply::Data).await;
-    let (stream, _handle) = subscribe(
-        server.config().internal_disable_geyser_archive_fallback(),
-        request(),
-    );
-    futures::pin_mut!(stream);
-    let update = tokio::time::timeout(Duration::from_secs(2), stream.next())
-        .await
-        .unwrap()
-        .unwrap()
-        .unwrap();
-    assert!(matches!(update.update_oneof, Some(UpdateOneof::Account(_))));
-    assert_eq!(
-        server.requests.lock().unwrap()[0]
-            .disable_archive
-            .as_deref(),
-        Some("true")
-    );
+    let config = server.config().internal_disable_geyser_archive_fallback();
+    assert_delivers_data(&server, config, (Some("true"), Some("true"))).await;
+}
+
+#[tokio::test]
+async fn intra_slot_client_sends_only_the_intra_slot_header() {
+    let server = TestServer::start(Reply::Data).await;
+    let config = server.config().with_intra_slot_updates(true);
+    assert_delivers_data(&server, config, (Some("true"), None)).await;
 }
 
 #[tokio::test]
@@ -154,7 +156,7 @@ async fn default_client_still_retries_out_of_range() {
         assert_eq!(requests.len(), 2);
         assert!(requests
             .iter()
-            .all(|request| request.from_slot == Some(95) && request.disable_archive.is_none()));
+            .all(|request| request.from_slot == Some(95) && request.headers() == (None, None)));
     }
 }
 
@@ -204,10 +206,20 @@ enum Reply {
     TransientThenOutOfRange,
 }
 
+/// The `x-intra-slot-updates` and `x-disable-geyser-archive` header values.
+type Headers = (Option<&'static str>, Option<&'static str>);
+
 #[derive(Debug)]
 struct ObservedRequest {
+    intra_slot_updates: Option<String>,
     disable_archive: Option<String>,
     from_slot: Option<u64>,
+}
+
+impl ObservedRequest {
+    fn headers(&self) -> (Option<&str>, Option<&str>) {
+        (self.intra_slot_updates.as_deref(), self.disable_archive.as_deref())
+    }
 }
 
 #[derive(Debug)]
@@ -228,14 +240,19 @@ impl geyser_server::Geyser for TestGeyser {
         &self,
         request: Request<Streaming<SubscribeRequest>>,
     ) -> Result<Response<Updates>, Status> {
-        let disable_archive = request
-            .metadata()
-            .get("x-disable-geyser-archive")
-            .map(|value| value.to_str().unwrap().to_owned());
+        let header = |name: &str| {
+            request
+                .metadata()
+                .get(name)
+                .map(|value| value.to_str().unwrap().to_owned())
+        };
+        let (intra_slot_updates, disable_archive) =
+            (header("x-intra-slot-updates"), header("x-disable-geyser-archive"));
         let first = request.into_inner().message().await?.unwrap();
         let _attempt = {
             let mut requests = self.requests.lock().unwrap();
             requests.push(ObservedRequest {
+                intra_slot_updates,
                 disable_archive,
                 from_slot: first.from_slot,
             });
@@ -380,26 +397,46 @@ fn request() -> SubscribeRequest {
     }
 }
 
-#[cfg(feature = "internal")]
-async fn assert_terminal(reply: Reply, code: Code, attempts: usize) {
-    let server = TestServer::start(reply).await;
-    assert_terminal_with_config(
-        &server,
-        server.config().internal_disable_geyser_archive_fallback(),
-        code,
-        attempts,
-        Some("true"),
-    )
-    .await;
+type OptIn = fn(LaserstreamConfig) -> LaserstreamConfig;
+
+/// Each opt-out of Geyser Archive replay with the headers it sends: intra-slot updates and, with `internal`, the deprecated archive flag.
+fn archive_opt_outs() -> Vec<(OptIn, Headers)> {
+    let intra_slot: (OptIn, Headers) = (|config| config.with_intra_slot_updates(true), (Some("true"), None));
+    #[cfg(feature = "internal")]
+    #[allow(deprecated)]
+    return vec![
+        intra_slot,
+        (LaserstreamConfig::internal_disable_geyser_archive_fallback, (Some("true"), Some("true"))),
+    ];
+    #[cfg(not(feature = "internal"))]
+    vec![intra_slot]
 }
 
-#[cfg(feature = "internal")]
+async fn assert_terminal(reply: Reply, code: Code, attempts: usize) {
+    for (opt_in, headers) in archive_opt_outs() {
+        let server = TestServer::start(reply).await;
+        assert_terminal_with_config(&server, opt_in(server.config()), code, attempts, headers).await;
+    }
+}
+
+async fn assert_delivers_data(server: &TestServer, config: LaserstreamConfig, headers: Headers) {
+    let (stream, _handle) = subscribe(config, request());
+    futures::pin_mut!(stream);
+    let update = tokio::time::timeout(Duration::from_secs(2), stream.next())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    assert!(matches!(update.update_oneof, Some(UpdateOneof::Account(_))));
+    assert_eq!(server.requests.lock().unwrap()[0].headers(), headers);
+}
+
 async fn assert_terminal_with_config(
     server: &TestServer,
     config: LaserstreamConfig,
     code: Code,
     attempts: usize,
-    expected_header: Option<&str>,
+    expected_headers: Headers,
 ) {
     let (stream, _handle) = subscribe(config, request());
     futures::pin_mut!(stream);
@@ -418,7 +455,7 @@ async fn assert_terminal_with_config(
     let requests = server.requests.lock().unwrap();
     assert_eq!(requests.len(), attempts);
     for request in requests.iter() {
-        assert_eq!(request.disable_archive.as_deref(), expected_header);
+        assert_eq!(request.headers(), expected_headers);
         assert_eq!(request.from_slot, Some(95));
     }
 }

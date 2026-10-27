@@ -30,6 +30,8 @@ pub struct LaserstreamConfig {
     #[cfg(feature = "internal")]
     #[doc(hidden)]
     pub internal_disable_geyser_archive_fallback: bool,
+    /// Every write of each bank at confirmed and finalized, without Geyser Archive replay. Default: false
+    pub intra_slot_updates: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -93,6 +95,7 @@ impl Default for LaserstreamConfig {
             replay: true, // Default to true
             #[cfg(feature = "internal")]
             internal_disable_geyser_archive_fallback: false,
+            intra_slot_updates: false,
         }
     }
 }
@@ -107,6 +110,7 @@ impl LaserstreamConfig {
             replay: true, // Default to true
             #[cfg(feature = "internal")]
             internal_disable_geyser_archive_fallback: false,
+            intra_slot_updates: false,
         }
     }
 
@@ -129,9 +133,18 @@ impl LaserstreamConfig {
     /// This does not change the subscription's commitment or enable replay.
     #[cfg(feature = "internal")]
     #[doc(hidden)]
+    #[deprecated(
+        since = "1.1.0",
+        note = "use with_intra_slot_updates; the server treats x-disable-geyser-archive as intra-slot updates"
+    )]
     pub fn internal_disable_geyser_archive_fallback(mut self) -> Self {
         self.internal_disable_geyser_archive_fallback = true;
         self
+    }
+
+    /// Delivers every write of each bank at confirmed and finalized; a `from_slot` older than in-memory retention fails with OUT_OF_RANGE instead of replaying from Geyser Archive.
+    pub fn with_intra_slot_updates(self, _intra_slot_updates: bool) -> Self {
+        unimplemented!()
     }
 
     /// Sets replay behavior on reconnects.

@@ -50,6 +50,7 @@ type LaserstreamConfig struct {
 	MaxReconnectAttempts *int            // nil uses default (240 attempts)
 	ChannelOptions       *ChannelOptions // nil uses defaults
 	Replay               *bool           // nil => default true; set to pointer false to disable
+	IntraSlotUpdates     bool            // every write of each bank at confirmed/finalized; no Geyser Archive replay, so OUT_OF_RANGE is returned without retrying
 }
 
 // ChannelOptions configures gRPC channel behavior
