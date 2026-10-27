@@ -31,7 +31,8 @@ async function subscribe(config, request, onData, onError) {
     config.apiKey,
     config.maxReconnectAttempts,
     config.channelOptions,
-    config.replay
+    config.replay,
+    config.intraSlotUpdates
   );
 
   // Wrap the callbacks to decode protobuf bytes

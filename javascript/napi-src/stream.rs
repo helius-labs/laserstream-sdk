@@ -23,6 +23,15 @@ const FORK_DEPTH_SAFETY_MARGIN: u64 = 31; // Max fork depth for processed commit
 // SDK metadata constants
 const SDK_NAME: &str = "laserstream-javascript";
 const SDK_VERSION: &str = env!("CARGO_PKG_VERSION");
+const INTRA_SLOT_UPDATES_HEADER: &str = "x-intra-slot-updates";
+
+/// OUT_OF_RANGE with intra-slot updates, which have no Geyser Archive replay to fall back on, ends the stream.
+fn is_terminal(intra_slot_updates: bool, error: &(dyn std::error::Error + Send + Sync + 'static)) -> bool {
+    intra_slot_updates
+        && error
+            .downcast_ref::<Status>()
+            .is_some_and(|status| status.code() == laserstream_core_proto::tonic::Code::OutOfRange)
+}
 
 /// Custom interceptor that adds SDK metadata headers to all gRPC requests
 #[derive(Clone)]
@@ -388,6 +397,7 @@ impl StreamInner {
         max_reconnect_attempts: u32,
         channel_options: Option<ChannelOptions>,
         replay: bool,
+        intra_slot_updates: bool,
     ) -> Result<Self> {
         let (cancel_tx, mut cancel_rx) = oneshot::channel();
         let (write_tx, mut write_rx) = mpsc::unbounded_channel();
@@ -447,6 +457,7 @@ impl StreamInner {
                         &token,
                         &request_snapshot,
                         replay,
+                        intra_slot_updates,
                         ts_callback_clone,
                         tracked_slot_clone,
                         internal_slot_id_clone,
@@ -459,6 +470,10 @@ impl StreamInner {
                             Ok(()) => {
                                 reconnect_attempts = 0;
                                 // Session ended gracefully, attempts reset
+                            }
+                            Err(e) if is_terminal(intra_slot_updates, e.as_ref()) => {
+                                let _ = ts_callback.call(Err(napi::Error::from_reason(e.to_string())), ThreadsafeFunctionCallMode::Blocking);
+                                break;
                             }
                             Err(e) => {
                                 // Connection error occurred
@@ -528,6 +543,7 @@ impl StreamInner {
         token: &Option<String>,
         request: &geyser::SubscribeRequest,
         replay: bool,
+        intra_slot_updates: bool,
         ts_callback: ThreadsafeFunction<crate::SubscribeUpdateBytes, ErrorStrategy::CalleeHandled>,
         tracked_slot: Arc<AtomicU64>,
         internal_slot_sub_id: String,
@@ -578,7 +594,13 @@ impl StreamInner {
             let path = laserstream_core_proto::tonic::codegen::http::uri::PathAndQuery::from_static(
                 "/geyser.Geyser/Subscribe",
             );
-            let response = grpc.streaming(Request::new(subscribe_rx), path, codec).await?;
+            let mut subscribe_rx = Request::new(subscribe_rx);
+            if intra_slot_updates {
+                subscribe_rx
+                    .metadata_mut()
+                    .insert(INTRA_SLOT_UPDATES_HEADER, MetadataValue::from_static("true"));
+            }
+            let response = grpc.streaming(subscribe_rx, path, codec).await?;
             (subscribe_tx, response.into_inner())
         };
 

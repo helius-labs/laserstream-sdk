@@ -45,6 +45,8 @@ pub struct ClientInner {
     // When true, enable replay behavior (internal slot tracking + from_slot on reconnects)
     // When false, disable replay (no internal slot tracking and no from_slot on reconnects)
     replay: bool,
+    // Every write of each bank at confirmed and finalized, with no Geyser Archive replay
+    intra_slot_updates: bool,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -228,6 +230,7 @@ impl ClientInner {
         max_reconnect_attempts: Option<u32>,
         channel_options: Option<ChannelOptions>,
         replay: Option<bool>,
+        intra_slot_updates: Option<bool>,
     ) -> Result<Self> {
         // Initialize rustls crypto provider
         crate::init_rustls();
@@ -239,6 +242,7 @@ impl ClientInner {
             channel_options,
             // Default to true (replay enabled) unless explicitly set to false
             replay: replay.unwrap_or(true),
+            intra_slot_updates: intra_slot_updates.unwrap_or(false),
         })
     }
 
@@ -564,6 +568,7 @@ impl ClientInner {
             self.max_reconnect_attempts,
             self.channel_options.clone(),
             self.replay,
+            self.intra_slot_updates,
         )?);
 
         // Register stream in global registry for lifecycle management
@@ -589,6 +594,7 @@ mod tests {
             None,
             None,
             Some(true),
+            None,
         )
         .expect("client")
     }

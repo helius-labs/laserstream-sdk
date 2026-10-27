@@ -36,6 +36,9 @@ const (
 	SDKVersion = "1.0.1"
 )
 
+// IntraSlotUpdatesHeader requests every write of each bank at confirmed and finalized.
+const IntraSlotUpdatesHeader = "x-intra-slot-updates"
+
 // Commitment levels
 const (
 	CommitmentProcessed = 0
@@ -130,6 +133,12 @@ func NewClient(config LaserstreamConfig) *Client {
 		writeChan:     make(chan *SubscribeRequest, 100),
 		writeStopChan: make(chan struct{}),
 	}
+}
+
+// isTerminal reports whether err ends the subscription instead of reconnecting: OUT_OF_RANGE with intra-slot updates, which have no Geyser Archive replay to fall back on.
+func (c *Client) isTerminal(err error) bool {
+	st, ok := status.FromError(err)
+	return ok && c.config.IntraSlotUpdates && st.Code() == codes.OutOfRange
 }
 
 // isReplayEnabled returns the effective replay setting
@@ -276,6 +285,13 @@ func (c *Client) streamLoop(ctx context.Context) {
 		err := c.connectAndStream(ctx)
 
 		if err != nil {
+			if c.isTerminal(err) {
+				if c.errorCallback != nil {
+					c.errorCallback(err)
+				}
+				return
+			}
+
 			// Always increment reconnect attempts first
 			reconnectAttempts++
 
@@ -332,6 +348,9 @@ func (c *Client) connectAndStream(ctx context.Context) error {
 	})
 	if c.config.APIKey != "" {
 		md.Set("x-token", c.config.APIKey)
+	}
+	if c.config.IntraSlotUpdates {
+		md.Set(IntraSlotUpdatesHeader, "true")
 	}
 	streamCtx = metadata.NewOutgoingContext(streamCtx, md)
 

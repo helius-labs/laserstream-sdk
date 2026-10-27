@@ -143,8 +143,9 @@ impl LaserstreamConfig {
     }
 
     /// Delivers every write of each bank at confirmed and finalized; a `from_slot` older than in-memory retention fails with OUT_OF_RANGE instead of replaying from Geyser Archive.
-    pub fn with_intra_slot_updates(self, _intra_slot_updates: bool) -> Self {
-        unimplemented!()
+    pub fn with_intra_slot_updates(mut self, intra_slot_updates: bool) -> Self {
+        self.intra_slot_updates = intra_slot_updates;
+        self
     }
 
     /// Sets replay behavior on reconnects.

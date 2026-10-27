@@ -23,15 +23,21 @@ const HARD_CAP_RECONNECT_ATTEMPTS: u32 = (20 * 60) / 5; // 20 mins / 5 sec inter
 const FIXED_RECONNECT_INTERVAL_MS: u64 = 5000; // 5 seconds fixed interval
 const SDK_NAME: &str = "laserstream-rust";
 const SDK_VERSION: &str = env!("CARGO_PKG_VERSION");
+const INTRA_SLOT_UPDATES_HEADER: &str = "x-intra-slot-updates";
 #[cfg(feature = "internal")]
 const DISABLE_GEYSER_ARCHIVE_HEADER: &str = "x-disable-geyser-archive";
 
-fn is_terminal_error(_config: &LaserstreamConfig, _status: &Status) -> bool {
+fn is_terminal_error(config: &LaserstreamConfig, status: &Status) -> bool {
+    archive_replay_disabled(config) && status.code() == laserstream_core_proto::tonic::Code::OutOfRange
+}
+
+/// Intra-slot updates, or the deprecated archive flag that the server treats as intra-slot updates.
+fn archive_replay_disabled(config: &LaserstreamConfig) -> bool {
     #[cfg(feature = "internal")]
-    if is_out_of_range_with_ga_disabled(_config, _status) {
+    if config.internal_disable_geyser_archive_fallback {
         return true;
     }
-    false
+    config.intra_slot_updates
 }
 
 fn footer_resume_slot(update: &SubscribeUpdate) -> Option<u64> {
@@ -39,12 +45,6 @@ fn footer_resume_slot(update: &SubscribeUpdate) -> Option<u64> {
         UpdateOneof::BlockFooter(msg) => Some(msg.slot),
         _ => None,
     }
-}
-
-#[cfg(feature = "internal")]
-fn is_out_of_range_with_ga_disabled(config: &LaserstreamConfig, status: &Status) -> bool {
-    config.internal_disable_geyser_archive_fallback
-        && status.code() == laserstream_core_proto::tonic::Code::OutOfRange
 }
 
 #[cfg(test)]
@@ -412,23 +412,24 @@ async fn connect_and_subscribe_once(
         .await
         .map_err(|e| Status::internal(format!("Failed to send initial request: {}", e)))?;
 
+    let mut subscribe_rx = Request::new(subscribe_rx);
+    if archive_replay_disabled(config) {
+        subscribe_rx
+            .metadata_mut()
+            .insert(INTRA_SLOT_UPDATES_HEADER, MetadataValue::from_static("true"));
+    }
+    // Servers without intra-slot updates still read the deprecated header.
     #[cfg(feature = "internal")]
-    let subscribe_rx = {
-        let mut request = Request::new(subscribe_rx);
-        if config.internal_disable_geyser_archive_fallback {
-            request.metadata_mut().insert(
-                DISABLE_GEYSER_ARCHIVE_HEADER,
-                MetadataValue::from_static("true"),
-            );
-        }
-        request
-    };
+    if config.internal_disable_geyser_archive_fallback {
+        subscribe_rx
+            .metadata_mut()
+            .insert(DISABLE_GEYSER_ARCHIVE_HEADER, MetadataValue::from_static("true"));
+    }
     let response = geyser_client
         .subscribe(subscribe_rx)
         .await
         .map_err(|status| {
-            #[cfg(feature = "internal")]
-            if config.internal_disable_geyser_archive_fallback {
+            if archive_replay_disabled(config) {
                 return status;
             }
             Status::internal(format!("Subscription failed: {}", status))
