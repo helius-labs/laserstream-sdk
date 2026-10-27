@@ -98,6 +98,16 @@ const config: LaserstreamConfig = {
 config.replay = true; // No data loss
 ```
 
+### Intra-Slot Updates
+By default, confirmed and finalized subscriptions receive the last write of each account per slot. Intra-slot updates deliver every write instead. They replay only from in-memory retention, without Geyser Archive, so a `fromSlot` older than that fails with `OUT_OF_RANGE` (passed to `onError`) instead of retrying.
+```typescript
+const config: LaserstreamConfig = {
+  apiKey: 'your-api-key',
+  endpoint: 'your-endpoint',
+  intraSlotUpdates: true,
+};
+```
+
 ## Subscription Examples
 
 ### Account Subscriptions

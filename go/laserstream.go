@@ -33,7 +33,7 @@ const (
 // SDK metadata constants
 const (
 	SDKName    = "laserstream-go"
-	SDKVersion = "1.0.1"
+	SDKVersion = "1.1.0"
 )
 
 // IntraSlotUpdatesHeader requests every write of each bank at confirmed and finalized.

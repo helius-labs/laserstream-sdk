@@ -94,6 +94,13 @@ let config = LaserstreamConfig::new(endpoint, api_key)
     .with_replay(true); // No data loss
 ```
 
+### Intra-Slot Updates
+By default, confirmed and finalized subscriptions receive the last write of each account per slot. Intra-slot updates deliver every write instead. They replay only from in-memory retention, without Geyser Archive, so a `from_slot` older than that fails with `OUT_OF_RANGE` instead of retrying.
+```rust
+let config = LaserstreamConfig::new(endpoint, api_key)
+    .with_intra_slot_updates(true);
+```
+
 ## Subscription Examples
 
 ### Account Subscriptions
