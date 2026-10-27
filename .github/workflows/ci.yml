@@ -295,7 +295,6 @@ jobs:
       - run: python3 scripts/release.py render
       - uses: dtolnay/rust-toolchain@stable
       - name: Authenticate to crates.io
-        if: env.DRY_RUN != 'true'
         id: crates-auth
         uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
       - name: Publish Rust SDK
