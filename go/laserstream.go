@@ -33,7 +33,7 @@ const (
 // SDK metadata constants
 const (
 	SDKName    = "laserstream-go"
-	SDKVersion = "1.0.1"
+	SDKVersion = "1.0.2"
 )
 
 // Commitment levels

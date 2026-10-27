@@ -18,6 +18,25 @@ permissions:
   id-token: write
 
 jobs:
+  version-check:
+    name: SDK versions match
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/release.py check
+
+  release-availability:
+    name: SDK version is unpublished
+    runs-on: ubuntu-latest
+    needs: [version-check]
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/release.py check-available
+
   rust-tests:
     name: Rust SDK tests
     runs-on: ubuntu-latest
@@ -242,12 +261,58 @@ jobs:
           if-no-files-found: error
 
   publish:
-    name: Publish
+    name: Publish all SDKs
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [version-check, release-availability, rust-tests, go-tests, js-tests, build]
     if: github.event_name == 'release'
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
+      - name: Validate release tag
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION=$(cat VERSION)
+          MAIN_SHA=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [ "$GITHUB_SHA" != "$MAIN_SHA" ]; then
+            echo "Release commit $GITHUB_SHA is not current main $MAIN_SHA"
+            exit 1
+          fi
+          if [ "$RELEASE_TAG" != "v$VERSION" ]; then
+            echo "Release tag $RELEASE_TAG does not match v$VERSION"
+            exit 1
+          fi
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Authenticate to crates.io
+        id: crates-auth
+        uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
+      - name: Publish Rust SDK
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-auth.outputs.token }}
+        working-directory: rust
+        run: |
+          VERSION=$(cat ../VERSION)
+          if curl --fail --silent --show-error \
+            -H 'User-Agent: laserstream-sdk-release' \
+            "https://crates.io/api/v1/crates/helius-laserstream/$VERSION" >/dev/null 2>&1; then
+            TMP_DIR=$(mktemp -d)
+            curl --fail --silent --show-error --location \
+              -H 'User-Agent: laserstream-sdk-release' \
+              "https://crates.io/api/v1/crates/helius-laserstream/$VERSION/download" \
+              | tar -xz -C "$TMP_DIR"
+            PUBLISHED_SHA=$(jq -r '.git.sha1' \
+              "$TMP_DIR/helius-laserstream-$VERSION/.cargo_vcs_info.json")
+            rm -rf "$TMP_DIR"
+            if [ "$PUBLISHED_SHA" != "$GITHUB_SHA" ]; then
+              echo "helius-laserstream@$VERSION came from $PUBLISHED_SHA, expected $GITHUB_SHA"
+              exit 1
+            fi
+            echo "helius-laserstream@$VERSION is already published; skipping"
+          else
+            cargo publish --locked
+          fi
       - name: Setup node
         uses: actions/setup-node@v4
         with:
@@ -381,10 +446,19 @@ jobs:
             
             # Publish platform package
             echo "📤 Publishing $PACKAGE_NAME@$VERSION"
-            npm publish || {
-              echo "❌ Error: Failed to publish $PACKAGE_NAME"
-              exit 1
-            }
+            if npm view "$PACKAGE_NAME@$VERSION" version --prefer-online >/dev/null 2>&1; then
+              PUBLISHED_SHA=$(npm view "$PACKAGE_NAME@$VERSION" gitHead --prefer-online)
+              if [ "$PUBLISHED_SHA" != "$GITHUB_SHA" ]; then
+                echo "$PACKAGE_NAME@$VERSION came from $PUBLISHED_SHA, expected $GITHUB_SHA"
+                exit 1
+              fi
+              echo "ℹ️ $PACKAGE_NAME@$VERSION is already published; skipping"
+            else
+              npm publish || {
+                echo "❌ Error: Failed to publish $PACKAGE_NAME"
+                exit 1
+              }
+            fi
             
             PUBLISHED_COUNT=$((PUBLISHED_COUNT + 1))
             cd ..
@@ -413,10 +487,19 @@ jobs:
             package.json > package.json.tmp && mv package.json.tmp package.json
 
           echo "📤 Publishing main package helius-laserstream"
-          npm publish || {
-            echo "❌ Error: Failed to publish main package"
-            exit 1
-          }
+          if npm view "helius-laserstream@$VERSION" version --prefer-online >/dev/null 2>&1; then
+            PUBLISHED_SHA=$(npm view "helius-laserstream@$VERSION" gitHead --prefer-online)
+            if [ "$PUBLISHED_SHA" != "$GITHUB_SHA" ]; then
+              echo "helius-laserstream@$VERSION came from $PUBLISHED_SHA, expected $GITHUB_SHA"
+              exit 1
+            fi
+            echo "ℹ️ helius-laserstream@$VERSION is already published; skipping"
+          else
+            npm publish || {
+              echo "❌ Error: Failed to publish main package"
+              exit 1
+            }
+          fi
           echo "✅ Successfully published main package"
       - name: Verify publication
         env:
@@ -460,4 +543,48 @@ jobs:
             verify_package "$package"
           done
           
-          echo "🎉 All packages successfully published and verified!" 
+          echo "🎉 All npm packages successfully published and verified!"
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - name: Publish Go SDK tag
+        run: |
+          VERSION=$(cat VERSION)
+          TAG="go/v$VERSION"
+          EXISTING=$(git ls-remote --tags origin "refs/tags/$TAG^{}" | cut -f1)
+          if [ -z "$EXISTING" ]; then
+            DIRECT=$(git ls-remote --tags origin "refs/tags/$TAG" | cut -f1)
+            if [ -n "$DIRECT" ]; then
+              EXISTING=$DIRECT
+            fi
+          fi
+
+          if [ -n "$EXISTING" ]; then
+            if [ "$EXISTING" != "$GITHUB_SHA" ]; then
+              echo "$TAG points to $EXISTING, expected $GITHUB_SHA"
+              exit 1
+            fi
+            echo "$TAG already points to $GITHUB_SHA; skipping"
+          else
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git tag -a "$TAG" -m "Go SDK v$VERSION" "$GITHUB_SHA"
+            git push origin "refs/tags/$TAG"
+          fi
+      - name: Verify Rust and Go publication
+        run: |
+          VERSION=$(cat VERSION)
+          for _ in $(seq 1 24); do
+            if curl --fail --silent --show-error \
+              -H 'User-Agent: laserstream-sdk-release' \
+              "https://crates.io/api/v1/crates/helius-laserstream/$VERSION" >/dev/null && \
+              GOPROXY=https://proxy.golang.org go list \
+                -m "github.com/helius-labs/laserstream-sdk/go@v$VERSION" >/dev/null 2>&1; then
+              echo "Verified Rust and Go SDK v$VERSION"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Rust or Go SDK v$VERSION was not visible after ~4 min"
+          exit 1
