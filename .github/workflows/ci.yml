@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   release:
     types: [published]
 
@@ -29,15 +30,34 @@ jobs:
           python3 scripts/release.py render
           python3 scripts/release.py check
 
-  release-availability:
-    name: SDK version is unpublished
+  release-policy:
+    name: SDK release policy
     runs-on: ubuntu-latest
     needs: [version-check]
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - run: python3 scripts/release.py check-available
+        with:
+          fetch-depth: 0
+      - name: Reject version changes for no-release PRs
+        if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'no-release')
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if ! git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- VERSION; then
+            echo "PRs labeled no-release must not change VERSION"
+            git diff "$BASE_SHA" "$HEAD_SHA" -- VERSION
+            exit 1
+          fi
+          echo "VERSION is unchanged; registry availability check skipped"
+      - name: Verify release version is unpublished
+        if: github.event_name == 'release' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'no-release'))
+        run: python3 scripts/release.py check-available
+      - name: Skip release availability on main pushes
+        if: github.event_name == 'push'
+        run: echo "Release availability is checked on release PRs and release events"
 
   rust-tests:
     name: Rust SDK tests
@@ -268,7 +288,7 @@ jobs:
   publish:
     name: Publish all SDKs
     runs-on: ubuntu-latest
-    needs: [version-check, release-availability, rust-tests, go-tests, js-tests, build]
+    needs: [version-check, release-policy, rust-tests, go-tests, js-tests, build]
     if: github.event_name == 'release'
     permissions:
       contents: write
