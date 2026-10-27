@@ -14,9 +14,9 @@
 //! ```
 
 use crate::client::{build_geyser_client, SdkGeyserClient};
-use crate::{grpc::CommitmentLevel, LaserstreamConfig, LaserstreamError};
+use crate::{LaserstreamConfig, LaserstreamError};
 use laserstream_core_proto::geyser::{
-    GetBlockHeightRequest, GetBlockHeightResponse, GetLatestBlockhashRequest,
+    CommitmentLevel, GetBlockHeightRequest, GetBlockHeightResponse, GetLatestBlockhashRequest,
     GetLatestBlockhashResponse, GetSlotRequest, GetSlotResponse, GetVersionRequest,
     GetVersionResponse, IsBlockhashValidRequest, IsBlockhashValidResponse, PingRequest,
     PongResponse, SubscribeReplayInfoRequest, SubscribeReplayInfoResponse,
