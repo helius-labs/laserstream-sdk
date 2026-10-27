@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, bert/release-dry-run]
   pull_request:
   release:
     types: [published]
@@ -269,13 +269,16 @@ jobs:
     name: Publish all SDKs
     runs-on: ubuntu-latest
     needs: [version-check, release-availability, rust-tests, go-tests, js-tests, build]
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' || github.ref == 'refs/heads/bert/release-dry-run'
     permissions:
       contents: write
       id-token: write
+    env:
+      DRY_RUN: ${{ github.ref == 'refs/heads/bert/release-dry-run' }}
     steps:
       - uses: actions/checkout@v4
       - name: Validate release tag
+        if: env.DRY_RUN != 'true'
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
@@ -292,6 +295,7 @@ jobs:
       - run: python3 scripts/release.py render
       - uses: dtolnay/rust-toolchain@stable
       - name: Authenticate to crates.io
+        if: env.DRY_RUN != 'true'
         id: crates-auth
         uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
       - name: Publish Rust SDK
@@ -317,7 +321,11 @@ jobs:
             fi
             echo "helius-laserstream@$VERSION is already published; skipping"
           else
-            cargo publish --locked --allow-dirty
+            if [ "$DRY_RUN" = true ]; then
+              cargo publish --dry-run --locked --allow-dirty
+            else
+              cargo publish --locked --allow-dirty
+            fi
           fi
       - name: Setup node
         uses: actions/setup-node@v4
@@ -460,7 +468,11 @@ jobs:
               fi
               echo "ℹ️ $PACKAGE_NAME@$VERSION is already published; skipping"
             else
-              npm publish || {
+              if [ "$DRY_RUN" = true ]; then
+                npm publish --dry-run
+              else
+                npm publish
+              fi || {
                 echo "❌ Error: Failed to publish $PACKAGE_NAME"
                 exit 1
               }
@@ -501,13 +513,18 @@ jobs:
             fi
             echo "ℹ️ helius-laserstream@$VERSION is already published; skipping"
           else
-            npm publish || {
+            if [ "$DRY_RUN" = true ]; then
+              npm publish --dry-run
+            else
+              npm publish
+            fi || {
               echo "❌ Error: Failed to publish main package"
               exit 1
             }
           fi
           echo "✅ Successfully published main package"
       - name: Verify publication
+        if: env.DRY_RUN != 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         working-directory: javascript
@@ -576,9 +593,14 @@ jobs:
             git config user.name github-actions[bot]
             git config user.email 41898282+github-actions[bot]@users.noreply.github.com
             git tag -a "$TAG" -m "Go SDK v$VERSION" "$GITHUB_SHA"
-            git push origin "refs/tags/$TAG"
+            if [ "$DRY_RUN" = true ]; then
+              git push --dry-run origin "refs/tags/$TAG"
+            else
+              git push origin "refs/tags/$TAG"
+            fi
           fi
       - name: Verify Rust and Go publication
+        if: env.DRY_RUN != 'true'
         run: |
           VERSION=$(cat VERSION)
           for _ in $(seq 1 24); do
@@ -594,3 +616,8 @@ jobs:
           done
           echo "Rust or Go SDK v$VERSION was not visible after ~4 min"
           exit 1
+      - name: Verify dry run made no registry changes
+        if: env.DRY_RUN == 'true'
+        run: |
+          python3 scripts/release.py restore-template
+          python3 scripts/release.py check-available
