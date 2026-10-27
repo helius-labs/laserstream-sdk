@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"runtime/debug"
 	"testing"
 	"time"
 
@@ -11,6 +12,23 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
+
+func TestSDKVersionFromDependencyBuildInfo(t *testing.T) {
+	info := &debug.BuildInfo{
+		Main: debug.Module{Path: "example.com/customer", Version: "(devel)"},
+		Deps: []*debug.Module{{Path: goModulePath, Version: "v1.2.3"}},
+	}
+	if got := sdkVersionFromBuildInfo(info); got != "1.2.3" {
+		t.Fatalf("sdkVersionFromBuildInfo() = %q, want 1.2.3", got)
+	}
+}
+
+func TestSDKVersionFromMainBuildInfo(t *testing.T) {
+	info := &debug.BuildInfo{Main: debug.Module{Path: goModulePath, Version: "v2.0.0"}}
+	if got := sdkVersionFromBuildInfo(info); got != "2.0.0" {
+		t.Fatalf("sdkVersionFromBuildInfo() = %q, want 2.0.0", got)
+	}
+}
 
 type unaryTestServer struct {
 	pb.UnimplementedGeyserServer

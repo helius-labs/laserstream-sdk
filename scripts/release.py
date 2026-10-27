@@ -16,6 +16,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION_FILE = ROOT / "VERSION"
+TEMPLATE_VERSION = "0.0.0"
 SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 NPM_PACKAGES = [
     "helius-laserstream",
@@ -48,11 +49,6 @@ def recorded_versions() -> dict[str, str]:
     package_lock = json.loads((ROOT / "javascript/package-lock.json").read_text())
     js_cargo = tomllib.loads((ROOT / "javascript/Cargo.toml").read_text())
     rust_cargo = tomllib.loads((ROOT / "rust/Cargo.toml").read_text())
-    go_source = (ROOT / "go/laserstream.go").read_text()
-    go_match = re.search(r'^\s*SDKVersion\s*=\s*"([^"]+)"', go_source, re.MULTILINE)
-    if go_match is None:
-        raise ValueError("go/laserstream.go: SDKVersion not found")
-
     versions = {
         "javascript/package.json": package_json["version"],
         "javascript/package-lock.json": package_lock["version"],
@@ -65,7 +61,6 @@ def recorded_versions() -> dict[str, str]:
         "rust/Cargo.lock": package_version(
             ROOT / "rust/Cargo.lock", "helius-laserstream"
         ),
-        "go/laserstream.go": go_match.group(1),
     }
     for package_name, version in package_json["optionalDependencies"].items():
         versions[f"javascript/package.json optionalDependency {package_name}"] = version
@@ -78,6 +73,16 @@ def recorded_versions() -> dict[str, str]:
 
 def check_versions() -> None:
     expected = canonical_version()
+    check_recorded_versions(expected)
+    print(f"All rendered SDK versions match {expected}")
+
+
+def check_templates() -> None:
+    check_recorded_versions(TEMPLATE_VERSION)
+    print("All SDK manifests contain version templates")
+
+
+def check_recorded_versions(expected: str) -> None:
     mismatches = {
         location: actual
         for location, actual in recorded_versions().items()
@@ -87,7 +92,6 @@ def check_versions() -> None:
         for location, actual in mismatches.items():
             print(f"{location}: expected {expected}, found {actual}", file=sys.stderr)
         raise SystemExit(1)
-    print(f"All SDK versions match {expected}")
 
 
 def replace_once(path: Path, pattern: str, replacement: str) -> None:
@@ -98,12 +102,7 @@ def replace_once(path: Path, pattern: str, replacement: str) -> None:
     path.write_text(updated)
 
 
-def set_version(version: str) -> None:
-    if not SEMVER.fullmatch(version):
-        raise ValueError(f"version must be MAJOR.MINOR.PATCH, found {version!r}")
-
-    VERSION_FILE.write_text(f"{version}\n")
-
+def write_rendered_version(version: str) -> None:
     package_path = ROOT / "javascript/package.json"
     package_data = json.loads(package_path.read_text())
     package_data["version"] = version
@@ -139,12 +138,25 @@ def set_version(version: str) -> None:
         r'(?s)(\[\[package\]\]\nname = "helius-laserstream"\nversion = ")[^"]+("\n)',
         rf"\g<1>{version}\g<2>",
     )
-    replace_once(
-        ROOT / "go/laserstream.go",
-        r'^(\s*SDKVersion\s*=\s*")[^"]+(".*)$',
-        rf"\g<1>{version}\g<2>",
-    )
+
+
+def set_version(version: str) -> None:
+    if not SEMVER.fullmatch(version):
+        raise ValueError(f"version must be MAJOR.MINOR.PATCH, found {version!r}")
+    VERSION_FILE.write_text(f"{version}\n")
+    check_templates()
+
+
+def render_version() -> None:
+    version = canonical_version()
+    check_templates()
+    write_rendered_version(version)
     check_versions()
+
+
+def restore_templates() -> None:
+    write_rendered_version(TEMPLATE_VERSION)
+    check_templates()
 
 
 def url_exists(url: str) -> bool:
@@ -160,7 +172,7 @@ def url_exists(url: str) -> bool:
 
 def check_available() -> None:
     version = canonical_version()
-    check_versions()
+    check_templates()
     published = []
 
     for package_name in NPM_PACKAGES:
@@ -199,15 +211,24 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("check")
+    subparsers.add_parser("check-template")
     subparsers.add_parser("check-available")
+    subparsers.add_parser("render")
+    subparsers.add_parser("restore-template")
     set_parser = subparsers.add_parser("set")
     set_parser.add_argument("version")
     args = parser.parse_args()
 
     if args.command == "check":
         check_versions()
+    elif args.command == "check-template":
+        check_templates()
     elif args.command == "check-available":
         check_available()
+    elif args.command == "render":
+        render_version()
+    elif args.command == "restore-template":
+        restore_templates()
     else:
         set_version(args.version)
 

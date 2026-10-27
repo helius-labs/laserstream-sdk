@@ -25,7 +25,10 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - run: python3 scripts/release.py check
+      - run: |
+          python3 scripts/release.py check-template
+          python3 scripts/release.py render
+          python3 scripts/release.py check
 
   release-availability:
     name: SDK version is unpublished
@@ -47,6 +50,7 @@ jobs:
         working-directory: rust
     steps:
       - uses: actions/checkout@v4
+      - run: python3 ../scripts/release.py render
       - uses: dtolnay/rust-toolchain@stable
       - name: Cache Rust SDK build
         uses: actions/cache@v4
@@ -93,6 +97,7 @@ jobs:
         working-directory: javascript
     steps:
       - uses: actions/checkout@v4
+      - run: python3 ../scripts/release.py render
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -147,6 +152,7 @@ jobs:
     runs-on: ${{ matrix.settings.host }}
     steps:
       - uses: actions/checkout@v4
+      - run: python3 scripts/release.py render
       - name: Setup node
         uses: actions/setup-node@v4
         with:
@@ -284,6 +290,7 @@ jobs:
             echo "Release tag $RELEASE_TAG does not match v$VERSION"
             exit 1
           fi
+      - run: python3 scripts/release.py render
       - uses: dtolnay/rust-toolchain@stable
       - name: Authenticate to crates.io
         id: crates-auth
@@ -311,7 +318,7 @@ jobs:
             fi
             echo "helius-laserstream@$VERSION is already published; skipping"
           else
-            cargo publish --locked
+            cargo publish --locked --allow-dirty
           fi
       - name: Setup node
         uses: actions/setup-node@v4

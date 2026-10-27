@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -30,11 +31,36 @@ const (
 	ForkDepthSafetyMargin    = 31   // Max fork depth for processed commitment
 )
 
-// SDK metadata constants
-const (
-	SDKName    = "laserstream-go"
-	SDKVersion = "1.0.2"
-)
+const goModulePath = "github.com/helius-labs/laserstream-sdk/go"
+
+// SDK metadata values.
+const SDKName = "laserstream-go"
+
+var SDKVersion = detectSDKVersion()
+
+func detectSDKVersion() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "devel"
+	}
+	return sdkVersionFromBuildInfo(info)
+}
+
+func sdkVersionFromBuildInfo(info *debug.BuildInfo) string {
+	modules := append([]*debug.Module{&info.Main}, info.Deps...)
+	for _, module := range modules {
+		if module.Path != goModulePath {
+			continue
+		}
+		if module.Replace != nil {
+			module = module.Replace
+		}
+		if module.Version != "" && module.Version != "(devel)" {
+			return strings.TrimPrefix(module.Version, "v")
+		}
+	}
+	return "devel"
+}
 
 // Commitment levels
 const (
