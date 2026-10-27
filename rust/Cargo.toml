@@ -15,10 +15,10 @@ exclude = ["/Cargo.lock"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-laserstream-core-proto = { version = "13.1.0", git = "https://github.com/helius-labs/yellowstone-grpc", rev = "e7a819377fe1a7a96065e058eacf7a069b35508e", default-features = false, features = ["tonic", "tonic-compression"] }
+laserstream-core-proto = { package = "yellowstone-grpc-proto", version = "9.0.1", git = "https://github.com/helius-labs/yellowstone-grpc", rev = "9777b1d64a7b1b2ae761143f72aece6960202039", default-features = false, features = ["tonic", "tonic-compression"] }
 # Pin proto + client together: the client bundles its own proto, so a mismatched
 # version would make `SubscribeRequest` a distinct type from the client's API.
-laserstream-core-client = { version = "13.1.0", git = "https://github.com/helius-labs/yellowstone-grpc", rev = "e7a819377fe1a7a96065e058eacf7a069b35508e" }
+laserstream-core-client = { package = "yellowstone-grpc-client", version = "9.0.1", git = "https://github.com/helius-labs/yellowstone-grpc", rev = "9777b1d64a7b1b2ae761143f72aece6960202039" }
 tonic = { version = "0.12.1", features = ["transport", "tls", "zstd", "gzip"] }
 # RUSTSEC-2026-0258: floor h2 at the 0.4.19 fix so both the tonic 0.12 graph and
 # the core client's tonic 0.14 graph unify on a patched release.
