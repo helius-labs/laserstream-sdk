@@ -46,7 +46,7 @@ fn default_config_has_no_terminal_errors() {
     for value in 1..=16 {
         let code = Code::from_i32(value);
         assert!(
-            !is_terminal_error(&config, &Status::new(code, "test")),
+            !is_terminal_error(&config, &SubscribeOptions::default(), &Status::new(code, "test")),
             "{code:?}"
         );
     }
@@ -55,11 +55,12 @@ fn default_config_has_no_terminal_errors() {
 #[test]
 fn only_opted_in_out_of_range_is_terminal() {
     let opted_in = archive_opt_outs().into_iter().map(|(opt_in, _)| (opt_in(LaserstreamConfig::default()), true));
-    for (config, opted_in) in std::iter::once((LaserstreamConfig::default(), false)).chain(opted_in) {
+    let default = (LaserstreamConfig::default(), SubscribeOptions::default());
+    for ((config, options), opted_in) in std::iter::once((default, false)).chain(opted_in) {
         for value in 1..=16 {
             let code = Code::from_i32(value);
             assert_eq!(
-                is_terminal_error(&config, &Status::new(code, "test")),
+                is_terminal_error(&config, &options, &Status::new(code, "test")),
                 opted_in && code == Code::OutOfRange,
                 "{code:?}"
             );
@@ -68,13 +69,25 @@ fn only_opted_in_out_of_range_is_terminal() {
 }
 
 #[test]
-fn intra_slot_updates_are_off_by_default_and_independent_of_replay() {
-    assert!(!LaserstreamConfig::default().intra_slot_updates);
-    assert!(!LaserstreamConfig::new(String::new(), String::new()).intra_slot_updates);
-    let config = LaserstreamConfig::default().with_intra_slot_updates(true);
+fn intra_slot_updates_are_off_by_default() {
+    let options = SubscribeOptions::default();
+    assert!(!options.intra_slot_updates);
+    let options = options.with_intra_slot_updates(true);
+    assert!(options.intra_slot_updates);
+    assert!(!options.with_intra_slot_updates(false).intra_slot_updates);
+}
+
+#[cfg(not(feature = "internal"))]
+#[test]
+fn config_literal_from_1_0_1_still_compiles() {
+    let config = LaserstreamConfig {
+        api_key: String::new(),
+        endpoint: String::new(),
+        max_reconnect_attempts: None,
+        channel_options: crate::ChannelOptions::default(),
+        replay: true,
+    };
     assert!(config.replay);
-    assert!(config.intra_slot_updates);
-    assert!(!config.with_intra_slot_updates(false).intra_slot_updates);
 }
 
 #[cfg(feature = "internal")]
@@ -110,7 +123,7 @@ async fn initial_out_of_range_preserves_status() {
 async fn retryable_error_reconnects_and_retains_requested_slot() {
     let server = TestServer::start(Reply::TransientThenOutOfRange).await;
     let config = server.config().internal_disable_geyser_archive_fallback();
-    assert_terminal_with_config(&server, config, Code::OutOfRange, 2, (Some("true"), Some("true"))).await;
+    assert_terminal_with_config(&server, config, SubscribeOptions::default(), Code::OutOfRange, 2, (Some("true"), Some("true"))).await;
 }
 
 #[tokio::test]
@@ -133,14 +146,14 @@ async fn default_client_omits_internal_header() {
 async fn disabled_client_sends_both_headers_and_delivers_data_without_acknowledgement() {
     let server = TestServer::start(Reply::Data).await;
     let config = server.config().internal_disable_geyser_archive_fallback();
-    assert_delivers_data(&server, config, (Some("true"), Some("true"))).await;
+    assert_delivers_data(&server, config, SubscribeOptions::default(), (Some("true"), Some("true"))).await;
 }
 
 #[tokio::test]
 async fn intra_slot_client_sends_only_the_intra_slot_header() {
     let server = TestServer::start(Reply::Data).await;
-    let config = server.config().with_intra_slot_updates(true);
-    assert_delivers_data(&server, config, (Some("true"), None)).await;
+    let options = SubscribeOptions::default().with_intra_slot_updates(true);
+    assert_delivers_data(&server, server.config(), options, (Some("true"), None)).await;
 }
 
 #[tokio::test]
@@ -397,16 +410,16 @@ fn request() -> SubscribeRequest {
     }
 }
 
-type OptIn = fn(LaserstreamConfig) -> LaserstreamConfig;
+type OptIn = fn(LaserstreamConfig) -> (LaserstreamConfig, SubscribeOptions);
 
 /// Each opt-out of Geyser Archive replay with the headers it sends: intra-slot updates and, with `internal`, the deprecated archive flag.
 fn archive_opt_outs() -> Vec<(OptIn, Headers)> {
-    let intra_slot: (OptIn, Headers) = (|config| config.with_intra_slot_updates(true), (Some("true"), None));
+    let intra_slot: (OptIn, Headers) = (|config| (config, SubscribeOptions::default().with_intra_slot_updates(true)), (Some("true"), None));
     #[cfg(feature = "internal")]
     #[allow(deprecated)]
     return vec![
         intra_slot,
-        (LaserstreamConfig::internal_disable_geyser_archive_fallback, (Some("true"), Some("true"))),
+        (|config| (config.internal_disable_geyser_archive_fallback(), SubscribeOptions::default()), (Some("true"), Some("true"))),
     ];
     #[cfg(not(feature = "internal"))]
     vec![intra_slot]
@@ -415,12 +428,13 @@ fn archive_opt_outs() -> Vec<(OptIn, Headers)> {
 async fn assert_terminal(reply: Reply, code: Code, attempts: usize) {
     for (opt_in, headers) in archive_opt_outs() {
         let server = TestServer::start(reply).await;
-        assert_terminal_with_config(&server, opt_in(server.config()), code, attempts, headers).await;
+        let (config, options) = opt_in(server.config());
+        assert_terminal_with_config(&server, config, options, code, attempts, headers).await;
     }
 }
 
-async fn assert_delivers_data(server: &TestServer, config: LaserstreamConfig, headers: Headers) {
-    let (stream, _handle) = subscribe(config, request());
+async fn assert_delivers_data(server: &TestServer, config: LaserstreamConfig, options: SubscribeOptions, headers: Headers) {
+    let (stream, _handle) = subscribe_with_options(config, request(), options);
     futures::pin_mut!(stream);
     let update = tokio::time::timeout(Duration::from_secs(2), stream.next())
         .await
@@ -434,11 +448,12 @@ async fn assert_delivers_data(server: &TestServer, config: LaserstreamConfig, he
 async fn assert_terminal_with_config(
     server: &TestServer,
     config: LaserstreamConfig,
+    options: SubscribeOptions,
     code: Code,
     attempts: usize,
     expected_headers: Headers,
 ) {
-    let (stream, _handle) = subscribe(config, request());
+    let (stream, _handle) = subscribe_with_options(config, request(), options);
     futures::pin_mut!(stream);
     let next = tokio::time::timeout(Duration::from_secs(8), stream.next())
         .await
