@@ -7,7 +7,7 @@
 //! let config = LaserstreamConfig::new("https://laserstream-mainnet-ewr.helius-rpc.com".into(), "API_KEY".into());
 //! let client = LaserstreamClient::connect(config).await?;
 //!
-//! let slot = client.get_slot(Some(CommitmentLevel::Processed)).await?.slot;
+//! let slot = client.get_slot(Some(CommitmentLevel::Finalized)).await?.slot;
 //! let bh = client.get_latest_blockhash(None).await?;
 //! let valid = client.is_blockhash_valid(&bh.blockhash, None).await?.valid;
 //! # Ok(()) }

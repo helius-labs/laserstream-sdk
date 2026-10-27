@@ -46,7 +46,7 @@ async function main() {
         filterByCommitment: true,
       }
     },
-    commitment: CommitmentLevel.PROCESSED
+    commitment: CommitmentLevel.FINALIZED
   };
 
   try {

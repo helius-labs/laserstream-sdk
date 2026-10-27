@@ -8,8 +8,8 @@ async function main() {
     timeoutMs: 10_000, // per-call deadline (default 30000)
   });
 
-  const { slot } = await client.getSlot(CommitmentLevel.PROCESSED);
-  console.log('slot (processed): ', slot);
+  const { slot } = await client.getSlot(CommitmentLevel.FINALIZED);
+  console.log('slot (finalized): ', slot);
 
   const { blockHeight } = await client.getBlockHeight();
   console.log('block height:     ', blockHeight);
