@@ -95,12 +95,14 @@ let config = LaserstreamConfig::new(endpoint, api_key)
 ```
 
 ### Intra-Slot Updates
-By default, confirmed and finalized subscriptions receive the last write of each account per slot. Intra-slot updates deliver every write instead.
+By default, confirmed and finalized subscriptions receive the last write of each account per slot. Intra-slot updates deliver every write instead. Enable them with `subscribe_with_options`.
 
 > **Note:** Retention for intra-slot updates is limited. A `from_slot` older than the retention period fails with `OUT_OF_RANGE` instead of retrying.
 ```rust
-let config = LaserstreamConfig::new(endpoint, api_key)
-    .with_intra_slot_updates(true);
+use helius_laserstream::{subscribe_with_options, SubscribeOptions};
+
+let options = SubscribeOptions::default().with_intra_slot_updates(true);
+let (stream, handle) = subscribe_with_options(config, request, options);
 ```
 
 ## Subscription Examples

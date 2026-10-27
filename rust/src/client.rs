@@ -32,6 +32,7 @@ fn is_terminal_error(config: &LaserstreamConfig, options: &SubscribeOptions, sta
 }
 
 /// Intra-slot updates, or the deprecated archive flag that the server treats as intra-slot updates.
+#[cfg_attr(not(feature = "internal"), allow(unused_variables))]
 fn archive_replay_disabled(config: &LaserstreamConfig, options: &SubscribeOptions) -> bool {
     #[cfg(feature = "internal")]
     if config.internal_disable_geyser_archive_fallback {
@@ -99,23 +100,8 @@ impl StreamHandle {
     }
 }
 
-/// `subscribe` with per-subscription options such as intra-slot updates.
-pub fn subscribe_with_options(
-    _config: LaserstreamConfig,
-    _request: SubscribeRequest,
-    _options: SubscribeOptions,
-) -> (
-    impl Stream<Item = Result<SubscribeUpdate, LaserstreamError>>,
-    StreamHandle,
-) {
-    unimplemented!();
-    #[allow(unreachable_code)]
-    (futures::stream::empty(), StreamHandle { write_tx: mpsc::unbounded_channel().0 })
-}
-
 /// Establishes a gRPC connection, handles the subscription lifecycle,
 /// and provides a stream of updates. Automatically reconnects on failure.
-#[instrument(skip(config, request))]
 pub fn subscribe(
     config: LaserstreamConfig,
     request: SubscribeRequest,
@@ -123,9 +109,21 @@ pub fn subscribe(
     impl Stream<Item = Result<SubscribeUpdate, LaserstreamError>>,
     StreamHandle,
 ) {
+    subscribe_with_options(config, request, SubscribeOptions::default())
+}
+
+/// `subscribe` with per-subscription options such as intra-slot updates.
+#[instrument(skip(config, request))]
+pub fn subscribe_with_options(
+    config: LaserstreamConfig,
+    request: SubscribeRequest,
+    options: SubscribeOptions,
+) -> (
+    impl Stream<Item = Result<SubscribeUpdate, LaserstreamError>>,
+    StreamHandle,
+) {
     let (write_tx, mut write_rx) = mpsc::unbounded_channel::<SubscribeRequest>();
     let handle = StreamHandle { write_tx };
-    let options = SubscribeOptions::default();
     let update_stream = stream! {
         let mut reconnect_attempts = 0;
         let mut tracked_slot: u64 = 0;
