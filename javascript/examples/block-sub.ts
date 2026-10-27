@@ -20,7 +20,7 @@ async function main() {
         includeEntries: false
       }
     },
-    commitment: CommitmentLevel.CONFIRMED,
+    commitment: CommitmentLevel.PROCESSED,
     accounts: {},
     slots: {},
     transactions: {},

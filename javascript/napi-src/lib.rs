@@ -110,11 +110,10 @@ pub fn subscribe_update_to_bytes(update: YellowstoneSubscribeUpdate) -> Result<V
 }
 
 
-// Commitment levels enum (keeping for API compatibility)
+// Commitment levels supported after Alpenglow.
 #[napi]
 pub enum CommitmentLevel {
     PROCESSED = 0,
-    CONFIRMED = 1,
     FINALIZED = 2,
 }
 

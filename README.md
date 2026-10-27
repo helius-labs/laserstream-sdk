@@ -87,7 +87,7 @@ import { subscribe, CommitmentLevel } from 'helius-laserstream';
 
 const stream = await subscribe(
   { apiKey: 'your-key', endpoint: 'your-endpoint' },
-  { slots: { client: {} }, commitment: CommitmentLevel.CONFIRMED },
+  { slots: { client: {} }, commitment: CommitmentLevel.PROCESSED },
   (update) => console.log('Update:', update),
   (error) => console.error('Error:', error)
 );

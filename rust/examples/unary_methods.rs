@@ -16,8 +16,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // One client, reused for every call (cheap to clone, shares the connection).
     let client = LaserstreamClient::connect(LaserstreamConfig::new(endpoint, api_key)).await?;
 
-    let slot = client.get_slot(Some(CommitmentLevel::Confirmed)).await?;
-    println!("slot (confirmed):  {}", slot.slot);
+    let slot = client.get_slot(Some(CommitmentLevel::Processed)).await?;
+    println!("slot (processed):  {}", slot.slot);
 
     let height = client.get_block_height(None).await?;
     println!("block height:      {}", height.block_height);

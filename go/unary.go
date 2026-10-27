@@ -91,7 +91,7 @@ func callUnary[T any](c *Client, ctx context.Context, fn func(context.Context, p
 
 // GetSlot returns the current slot. Commitment is optional (server default if omitted):
 //
-//	resp, err := client.GetSlot(ctx, laserstream.CommitmentLevel_CONFIRMED)
+//	resp, err := client.GetSlot(ctx, laserstream.CommitmentLevel_PROCESSED)
 func (c *Client) GetSlot(ctx context.Context, commitment ...CommitmentLevel) (*GetSlotResponse, error) {
 	return callUnary(c, ctx, func(ctx context.Context, g pb.GeyserClient) (*GetSlotResponse, error) {
 		return g.GetSlot(ctx, &pb.GetSlotRequest{Commitment: optCommitment(commitment)})

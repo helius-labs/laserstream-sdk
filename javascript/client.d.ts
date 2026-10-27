@@ -1,6 +1,4 @@
 // TypeScript declarations for Laserstream client
-import type { CommitmentLevel } from 'laserstream-core-proto-js/generated';
-
 import type { geyser } from 'laserstream-core-proto-js/generated';
 
 // The generated package exports a namespace, not these top-level aliases.
@@ -14,6 +12,13 @@ export type SubscribeUpdateTransaction = geyser.ISubscribeUpdateTransaction;
 export type SubscribeUpdateTransactionStatus = geyser.ISubscribeUpdateTransactionStatus;
 export type SubscribeUpdateBlockMeta = geyser.ISubscribeUpdateBlockMeta;
 export type SubscribeUpdateEntry = geyser.ISubscribeUpdateEntry;
+export enum CommitmentLevel {
+  PROCESSED = 0,
+  FINALIZED = 2,
+}
+export type SubscribeRequest = Omit<geyser.ISubscribeRequest, 'commitment'> & {
+  commitment?: CommitmentLevel | null;
+};
 
 // Re-export gRPC types
 export { ChannelOptions } from '@grpc/grpc-js';
@@ -25,7 +30,6 @@ export {
   SubscribeUpdatePing,
   SubscribeUpdatePong,
   // Request types
-  SubscribeRequest,
   SubscribeRequestFilterAccounts,
   SubscribeRequestFilterAccountsFilter,
   SubscribeRequestFilterSlots,
@@ -36,7 +40,6 @@ export {
   SubscribeRequestAccountsDataSlice,
   SubscribeRequestPing,
   // Enums
-  CommitmentLevel,
   SlotStatus,
 } from 'laserstream-core-proto-js/generated';
 

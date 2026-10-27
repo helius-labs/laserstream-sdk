@@ -59,7 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let subscribe_req = SubscribeRequest {
         accounts: accounts_map,
-        commitment: Some(CommitmentLevel::Confirmed as i32),
+        commitment: Some(CommitmentLevel::Processed as i32),
         accounts_data_slice: Vec::<SubscribeRequestAccountsDataSlice>::new(),
         ..Default::default()
     };

@@ -77,7 +77,6 @@ const IntraSlotUpdatesHeader = "x-intra-slot-updates"
 // Commitment levels
 const (
 	CommitmentProcessed = 0
-	CommitmentConfirmed = 1
 	CommitmentFinalized = 2
 )
 
@@ -637,8 +636,8 @@ func (c *Client) updateRequestForReconnection() {
 			} else {
 				fromSlot = 0
 			}
-		case CommitmentConfirmed, CommitmentFinalized:
-			// Confirmed/Finalized – resume exactly at tracked slot
+		case CommitmentFinalized:
+			// Finalized – resume exactly at tracked slot
 			fromSlot = lastTrackedSlot
 		default:
 			// Default to processed behavior
@@ -844,7 +843,6 @@ type (
 // Commitment levels - re-export enum values
 const (
 	CommitmentLevel_PROCESSED = pb.CommitmentLevel_PROCESSED
-	CommitmentLevel_CONFIRMED = pb.CommitmentLevel_CONFIRMED
 	CommitmentLevel_FINALIZED = pb.CommitmentLevel_FINALIZED
 )
 

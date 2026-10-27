@@ -45,7 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let subscribe_req = SubscribeRequest {
         transactions: tx_filter_map,
-        commitment: Some(CommitmentLevel::Confirmed as i32),
+        commitment: Some(CommitmentLevel::Processed as i32),
         ..Default::default()
     };
 

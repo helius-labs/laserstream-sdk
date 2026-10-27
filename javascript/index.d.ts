@@ -31,7 +31,6 @@ export declare function shutdownAllStreams(): void
 export declare function getActiveStreamCount(): number
 export const enum CommitmentLevel {
   PROCESSED = 0,
-  CONFIRMED = 1,
   FINALIZED = 2
 }
 /**

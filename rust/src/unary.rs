@@ -7,16 +7,16 @@
 //! let config = LaserstreamConfig::new("https://laserstream-mainnet-ewr.helius-rpc.com".into(), "API_KEY".into());
 //! let client = LaserstreamClient::connect(config).await?;
 //!
-//! let slot = client.get_slot(Some(CommitmentLevel::Confirmed)).await?.slot;
+//! let slot = client.get_slot(Some(CommitmentLevel::Processed)).await?.slot;
 //! let bh = client.get_latest_blockhash(None).await?;
 //! let valid = client.is_blockhash_valid(&bh.blockhash, None).await?.valid;
 //! # Ok(()) }
 //! ```
 
 use crate::client::{build_geyser_client, SdkGeyserClient};
-use crate::{LaserstreamConfig, LaserstreamError};
+use crate::{grpc::CommitmentLevel, LaserstreamConfig, LaserstreamError};
 use laserstream_core_proto::geyser::{
-    CommitmentLevel, GetBlockHeightRequest, GetBlockHeightResponse, GetLatestBlockhashRequest,
+    GetBlockHeightRequest, GetBlockHeightResponse, GetLatestBlockhashRequest,
     GetLatestBlockhashResponse, GetSlotRequest, GetSlotResponse, GetVersionRequest,
     GetVersionResponse, IsBlockhashValidRequest, IsBlockhashValidResponse, PingRequest,
     PongResponse, SubscribeReplayInfoRequest, SubscribeReplayInfoResponse,

@@ -173,7 +173,7 @@ pub fn subscribe_with_options(
                 let commitment_level = current_request.commitment.unwrap_or(0);
                 let from_slot = match commitment_level {
                     0 => tracked_slot.saturating_sub(31), // PROCESSED: rewind by 31 slots
-                    1 | 2 => tracked_slot,                 // CONFIRMED/FINALIZED: exact slot
+                    2 => tracked_slot,                     // FINALIZED: exact slot
                     _ => tracked_slot.saturating_sub(31),  // Unknown: default to safe behavior
                 };
                 current_request.from_slot = Some(from_slot);

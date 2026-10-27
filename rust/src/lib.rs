@@ -11,8 +11,63 @@ pub use unary::LaserstreamClient;
 pub use config::{ChannelOptions, LaserstreamConfig, CompressionEncoding, SubscribeOptions};
 pub use error::LaserstreamError;
 
-// Re-export commonly used types from laserstream-core-proto
-pub use laserstream_core_proto::geyser as grpc;
+// Re-export commonly used types from laserstream-core-proto, with the
+// Alpenglow commitment surface exposed by this SDK.
+pub mod grpc {
+    pub use laserstream_core_proto::geyser::*;
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
+    #[repr(i32)]
+    pub enum CommitmentLevel {
+        #[default]
+        Processed = 0,
+        Finalized = 2,
+    }
+
+    impl CommitmentLevel {
+        pub fn is_valid(value: i32) -> bool {
+            matches!(value, 0 | 2)
+        }
+
+        #[deprecated = "Use the TryFrom<i32> implementation instead"]
+        pub fn from_i32(value: i32) -> Option<Self> {
+            Self::try_from(value).ok()
+        }
+
+        pub fn as_str_name(&self) -> &'static str {
+            match self {
+                Self::Processed => "PROCESSED",
+                Self::Finalized => "FINALIZED",
+            }
+        }
+
+        pub fn from_str_name(value: &str) -> Option<Self> {
+            match value {
+                "PROCESSED" => Some(Self::Processed),
+                "FINALIZED" => Some(Self::Finalized),
+                _ => None,
+            }
+        }
+    }
+
+    impl From<CommitmentLevel> for i32 {
+        fn from(value: CommitmentLevel) -> Self {
+            value as i32
+        }
+    }
+
+    impl TryFrom<i32> for CommitmentLevel {
+        type Error = laserstream_core_proto::prost::UnknownEnumValue;
+
+        fn try_from(value: i32) -> Result<Self, Self::Error> {
+            match value {
+                0 => Ok(Self::Processed),
+                2 => Ok(Self::Finalized),
+                _ => Err(laserstream_core_proto::prost::UnknownEnumValue(value)),
+            }
+        }
+    }
+}
 pub use laserstream_core_proto::solana;
 
 /// Compressed account (cuckoo) filtering.
