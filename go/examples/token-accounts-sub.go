@@ -19,7 +19,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	laserstream "github.com/helius-labs/laserstream-sdk/go"
+	laserstream "github.com/helius-labs/laserstream-sdk/go/v2"
 
 	"github.com/joho/godotenv"
 )
@@ -46,7 +46,7 @@ func main() {
 		APIKey:   apiKey,
 	}
 
-	commitmentLevel := laserstream.CommitmentLevel_CONFIRMED
+	commitmentLevel := laserstream.CommitmentLevel_FINALIZED
 	vote := false
 	failed := false
 	subscriptionRequest := &laserstream.SubscribeRequest{

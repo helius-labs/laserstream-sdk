@@ -6,14 +6,13 @@ import (
 	"io"
 	"net/url"
 	"runtime/debug"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
-	pb "github.com/helius-labs/laserstream-sdk/go/proto"
+	pb "github.com/helius-labs/laserstream-sdk/go/v2/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/codes"
@@ -32,7 +31,7 @@ const (
 	ForkDepthSafetyMargin    = 31   // Max fork depth for processed commitment
 )
 
-const goModulePath = "github.com/helius-labs/laserstream-sdk/go"
+const goModulePath = "github.com/helius-labs/laserstream-sdk/go/v2"
 
 // SDK metadata values.
 const SDKName = "laserstream-go"
@@ -64,11 +63,7 @@ func sdkVersionFromBuildInfo(info *debug.BuildInfo) string {
 }
 
 func isSDKModulePath(path string) bool {
-	if path == goModulePath {
-		return true
-	}
-	major, err := strconv.Atoi(strings.TrimPrefix(path, goModulePath+"/v"))
-	return err == nil && major >= 2
+	return path == goModulePath
 }
 
 // IntraSlotUpdatesHeader requests every write of each bank at confirmed and finalized.
@@ -77,7 +72,6 @@ const IntraSlotUpdatesHeader = "x-intra-slot-updates"
 // Commitment levels
 const (
 	CommitmentProcessed = 0
-	CommitmentConfirmed = 1
 	CommitmentFinalized = 2
 )
 
@@ -637,8 +631,8 @@ func (c *Client) updateRequestForReconnection() {
 			} else {
 				fromSlot = 0
 			}
-		case CommitmentConfirmed, CommitmentFinalized:
-			// Confirmed/Finalized – resume exactly at tracked slot
+		case CommitmentFinalized:
+			// Finalized – resume exactly at tracked slot
 			fromSlot = lastTrackedSlot
 		default:
 			// Default to processed behavior
@@ -844,7 +838,6 @@ type (
 // Commitment levels - re-export enum values
 const (
 	CommitmentLevel_PROCESSED = pb.CommitmentLevel_PROCESSED
-	CommitmentLevel_CONFIRMED = pb.CommitmentLevel_CONFIRMED
 	CommitmentLevel_FINALIZED = pb.CommitmentLevel_FINALIZED
 )
 

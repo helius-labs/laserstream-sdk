@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	laserstream "github.com/helius-labs/laserstream-sdk/go"
+	laserstream "github.com/helius-labs/laserstream-sdk/go/v2"
 
 	"github.com/joho/godotenv"
 
@@ -247,7 +247,7 @@ func startLaserstreamStream(tracker *SignatureTracker) error {
 		APIKey:   apiKey,
 	}
 
-	commitmentLevel := laserstream.CommitmentLevel_CONFIRMED
+	commitmentLevel := laserstream.CommitmentLevel_FINALIZED
 	voteFilterBool := false
 	failedFilterBool := false
 
@@ -304,7 +304,7 @@ func startYellowstoneStream(tracker *SignatureTracker) error {
 		return fmt.Errorf("failed to create yellowstone stream: %w", err)
 	}
 
-	pbCommitmentLevel := pb.CommitmentLevel_CONFIRMED
+	pbCommitmentLevel := pb.CommitmentLevel_FINALIZED
 	voteFilterBool := false
 	failedFilterBool := false
 

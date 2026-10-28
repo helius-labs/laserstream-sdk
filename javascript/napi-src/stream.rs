@@ -433,7 +433,7 @@ impl StreamInner {
             let effective_max_attempts = max_reconnect_attempts.min(HARD_CAP_RECONNECT_ATTEMPTS);
 
             // Extract commitment level for reconnection logic
-            let commitment_level = current_request.lock().commitment.unwrap_or(0); // 0 = Processed, 1 = Confirmed, 2 = Finalized
+            let commitment_level = current_request.lock().commitment.unwrap_or(0); // 0 = Processed, 2 = Finalized
 
             loop {
                 let tracked_slot_clone = tracked_slot.clone();
@@ -508,8 +508,8 @@ impl StreamInner {
                                 0 => {
                                     last_tracked_slot.saturating_sub(FORK_DEPTH_SAFETY_MARGIN)
                                 }
-                                // Confirmed / Finalized – always resume exactly at tracked slot
-                                1 | 2 => {
+                                // Finalized – always resume exactly at tracked slot
+                                2 => {
                                     last_tracked_slot
                                 }
                                 _ => {

@@ -35,7 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let initial_request = SubscribeRequest {
         slots: slots_filter,
-        commitment: Some(1), // Confirmed
+        commitment: Some(2), // Finalized
         ..Default::default()
     };
 

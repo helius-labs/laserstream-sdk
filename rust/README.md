@@ -315,7 +315,7 @@ use helius_laserstream::{LaserstreamClient, LaserstreamConfig, grpc::CommitmentL
 
 let client = LaserstreamClient::connect(LaserstreamConfig::new(endpoint, api_key)).await?;
 
-let slot = client.get_slot(Some(CommitmentLevel::Confirmed)).await?.slot;
+let slot = client.get_slot(Some(CommitmentLevel::Finalized)).await?.slot;
 let height = client.get_block_height(None).await?.block_height;
 let bh = client.get_latest_blockhash(None).await?; // .blockhash, .slot, .last_valid_block_height
 let valid = client.is_blockhash_valid(&bh.blockhash, None).await?.valid;
@@ -489,9 +489,6 @@ let request = SubscribeRequest {
     // Latest data (may be rolled back)
     commitment: Some(CommitmentLevel::Processed as i32),
     
-    // Confirmed by cluster majority
-    // commitment: Some(CommitmentLevel::Confirmed as i32),
-    
     // Finalized, cannot be rolled back
     // commitment: Some(CommitmentLevel::Finalized as i32),
     
@@ -541,7 +538,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             )
         ]),
-        commitment: Some(CommitmentLevel::Confirmed as i32),
+        commitment: Some(CommitmentLevel::Finalized as i32),
         ..Default::default()
     };
 

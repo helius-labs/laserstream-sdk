@@ -3,7 +3,7 @@ syntax = "proto3";
 import "google/protobuf/timestamp.proto";
 import public "solana-storage.proto";
 
-option go_package = "github.com/helius-labs/laserstream-sdk/go/proto";
+option go_package = "github.com/helius-labs/laserstream-sdk/go/v2/proto";
 
 package geyser;
 
@@ -20,7 +20,8 @@ service Geyser {
 
 enum CommitmentLevel {
   PROCESSED = 0;
-  CONFIRMED = 1;
+  reserved 1;
+  reserved "CONFIRMED";
   FINALIZED = 2;
 }
 

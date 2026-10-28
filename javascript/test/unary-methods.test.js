@@ -87,9 +87,9 @@ async function main() {
   assert.deepStrictEqual(await client.getSlot(), { slot: '999' });
   assert.deepStrictEqual(await client.getSlot(CommitmentLevel.FINALIZED), { slot: '1002' });
   assert.deepStrictEqual(await client.getBlockHeight(), { blockHeight: '900' });
-  const bh = await client.getLatestBlockhash(CommitmentLevel.CONFIRMED);
+  const bh = await client.getLatestBlockhash(CommitmentLevel.FINALIZED);
   // u64 max survives as a string (no precision loss)
-  assert.deepStrictEqual(bh, { slot: '1001', blockhash: 'hash', lastValidBlockHeight: '18446744073709551615' });
+  assert.deepStrictEqual(bh, { slot: '1002', blockhash: 'hash', lastValidBlockHeight: '18446744073709551615' });
   assert.deepStrictEqual(await client.isBlockhashValid('hash'), { slot: '5', valid: true });
   assert.strictEqual((await client.isBlockhashValid('nope')).valid, false);
   assert.deepStrictEqual(await client.getVersion(), { version: 'secret|laserstream-javascript' });

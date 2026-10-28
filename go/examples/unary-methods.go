@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	laserstream "github.com/helius-labs/laserstream-sdk/go"
+	laserstream "github.com/helius-labs/laserstream-sdk/go/v2"
 
 	"github.com/joho/godotenv"
 )
@@ -30,11 +30,11 @@ func main() {
 	defer client.Close()
 	ctx := context.Background()
 
-	slot, err := client.GetSlot(ctx, laserstream.CommitmentLevel_CONFIRMED)
+	slot, err := client.GetSlot(ctx, laserstream.CommitmentLevel_FINALIZED)
 	if err != nil {
 		log.Fatalf("GetSlot: %v", err)
 	}
-	fmt.Println("slot (confirmed): ", slot.Slot)
+	fmt.Println("slot (finalized): ", slot.Slot)
 
 	height, err := client.GetBlockHeight(ctx)
 	if err != nil {

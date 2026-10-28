@@ -26,7 +26,6 @@ type CommitmentLevel int32
 
 const (
 	CommitmentLevel_PROCESSED CommitmentLevel = 0
-	CommitmentLevel_CONFIRMED CommitmentLevel = 1
 	CommitmentLevel_FINALIZED CommitmentLevel = 2
 )
 
@@ -34,12 +33,10 @@ const (
 var (
 	CommitmentLevel_name = map[int32]string{
 		0: "PROCESSED",
-		1: "CONFIRMED",
 		2: "FINALIZED",
 	}
 	CommitmentLevel_value = map[string]int32{
 		"PROCESSED": 0,
-		"CONFIRMED": 1,
 		"FINALIZED": 2,
 	}
 )
@@ -3411,11 +3408,10 @@ const file_geyser_proto_rawDesc = "" +
 	"\v_commitment\"D\n" +
 	"\x18IsBlockhashValidResponse\x12\x12\n" +
 	"\x04slot\x18\x01 \x01(\x04R\x04slot\x12\x14\n" +
-	"\x05valid\x18\x02 \x01(\bR\x05valid*>\n" +
+	"\x05valid\x18\x02 \x01(\bR\x05valid*@\n" +
 	"\x0fCommitmentLevel\x12\r\n" +
 	"\tPROCESSED\x10\x00\x12\r\n" +
-	"\tCONFIRMED\x10\x01\x12\r\n" +
-	"\tFINALIZED\x10\x02*\xa1\x01\n" +
+	"\tFINALIZED\x10\x02\"\x04\b\x01\x10\x01*\tCONFIRMED*\xa1\x01\n" +
 	"\n" +
 	"SlotStatus\x12\x12\n" +
 	"\x0eSLOT_PROCESSED\x10\x00\x12\x12\n" +
@@ -3437,7 +3433,7 @@ const file_geyser_proto_rawDesc = "" +
 	"\aGetSlot\x12\x16.geyser.GetSlotRequest\x1a\x17.geyser.GetSlotResponse\"\x00\x12W\n" +
 	"\x10IsBlockhashValid\x12\x1f.geyser.IsBlockhashValidRequest\x1a .geyser.IsBlockhashValidResponse\"\x00\x12E\n" +
 	"\n" +
-	"GetVersion\x12\x19.geyser.GetVersionRequest\x1a\x1a.geyser.GetVersionResponse\"\x00B1Z/github.com/helius-labs/laserstream-sdk/go/protoP\x01b\x06proto3"
+	"GetVersion\x12\x19.geyser.GetVersionRequest\x1a\x1a.geyser.GetVersionResponse\"\x00B4Z2github.com/helius-labs/laserstream-sdk/go/v2/protoP\x01b\x06proto3"
 
 var (
 	file_geyser_proto_rawDescOnce sync.Once

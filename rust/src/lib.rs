@@ -11,7 +11,7 @@ pub use unary::LaserstreamClient;
 pub use config::{ChannelOptions, LaserstreamConfig, CompressionEncoding, SubscribeOptions};
 pub use error::LaserstreamError;
 
-// Re-export commonly used types from laserstream-core-proto
+// Re-export commonly used types from laserstream-core-proto.
 pub use laserstream_core_proto::geyser as grpc;
 pub use laserstream_core_proto::solana;
 
