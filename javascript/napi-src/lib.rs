@@ -114,6 +114,7 @@ pub fn subscribe_update_to_bytes(update: YellowstoneSubscribeUpdate) -> Result<V
 #[napi]
 pub enum CommitmentLevel {
     PROCESSED = 0,
+    /// @deprecated Use FINALIZED. CONFIRMED will be removed in v2.
     CONFIRMED = 1,
     FINALIZED = 2,
 }

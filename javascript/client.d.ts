@@ -1,6 +1,4 @@
 // TypeScript declarations for Laserstream client
-import type { CommitmentLevel } from 'laserstream-core-proto-js/generated';
-
 import type { geyser } from 'laserstream-core-proto-js/generated';
 
 // The generated package exports a namespace, not these top-level aliases.
@@ -36,9 +34,15 @@ export {
   SubscribeRequestAccountsDataSlice,
   SubscribeRequestPing,
   // Enums
-  CommitmentLevel,
   SlotStatus,
 } from 'laserstream-core-proto-js/generated';
+
+export declare enum CommitmentLevel {
+  PROCESSED = 0,
+  /** @deprecated Use FINALIZED. CONFIRMED will be removed in v2. */
+  CONFIRMED = 1,
+  FINALIZED = 2
+}
 
 // ============================================================================
 // Compression and Configuration

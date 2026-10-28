@@ -121,7 +121,7 @@ config.IntraSlotUpdates = true
 
 ### Account Subscriptions
 ```go
-commitmentLevel := laserstream.CommitmentLevel_CONFIRMED
+commitmentLevel := laserstream.CommitmentLevel_FINALIZED
 req := &laserstream.SubscribeRequest{
     Accounts: map[string]*laserstream.SubscribeRequestFilterAccounts{
         "usdc-accounts": {
@@ -268,7 +268,7 @@ Besides streaming, the Geyser service exposes request/response RPCs. They are me
 client := laserstream.NewClient(laserstream.NewLaserstreamConfig(endpoint, apiKey))
 defer client.Close()
 
-slot, err := client.GetSlot(ctx, laserstream.CommitmentLevel_CONFIRMED) // slot.Slot
+slot, err := client.GetSlot(ctx, laserstream.CommitmentLevel_FINALIZED) // slot.Slot
 height, err := client.GetBlockHeight(ctx)                               // commitment optional
 bh, err := client.GetLatestBlockhash(ctx)                               // bh.Blockhash, bh.Slot, bh.LastValidBlockHeight
 valid, err := client.IsBlockhashValid(ctx, bh.Blockhash)                // valid.Valid
@@ -341,7 +341,7 @@ err := client.Subscribe(req,
 commitmentLevel := laserstream.CommitmentLevel_PROCESSED
 
 // Confirmed by cluster majority  
-commitmentLevel := laserstream.CommitmentLevel_CONFIRMED
+commitmentLevel := laserstream.CommitmentLevel_FINALIZED
 
 // Finalized, cannot be rolled back
 commitmentLevel := laserstream.CommitmentLevel_FINALIZED
@@ -388,7 +388,7 @@ func main() {
     defer client.Close()
 
     // Create subscription
-    commitmentLevel := laserstream.CommitmentLevel_CONFIRMED
+    commitmentLevel := laserstream.CommitmentLevel_FINALIZED
     req := &laserstream.SubscribeRequest{
         Slots: map[string]*laserstream.SubscribeRequestFilterSlots{
             "client": {},

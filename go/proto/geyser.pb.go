@@ -26,6 +26,9 @@ type CommitmentLevel int32
 
 const (
 	CommitmentLevel_PROCESSED CommitmentLevel = 0
+	// Deprecated: use FINALIZED. CONFIRMED will be removed in v2.
+	//
+	// Deprecated: Marked as deprecated in geyser.proto.
 	CommitmentLevel_CONFIRMED CommitmentLevel = 1
 	CommitmentLevel_FINALIZED CommitmentLevel = 2
 )
@@ -3411,10 +3414,10 @@ const file_geyser_proto_rawDesc = "" +
 	"\v_commitment\"D\n" +
 	"\x18IsBlockhashValidResponse\x12\x12\n" +
 	"\x04slot\x18\x01 \x01(\x04R\x04slot\x12\x14\n" +
-	"\x05valid\x18\x02 \x01(\bR\x05valid*>\n" +
+	"\x05valid\x18\x02 \x01(\bR\x05valid*B\n" +
 	"\x0fCommitmentLevel\x12\r\n" +
-	"\tPROCESSED\x10\x00\x12\r\n" +
-	"\tCONFIRMED\x10\x01\x12\r\n" +
+	"\tPROCESSED\x10\x00\x12\x11\n" +
+	"\tCONFIRMED\x10\x01\x1a\x02\b\x01\x12\r\n" +
 	"\tFINALIZED\x10\x02*\xa1\x01\n" +
 	"\n" +
 	"SlotStatus\x12\x12\n" +
