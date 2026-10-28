@@ -24,21 +24,9 @@ const FIXED_RECONNECT_INTERVAL_MS: u64 = 5000; // 5 seconds fixed interval
 const SDK_NAME: &str = "laserstream-rust";
 const SDK_VERSION: &str = env!("CARGO_PKG_VERSION");
 const INTRA_SLOT_UPDATES_HEADER: &str = "x-intra-slot-updates";
-#[cfg(feature = "internal")]
-const DISABLE_GEYSER_ARCHIVE_HEADER: &str = "x-disable-geyser-archive";
 
-fn is_terminal_error(config: &LaserstreamConfig, options: &SubscribeOptions, status: &Status) -> bool {
-    archive_replay_disabled(config, options) && status.code() == laserstream_core_proto::tonic::Code::OutOfRange
-}
-
-/// Intra-slot updates, or the deprecated archive flag that the server treats as intra-slot updates.
-#[cfg_attr(not(feature = "internal"), allow(unused_variables))]
-fn archive_replay_disabled(config: &LaserstreamConfig, options: &SubscribeOptions) -> bool {
-    #[cfg(feature = "internal")]
-    if config.internal_disable_geyser_archive_fallback {
-        return true;
-    }
-    options.intra_slot_updates
+fn is_terminal_error(options: &SubscribeOptions, status: &Status) -> bool {
+    options.intra_slot_updates && status.code() == laserstream_core_proto::tonic::Code::OutOfRange
 }
 
 fn footer_resume_slot(update: &SubscribeUpdate) -> Option<u64> {
@@ -261,7 +249,7 @@ pub fn subscribe_with_options(
                                             }
                                         }
                                         Err(status) => {
-                                            if is_terminal_error(&config, &options, &status) {
+                                            if is_terminal_error(&options, &status) {
                                                 yield Err(LaserstreamError::Status(status));
                                                 return;
                                             }
@@ -299,7 +287,7 @@ pub fn subscribe_with_options(
                     }
                 }
                 Err(err) => {
-                    if is_terminal_error(&config, &options, &err) {
+                    if is_terminal_error(&options, &err) {
                         yield Err(LaserstreamError::Status(err));
                         return;
                     }
@@ -427,23 +415,16 @@ async fn connect_and_subscribe_once(
         .map_err(|e| Status::internal(format!("Failed to send initial request: {}", e)))?;
 
     let mut subscribe_rx = Request::new(subscribe_rx);
-    if archive_replay_disabled(config, options) {
+    if options.intra_slot_updates {
         subscribe_rx
             .metadata_mut()
             .insert(INTRA_SLOT_UPDATES_HEADER, MetadataValue::from_static("true"));
-    }
-    // Servers without intra-slot updates still read the deprecated header.
-    #[cfg(feature = "internal")]
-    if config.internal_disable_geyser_archive_fallback {
-        subscribe_rx
-            .metadata_mut()
-            .insert(DISABLE_GEYSER_ARCHIVE_HEADER, MetadataValue::from_static("true"));
     }
     let response = geyser_client
         .subscribe(subscribe_rx)
         .await
         .map_err(|status| {
-            if archive_replay_disabled(config, options) {
+            if options.intra_slot_updates {
                 return status;
             }
             Status::internal(format!("Subscription failed: {}", status))
