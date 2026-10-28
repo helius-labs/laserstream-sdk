@@ -459,6 +459,7 @@ def package_identity(tarball: Path) -> tuple[str, str]:
 def publish_npm(packages: Path, sha: str, dry_run: bool = False) -> None:
     version = canonical_version()
     channel = release_channel(version)
+    packages = packages.resolve()
     tarballs = []
     for tarball in packages.glob("*.tgz"):
         name, packaged_version = package_identity(tarball)
