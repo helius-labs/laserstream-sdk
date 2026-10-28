@@ -37,29 +37,20 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Reject version changes for no-release PRs
-        if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'no-release')
+      - name: Enforce PR release policy
+        if: github.event_name == 'pull_request'
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          NO_RELEASE: ${{ contains(github.event.pull_request.labels.*.name, 'no-release') }}
         run: |
-          if BASE_VERSION=$(git show "$BASE_SHA:VERSION" 2>/dev/null); then
-            :
-          else
-            BASE_VERSION=$(git show "$BASE_SHA:rust/Cargo.toml" | python3 -c \
-              'import sys, tomllib; print(tomllib.loads(sys.stdin.read())["package"]["version"])')
+          args=(--base-sha "$BASE_SHA")
+          if [ "$NO_RELEASE" = "true" ]; then
+            args+=(--no-release)
           fi
-          CURRENT_VERSION=$(cat VERSION)
-          if [ "$CURRENT_VERSION" != "$BASE_VERSION" ]; then
-            echo "PRs labeled no-release must keep VERSION at $BASE_VERSION, found $CURRENT_VERSION"
-            exit 1
-          fi
-          echo "VERSION remains $CURRENT_VERSION; registry availability check skipped"
-      - name: Verify release version is unpublished
-        if: github.event_name == 'release' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'no-release'))
-        run: python3 scripts/release.py check-available
-      - name: Skip release availability on main pushes
-        if: github.event_name == 'push'
-        run: echo "Release availability is checked on release PRs and release events"
+          python3 scripts/release.py check-pr-policy "${args[@]}"
+      - name: Skip release availability outside release PRs
+        if: github.event_name != 'pull_request'
+        run: echo "Release availability is checked on ordinary pull requests; release retries are provenance-checked per artifact"
 
   rust-tests:
     name: Rust SDK tests
@@ -294,49 +285,13 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
-      - name: Validate release tag
+        with:
+          fetch-depth: 0
+      - name: Validate release source
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: |
-          VERSION=$(cat VERSION)
-          MAIN_SHA=$(git ls-remote origin refs/heads/main | cut -f1)
-          if [ "$GITHUB_SHA" != "$MAIN_SHA" ]; then
-            echo "Release commit $GITHUB_SHA is not current main $MAIN_SHA"
-            exit 1
-          fi
-          if [ "$RELEASE_TAG" != "v$VERSION" ]; then
-            echo "Release tag $RELEASE_TAG does not match v$VERSION"
-            exit 1
-          fi
+        run: python3 scripts/release.py preflight-release --tag "$RELEASE_TAG" --sha "$GITHUB_SHA"
       - uses: dtolnay/rust-toolchain@stable
-      - name: Authenticate to crates.io
-        id: crates-auth
-        uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
-      - name: Publish Rust SDK
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.crates-auth.outputs.token }}
-        working-directory: rust
-        run: |
-          VERSION=$(cat ../VERSION)
-          if curl --fail --silent --show-error \
-            -H 'User-Agent: laserstream-sdk-release' \
-            "https://crates.io/api/v1/crates/helius-laserstream/$VERSION" >/dev/null 2>&1; then
-            TMP_DIR=$(mktemp -d)
-            curl --fail --silent --show-error --location \
-              -H 'User-Agent: laserstream-sdk-release' \
-              "https://crates.io/api/v1/crates/helius-laserstream/$VERSION/download" \
-              | tar -xz -C "$TMP_DIR"
-            PUBLISHED_SHA=$(jq -r '.git.sha1' \
-              "$TMP_DIR/helius-laserstream-$VERSION/.cargo_vcs_info.json")
-            rm -rf "$TMP_DIR"
-            if [ "$PUBLISHED_SHA" != "$GITHUB_SHA" ]; then
-              echo "helius-laserstream@$VERSION came from $PUBLISHED_SHA, expected $GITHUB_SHA"
-              exit 1
-            fi
-            echo "helius-laserstream@$VERSION is already published; skipping"
-          else
-            cargo publish --locked
-          fi
       - name: Setup node
         uses: actions/setup-node@v4
         with:
@@ -349,266 +304,24 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-      - name: Create platform packages
+      - name: Pre-pack every registry artifact
+        run: python3 scripts/release.py prepare-release --artifacts artifacts --output release-packages --sha "$GITHUB_SHA"
+      - name: Authenticate to crates.io
+        id: crates-auth
+        uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
+      - name: Publish npm packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        working-directory: javascript
-        run: |
-          # Get version from package.json
-          VERSION=$(node -p "require('./package.json').version")
-          
-          # Check if artifacts directory exists
-          if [ ! -d "../artifacts" ]; then
-            echo "❌ Error: artifacts directory not found!"
-            exit 1
-          fi
-          
-          # List artifacts for debugging
-          echo "📦 Available artifacts:"
-          ls -la ../artifacts/
-          
-          # Track successful packages
-          PUBLISHED_COUNT=0
-          
-          # Create platform-specific packages
-          for artifact in ../artifacts/bindings-*/; do
-            if [ ! -d "$artifact" ]; then
-              echo "❌ Error: artifact directory $artifact not found!"
-              continue
-            fi
-            
-            target=$(basename "$artifact" | sed 's/bindings-//')
-            echo "🔨 Creating package for $target"
-            
-            # Debug: List artifact contents
-            echo "🔍 Contents of $artifact:"
-            find "$artifact" -name "*.node" -type f
-            
-            # Check if .node files exist (they should be in javascript/ subdirectory)
-            if ! find "$artifact" -name "*.node" -type f | head -1 > /dev/null; then
-              echo "❌ Error: No .node files found in $artifact"
-              exit 1
-            fi
-            
-            # Create package directory
-            mkdir -p "platform-$target"
-            cd "platform-$target"
-            
-            # Copy the .node file (from javascript/ subdirectory)
-            find "../$artifact" -name "*.node" -type f -exec cp {} ./ \; || {
-              echo "❌ Error: Failed to copy .node files from $artifact"
-              exit 1
-            }
-            
-            # Verify .node file was copied
-            if ! ls *.node 1> /dev/null 2>&1; then
-              echo "❌ Error: No .node files found after copy"
-              exit 1
-            fi
-            
-            # Determine package name and platform info based on target
-            case $target in
-              "x86_64-apple-darwin") 
-                PACKAGE_NAME="helius-laserstream-darwin-x64"
-                OS_FIELD="darwin"
-                CPU_FIELD="x64"
-                MAIN_BINARY="laserstream-napi.darwin-x64.node"
-                ;;
-              "aarch64-apple-darwin") 
-                PACKAGE_NAME="helius-laserstream-darwin-arm64"
-                OS_FIELD="darwin"
-                CPU_FIELD="arm64"
-                MAIN_BINARY="laserstream-napi.darwin-arm64.node"
-                ;;
-              "x86_64-unknown-linux-gnu") 
-                PACKAGE_NAME="helius-laserstream-linux-x64-gnu"
-                OS_FIELD="linux"
-                CPU_FIELD="x64"
-                MAIN_BINARY="laserstream-napi.linux-x64-gnu.node"
-                ;;
-              "aarch64-unknown-linux-gnu") 
-                PACKAGE_NAME="helius-laserstream-linux-arm64-gnu"
-                OS_FIELD="linux"
-                CPU_FIELD="arm64"
-                MAIN_BINARY="laserstream-napi.linux-arm64-gnu.node"
-                ;;
-              "x86_64-unknown-linux-musl") 
-                PACKAGE_NAME="helius-laserstream-linux-x64-musl"
-                OS_FIELD="linux"
-                CPU_FIELD="x64"
-                MAIN_BINARY="laserstream-napi.linux-x64-musl.node"
-                ;;
-              "aarch64-unknown-linux-musl") 
-                PACKAGE_NAME="helius-laserstream-linux-arm64-musl"
-                OS_FIELD="linux"
-                CPU_FIELD="arm64"
-                MAIN_BINARY="laserstream-napi.linux-arm64-musl.node"
-                ;;
-              *) echo "❌ Unknown target: $target"; exit 1 ;;
-            esac
-            
-            # Create package.json for platform package
-            cat > package.json << EOF
-          {
-            "name": "$PACKAGE_NAME",
-            "version": "$VERSION",
-            "description": "Platform-specific binary for helius-laserstream ($target)",
-            "main": "$MAIN_BINARY",
-            "files": ["*.node"],
-            "os": ["$OS_FIELD"],
-            "cpu": ["$CPU_FIELD"],
-            "license": "MIT",
-            "repository": {
-              "type": "git",
-              "url": "git+https://github.com/helius-labs/laserstream.git"
-            },
-            "publishConfig": {
-              "access": "public"
-            }
-          }
-          EOF
-            
-            # Publish platform package
-            echo "📤 Publishing $PACKAGE_NAME@$VERSION"
-            if npm view "$PACKAGE_NAME@$VERSION" version --prefer-online >/dev/null 2>&1; then
-              PUBLISHED_SHA=$(npm view "$PACKAGE_NAME@$VERSION" gitHead --prefer-online)
-              if [ "$PUBLISHED_SHA" != "$GITHUB_SHA" ]; then
-                echo "$PACKAGE_NAME@$VERSION came from $PUBLISHED_SHA, expected $GITHUB_SHA"
-                exit 1
-              fi
-              echo "ℹ️ $PACKAGE_NAME@$VERSION is already published; skipping"
-            else
-              npm publish || {
-                echo "❌ Error: Failed to publish $PACKAGE_NAME"
-                exit 1
-              }
-            fi
-            
-            PUBLISHED_COUNT=$((PUBLISHED_COUNT + 1))
-            cd ..
-          done
-          
-          # Verify we published expected number of packages
-          if [ "$PUBLISHED_COUNT" -ne 6 ]; then
-            echo "❌ Error: Expected 6 platform packages, but published $PUBLISHED_COUNT"
-            exit 1
-          fi
-          
-          echo "✅ Successfully published $PUBLISHED_COUNT platform packages"
-      - name: Publish main package
+        run: python3 scripts/release.py publish-npm --packages release-packages --sha "$GITHUB_SHA"
+      - name: Publish Rust SDK
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        working-directory: javascript
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-
-          # Pin optionalDependencies (platform packages) to the current version so
-          # npm installs the matching native binary. Drift here will silently break
-          # `npm install` on every release — the optional deps fail to resolve,
-          # `require('helius-laserstream')` throws "Cannot find module".
-          echo "🔧 Rewriting optionalDependencies to $VERSION"
-          jq --arg v "$VERSION" '.optionalDependencies |= with_entries(.value = $v)' \
-            package.json > package.json.tmp && mv package.json.tmp package.json
-
-          echo "📤 Publishing main package helius-laserstream"
-          if npm view "helius-laserstream@$VERSION" version --prefer-online >/dev/null 2>&1; then
-            PUBLISHED_SHA=$(npm view "helius-laserstream@$VERSION" gitHead --prefer-online)
-            if [ "$PUBLISHED_SHA" != "$GITHUB_SHA" ]; then
-              echo "helius-laserstream@$VERSION came from $PUBLISHED_SHA, expected $GITHUB_SHA"
-              exit 1
-            fi
-            echo "ℹ️ helius-laserstream@$VERSION is already published; skipping"
-          else
-            npm publish || {
-              echo "❌ Error: Failed to publish main package"
-              exit 1
-            }
-          fi
-          echo "✅ Successfully published main package"
-      - name: Verify publication
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        working-directory: javascript
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          echo "🔍 Verifying publication of version $VERSION"
-
-          # npm reads are eventually consistent and the read CDN can lag a
-          # successful publish by a few minutes. Poll with a generous window
-          # (~4 min) and bypass the npm cache so we hit the registry directly;
-          # a too-short window here has red-flagged two already-successful
-          # releases (0.8.5, 0.9.0) even though publish succeeded.
-          verify_package() {
-            # initial grace period before the first check
-            sleep 15
-            for i in $(seq 1 24); do
-              if npm view "$1@$VERSION" version --prefer-online > /dev/null 2>&1; then
-                echo "✅ Verified: $1@$VERSION"
-                return 0
-              fi
-              sleep 10
-            done
-            echo "❌ Error: Package $1@$VERSION not found on NPM after ~4 min"
-            return 1
-          }
-
-          verify_package helius-laserstream
-
-          PLATFORM_PACKAGES=(
-            "helius-laserstream-darwin-x64"
-            "helius-laserstream-darwin-arm64"
-            "helius-laserstream-linux-x64-gnu"
-            "helius-laserstream-linux-arm64-gnu"
-            "helius-laserstream-linux-x64-musl"
-            "helius-laserstream-linux-arm64-musl"
-          )
-
-          for package in "${PLATFORM_PACKAGES[@]}"; do
-            verify_package "$package"
-          done
-          
-          echo "🎉 All npm packages successfully published and verified!"
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-auth.outputs.token }}
+        run: python3 scripts/release.py publish-rust --sha "$GITHUB_SHA"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go/go.mod
           cache-dependency-path: go/go.sum
       - name: Publish Go SDK tag
-        run: |
-          VERSION=$(cat VERSION)
-          TAG="go/v$VERSION"
-          EXISTING=$(git ls-remote --tags origin "refs/tags/$TAG^{}" | cut -f1)
-          if [ -z "$EXISTING" ]; then
-            DIRECT=$(git ls-remote --tags origin "refs/tags/$TAG" | cut -f1)
-            if [ -n "$DIRECT" ]; then
-              EXISTING=$DIRECT
-            fi
-          fi
-
-          if [ -n "$EXISTING" ]; then
-            if [ "$EXISTING" != "$GITHUB_SHA" ]; then
-              echo "$TAG points to $EXISTING, expected $GITHUB_SHA"
-              exit 1
-            fi
-            echo "$TAG already points to $GITHUB_SHA; skipping"
-          else
-            git config user.name github-actions[bot]
-            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-            git tag -a "$TAG" -m "Go SDK v$VERSION" "$GITHUB_SHA"
-            git push origin "refs/tags/$TAG"
-          fi
-      - name: Verify Rust and Go publication
-        run: |
-          VERSION=$(cat VERSION)
-          for _ in $(seq 1 24); do
-            if curl --fail --silent --show-error \
-              -H 'User-Agent: laserstream-sdk-release' \
-              "https://crates.io/api/v1/crates/helius-laserstream/$VERSION" >/dev/null && \
-              GOPROXY=https://proxy.golang.org go list \
-                -m "github.com/helius-labs/laserstream-sdk/go@v$VERSION" >/dev/null 2>&1; then
-              echo "Verified Rust and Go SDK v$VERSION"
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "Rust or Go SDK v$VERSION was not visible after ~4 min"
-          exit 1
+        run: python3 scripts/release.py publish-go --sha "$GITHUB_SHA"
+      - name: Verify publication and provenance
+        run: python3 scripts/release.py verify-release --sha "$GITHUB_SHA"
