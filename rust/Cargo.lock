@@ -1163,7 +1163,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.6.5",
  "tokio",
  "tower-service",
  "tracing",
@@ -1394,7 +1394,7 @@ dependencies = [
 [[package]]
 name = "laserstream-core-client"
 version = "13.1.0"
-source = "git+https://github.com/helius-labs/yellowstone-grpc?rev=4b6be6d1e72ba92f76c558ca6017a05f111810d9#4b6be6d1e72ba92f76c558ca6017a05f111810d9"
+source = "git+https://github.com/helius-labs/yellowstone-grpc?rev=998b66d4fb9a54f6530a0ad21e80be34279a70fb#998b66d4fb9a54f6530a0ad21e80be34279a70fb"
 dependencies = [
  "bytes",
  "futures",
@@ -1407,7 +1407,7 @@ dependencies = [
 [[package]]
 name = "laserstream-core-proto"
 version = "13.1.1"
-source = "git+https://github.com/helius-labs/yellowstone-grpc?rev=4b6be6d1e72ba92f76c558ca6017a05f111810d9#4b6be6d1e72ba92f76c558ca6017a05f111810d9"
+source = "git+https://github.com/helius-labs/yellowstone-grpc?rev=998b66d4fb9a54f6530a0ad21e80be34279a70fb#998b66d4fb9a54f6530a0ad21e80be34279a70fb"
 dependencies = [
  "anyhow",
  "bincode",
@@ -1949,7 +1949,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls",
- "socket2 0.5.10",
+ "socket2 0.6.5",
  "thiserror 2.0.19",
  "tokio",
  "tracing",
@@ -1987,7 +1987,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.5.10",
+ "socket2 0.6.5",
  "tracing",
  "windows-sys 0.61.2",
 ]
