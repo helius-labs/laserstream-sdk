@@ -48,9 +48,6 @@ jobs:
             args+=(--no-release)
           fi
           python3 scripts/release.py check-pr-policy "${args[@]}"
-      - name: Skip release availability outside release PRs
-        if: github.event_name != 'pull_request'
-        run: echo "Release availability is checked on ordinary pull requests; release retries are provenance-checked per artifact"
 
   rust-tests:
     name: Rust SDK tests
