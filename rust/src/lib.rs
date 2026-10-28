@@ -6,9 +6,9 @@ pub mod config;
 pub mod error;
 pub mod unary;
 
-pub use client::{subscribe, StreamHandle};
+pub use client::{subscribe, subscribe_with_options, StreamHandle};
 pub use unary::LaserstreamClient;
-pub use config::{ChannelOptions, LaserstreamConfig, CompressionEncoding};
+pub use config::{ChannelOptions, LaserstreamConfig, CompressionEncoding, SubscribeOptions};
 pub use error::LaserstreamError;
 
 // Re-export commonly used types from laserstream-core-proto

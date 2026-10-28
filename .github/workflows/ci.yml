@@ -99,7 +99,8 @@ jobs:
           cache-dependency-path: go/go.sum
       # Root package only: examples/ and test/ hold multiple `main` programs per directory.
       - run: go vet .
-      - run: go test -race -count=1 .
+      # Tests wait on signals; the timeout only backstops a signal that never comes.
+      - run: go test -race -count=1 -timeout 2m .
 
   js-tests:
     name: JS SDK tests
@@ -132,6 +133,7 @@ jobs:
       # Debug build: tests only need a loadable binding for the host platform.
       - run: npm run build:debug
       - run: npm run test:unary
+      - run: npm run test:intra-slot
       - run: npm run test:cuckoo
       - run: npm run test:v1-config
       - run: npm run test:update-parent

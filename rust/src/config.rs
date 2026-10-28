@@ -83,6 +83,22 @@ impl ChannelOptions {
     }
 }
 
+/// Per-subscription options for `subscribe_with_options`.
+#[derive(Debug, Clone, Default)]
+#[non_exhaustive]
+pub struct SubscribeOptions {
+    /// Every write of each bank at confirmed and finalized; retention is limited. Default: false
+    pub intra_slot_updates: bool,
+}
+
+impl SubscribeOptions {
+    /// Delivers every write of each bank at confirmed and finalized; retention is limited, so a `from_slot` older than it fails with OUT_OF_RANGE.
+    pub fn with_intra_slot_updates(mut self, intra_slot_updates: bool) -> Self {
+        self.intra_slot_updates = intra_slot_updates;
+        self
+    }
+}
+
 impl Default for LaserstreamConfig {
     fn default() -> Self {
         Self {
@@ -129,6 +145,10 @@ impl LaserstreamConfig {
     /// This does not change the subscription's commitment or enable replay.
     #[cfg(feature = "internal")]
     #[doc(hidden)]
+    #[deprecated(
+        since = "1.1.0",
+        note = "use SubscribeOptions::with_intra_slot_updates; the server treats x-disable-geyser-archive as intra-slot updates"
+    )]
     pub fn internal_disable_geyser_archive_fallback(mut self) -> Self {
         self.internal_disable_geyser_archive_fallback = true;
         self

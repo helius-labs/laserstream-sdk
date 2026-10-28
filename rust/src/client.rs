@@ -1,4 +1,4 @@
-use crate::{LaserstreamConfig, LaserstreamError, config::CompressionEncoding as ConfigCompressionEncoding};
+use crate::{LaserstreamConfig, LaserstreamError, SubscribeOptions, config::CompressionEncoding as ConfigCompressionEncoding};
 use async_stream::stream;
 use futures::StreamExt;
 use futures_channel::mpsc as futures_mpsc;
@@ -23,15 +23,22 @@ const HARD_CAP_RECONNECT_ATTEMPTS: u32 = (20 * 60) / 5; // 20 mins / 5 sec inter
 const FIXED_RECONNECT_INTERVAL_MS: u64 = 5000; // 5 seconds fixed interval
 const SDK_NAME: &str = "laserstream-rust";
 const SDK_VERSION: &str = env!("CARGO_PKG_VERSION");
+const INTRA_SLOT_UPDATES_HEADER: &str = "x-intra-slot-updates";
 #[cfg(feature = "internal")]
 const DISABLE_GEYSER_ARCHIVE_HEADER: &str = "x-disable-geyser-archive";
 
-fn is_terminal_error(_config: &LaserstreamConfig, _status: &Status) -> bool {
+fn is_terminal_error(config: &LaserstreamConfig, options: &SubscribeOptions, status: &Status) -> bool {
+    archive_replay_disabled(config, options) && status.code() == laserstream_core_proto::tonic::Code::OutOfRange
+}
+
+/// Intra-slot updates, or the deprecated archive flag that the server treats as intra-slot updates.
+#[cfg_attr(not(feature = "internal"), allow(unused_variables))]
+fn archive_replay_disabled(config: &LaserstreamConfig, options: &SubscribeOptions) -> bool {
     #[cfg(feature = "internal")]
-    if is_out_of_range_with_ga_disabled(_config, _status) {
+    if config.internal_disable_geyser_archive_fallback {
         return true;
     }
-    false
+    options.intra_slot_updates
 }
 
 fn footer_resume_slot(update: &SubscribeUpdate) -> Option<u64> {
@@ -39,12 +46,6 @@ fn footer_resume_slot(update: &SubscribeUpdate) -> Option<u64> {
         UpdateOneof::BlockFooter(msg) => Some(msg.slot),
         _ => None,
     }
-}
-
-#[cfg(feature = "internal")]
-fn is_out_of_range_with_ga_disabled(config: &LaserstreamConfig, status: &Status) -> bool {
-    config.internal_disable_geyser_archive_fallback
-        && status.code() == laserstream_core_proto::tonic::Code::OutOfRange
 }
 
 #[cfg(test)]
@@ -101,10 +102,22 @@ impl StreamHandle {
 
 /// Establishes a gRPC connection, handles the subscription lifecycle,
 /// and provides a stream of updates. Automatically reconnects on failure.
-#[instrument(skip(config, request))]
 pub fn subscribe(
     config: LaserstreamConfig,
     request: SubscribeRequest,
+) -> (
+    impl Stream<Item = Result<SubscribeUpdate, LaserstreamError>>,
+    StreamHandle,
+) {
+    subscribe_with_options(config, request, SubscribeOptions::default())
+}
+
+/// `subscribe` with per-subscription options such as intra-slot updates.
+#[instrument(skip(config, request))]
+pub fn subscribe_with_options(
+    config: LaserstreamConfig,
+    request: SubscribeRequest,
+    options: SubscribeOptions,
 ) -> (
     impl Stream<Item = Result<SubscribeUpdate, LaserstreamError>>,
     StreamHandle,
@@ -170,7 +183,7 @@ pub fn subscribe(
 
             let attempt_request = current_request.clone();
 
-            match connect_and_subscribe_once(&config, attempt_request, api_key_string.clone()).await {
+            match connect_and_subscribe_once(&config, &options, attempt_request, api_key_string.clone()).await {
                 Ok((sender, stream)) => {
                     // Successful connection – reset attempt counter so we don't hit the cap
                     reconnect_attempts = 0;
@@ -248,7 +261,7 @@ pub fn subscribe(
                                             }
                                         }
                                         Err(status) => {
-                                            if is_terminal_error(&config, &status) {
+                                            if is_terminal_error(&config, &options, &status) {
                                                 yield Err(LaserstreamError::Status(status));
                                                 return;
                                             }
@@ -286,7 +299,7 @@ pub fn subscribe(
                     }
                 }
                 Err(err) => {
-                    if is_terminal_error(&config, &err) {
+                    if is_terminal_error(&config, &options, &err) {
                         yield Err(LaserstreamError::Status(err));
                         return;
                     }
@@ -391,9 +404,10 @@ pub(crate) async fn build_geyser_client(
     Ok(geyser_client)
 }
 
-#[instrument(skip(config, request, api_key))]
+#[instrument(skip(config, options, request, api_key))]
 async fn connect_and_subscribe_once(
     config: &LaserstreamConfig,
+    options: &SubscribeOptions,
     request: SubscribeRequest,
     api_key: String,
 ) -> Result<
@@ -412,23 +426,24 @@ async fn connect_and_subscribe_once(
         .await
         .map_err(|e| Status::internal(format!("Failed to send initial request: {}", e)))?;
 
+    let mut subscribe_rx = Request::new(subscribe_rx);
+    if archive_replay_disabled(config, options) {
+        subscribe_rx
+            .metadata_mut()
+            .insert(INTRA_SLOT_UPDATES_HEADER, MetadataValue::from_static("true"));
+    }
+    // Servers without intra-slot updates still read the deprecated header.
     #[cfg(feature = "internal")]
-    let subscribe_rx = {
-        let mut request = Request::new(subscribe_rx);
-        if config.internal_disable_geyser_archive_fallback {
-            request.metadata_mut().insert(
-                DISABLE_GEYSER_ARCHIVE_HEADER,
-                MetadataValue::from_static("true"),
-            );
-        }
-        request
-    };
+    if config.internal_disable_geyser_archive_fallback {
+        subscribe_rx
+            .metadata_mut()
+            .insert(DISABLE_GEYSER_ARCHIVE_HEADER, MetadataValue::from_static("true"));
+    }
     let response = geyser_client
         .subscribe(subscribe_rx)
         .await
         .map_err(|status| {
-            #[cfg(feature = "internal")]
-            if config.internal_disable_geyser_archive_fallback {
+            if archive_replay_disabled(config, options) {
                 return status;
             }
             Status::internal(format!("Subscription failed: {}", status))

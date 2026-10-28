@@ -58,7 +58,7 @@ export declare class UnaryClient {
   subscribeReplayInfo(): Promise<SubscribeReplayInfoResponse>
 }
 export declare class LaserstreamClient {
-  constructor(endpoint: string, token?: string | undefined | null, maxReconnectAttempts?: number | undefined | null, channelOptions?: object | undefined | null, replay?: boolean | undefined | null)
+  constructor(endpoint: string, token?: string | undefined | null, maxReconnectAttempts?: number | undefined | null, channelOptions?: object | undefined | null, replay?: boolean | undefined | null, intraSlotUpdates?: boolean | undefined | null)
   subscribe(request: any, callback: (error: Error | null, updateBytes: Uint8Array) => void): Promise<StreamHandle>
 }
 export declare class StreamHandle {

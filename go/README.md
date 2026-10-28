@@ -108,6 +108,15 @@ config := laserstream.LaserstreamConfig{
 config.Replay = true // No data loss
 ```
 
+### Intra-Slot Updates
+By default, confirmed and finalized subscriptions receive the last write of each account per slot. Intra-slot updates deliver every write instead.
+
+> **Note:** Retention for intra-slot updates is limited. A `FromSlot` older than the retention period fails with `OUT_OF_RANGE` (reported to the error callback) instead of retrying.
+```go
+config := laserstream.NewLaserstreamConfig(endpoint, apiKey)
+config.IntraSlotUpdates = true
+```
+
 ## Subscription Examples
 
 ### Account Subscriptions
