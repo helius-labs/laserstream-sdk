@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/url"
 	"runtime/debug"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -32,7 +31,7 @@ const (
 	ForkDepthSafetyMargin    = 31   // Max fork depth for processed commitment
 )
 
-const goModulePath = "github.com/helius-labs/laserstream-sdk/go"
+const goModulePath = "github.com/helius-labs/laserstream-sdk/go/v2"
 
 // SDK metadata values.
 const SDKName = "laserstream-go"
@@ -64,11 +63,7 @@ func sdkVersionFromBuildInfo(info *debug.BuildInfo) string {
 }
 
 func isSDKModulePath(path string) bool {
-	if path == goModulePath {
-		return true
-	}
-	major, err := strconv.Atoi(strings.TrimPrefix(path, goModulePath+"/v"))
-	return err == nil && major >= 2
+	return path == goModulePath
 }
 
 // IntraSlotUpdatesHeader requests every write of each bank at confirmed and finalized.
