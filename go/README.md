@@ -5,7 +5,7 @@ High-performance Go client for streaming real-time Solana data via Laserstream w
 ## Installation
 
 ```bash
-go get github.com/helius-labs/laserstream-sdk/go
+go get github.com/helius-labs/laserstream-sdk/go/v2
 ```
 
 ## Quick Start
@@ -18,7 +18,7 @@ import (
     "os/signal"
     "syscall"
     
-    laserstream "github.com/helius-labs/laserstream-sdk/go"
+    laserstream "github.com/helius-labs/laserstream-sdk/go/v2"
 )
 
 func main() {
@@ -360,7 +360,7 @@ import (
     "os/signal"
     "syscall"
 
-    laserstream "github.com/helius-labs/laserstream-sdk/go"
+    laserstream "github.com/helius-labs/laserstream-sdk/go/v2"
     "github.com/joho/godotenv"
 )
 
