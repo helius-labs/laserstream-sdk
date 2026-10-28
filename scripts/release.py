@@ -389,9 +389,11 @@ def prepare_release(artifacts: Path, output: Path, sha: str, allow_dirty: bool) 
     staging = Path(tempfile.mkdtemp(prefix="laserstream-npm-", dir=output.parent))
     try:
         for target, (name, os_name, cpu, binary_name) in PLATFORM_PACKAGES.items():
-            candidates = list((artifacts / f"bindings-{target}").rglob("*.node"))
+            candidates = list((artifacts / f"bindings-{target}").rglob(binary_name))
             if len(candidates) != 1:
-                raise RuntimeError(f"expected one native artifact for {target}, found {len(candidates)}")
+                raise RuntimeError(
+                    f"expected one {binary_name} artifact for {target}, found {len(candidates)}"
+                )
             package_dir = staging / name
             package_dir.mkdir(parents=True)
             shutil.copy2(candidates[0], package_dir / binary_name)
