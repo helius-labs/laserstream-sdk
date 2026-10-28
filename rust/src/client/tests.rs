@@ -41,26 +41,13 @@ fn update_parent_proto_is_available() {
 }
 
 #[test]
-fn default_config_has_no_terminal_errors() {
-    let config = LaserstreamConfig::default();
-    for value in 1..=16 {
-        let code = Code::from_i32(value);
-        assert!(
-            !is_terminal_error(&config, &SubscribeOptions::default(), &Status::new(code, "test")),
-            "{code:?}"
-        );
-    }
-}
-
-#[test]
 fn only_opted_in_out_of_range_is_terminal() {
-    let opted_in = archive_opt_outs().into_iter().map(|(opt_in, _)| (opt_in(LaserstreamConfig::default()), true));
-    let default = (LaserstreamConfig::default(), SubscribeOptions::default());
-    for ((config, options), opted_in) in std::iter::once((default, false)).chain(opted_in) {
+    for opted_in in [false, true] {
+        let options = SubscribeOptions::default().with_intra_slot_updates(opted_in);
         for value in 1..=16 {
             let code = Code::from_i32(value);
             assert_eq!(
-                is_terminal_error(&config, &options, &Status::new(code, "test")),
+                is_terminal_error(&options, &Status::new(code, "test")),
                 opted_in && code == Code::OutOfRange,
                 "{code:?}"
             );
@@ -77,7 +64,6 @@ fn intra_slot_updates_are_off_by_default() {
     assert!(!options.with_intra_slot_updates(false).intra_slot_updates);
 }
 
-#[cfg(not(feature = "internal"))]
 #[test]
 fn config_literal_from_1_0_1_still_compiles() {
     let config = LaserstreamConfig {
@@ -90,25 +76,6 @@ fn config_literal_from_1_0_1_still_compiles() {
     assert!(config.replay);
 }
 
-#[cfg(feature = "internal")]
-#[test]
-#[allow(deprecated)]
-fn fallback_is_enabled_by_default_and_independent_of_replay() {
-    assert!(!LaserstreamConfig::default().internal_disable_geyser_archive_fallback);
-    assert!(
-        !LaserstreamConfig::new(String::new(), String::new())
-            .internal_disable_geyser_archive_fallback
-    );
-    let config = LaserstreamConfig::default().internal_disable_geyser_archive_fallback();
-    assert!(config.replay);
-    assert!(config.internal_disable_geyser_archive_fallback);
-    assert!(
-        config
-            .internal_disable_geyser_archive_fallback()
-            .internal_disable_geyser_archive_fallback
-    );
-}
-
 #[tokio::test]
 async fn stream_out_of_range_is_terminal() {
     assert_terminal(Reply::StreamOutOfRange, Code::OutOfRange, 1).await;
@@ -117,13 +84,9 @@ async fn stream_out_of_range_is_terminal() {
 async fn initial_out_of_range_preserves_status() {
     assert_terminal(Reply::InitialOutOfRange, Code::OutOfRange, 1).await;
 }
-#[cfg(feature = "internal")]
 #[tokio::test]
-#[allow(deprecated)]
 async fn retryable_error_reconnects_and_retains_requested_slot() {
-    let server = TestServer::start(Reply::TransientThenOutOfRange).await;
-    let config = server.config().internal_disable_geyser_archive_fallback();
-    assert_terminal_with_config(&server, config, SubscribeOptions::default(), Code::OutOfRange, 2, (Some("true"), Some("true"))).await;
+    assert_terminal(Reply::TransientThenOutOfRange, Code::OutOfRange, 2).await;
 }
 
 #[tokio::test]
@@ -138,15 +101,6 @@ async fn default_client_omits_internal_header() {
         .unwrap();
     assert!(matches!(update.update_oneof, Some(UpdateOneof::Account(_))));
     assert_eq!(server.requests.lock().unwrap()[0].headers(), (None, None));
-}
-
-#[cfg(feature = "internal")]
-#[tokio::test]
-#[allow(deprecated)]
-async fn disabled_client_sends_both_headers_and_delivers_data_without_acknowledgement() {
-    let server = TestServer::start(Reply::Data).await;
-    let config = server.config().internal_disable_geyser_archive_fallback();
-    assert_delivers_data(&server, config, SubscribeOptions::default(), (Some("true"), Some("true"))).await;
 }
 
 #[tokio::test]
@@ -215,7 +169,6 @@ enum Reply {
     StreamOutOfRange,
     InitialOutOfRange,
     Data,
-    #[cfg(feature = "internal")]
     TransientThenOutOfRange,
 }
 
@@ -262,7 +215,7 @@ impl geyser_server::Geyser for TestGeyser {
         let (intra_slot_updates, disable_archive) =
             (header("x-intra-slot-updates"), header("x-disable-geyser-archive"));
         let first = request.into_inner().message().await?.unwrap();
-        let _attempt = {
+        let attempt = {
             let mut requests = self.requests.lock().unwrap();
             requests.push(ObservedRequest {
                 intra_slot_updates,
@@ -276,9 +229,7 @@ impl geyser_server::Geyser for TestGeyser {
         }
         let update = match self.reply {
             Reply::StreamOutOfRange => Err(Status::out_of_range(SLOT_TOO_OLD_MESSAGE)),
-            #[cfg(feature = "internal")]
-            Reply::TransientThenOutOfRange if _attempt == 1 => Err(Status::unavailable("restart")),
-            #[cfg(feature = "internal")]
+            Reply::TransientThenOutOfRange if attempt == 1 => Err(Status::unavailable("restart")),
             Reply::TransientThenOutOfRange => Err(Status::out_of_range(SLOT_TOO_OLD_MESSAGE)),
             _ => Ok(SubscribeUpdate {
                 filters: vec!["accounts".into()],
@@ -410,27 +361,10 @@ fn request() -> SubscribeRequest {
     }
 }
 
-type OptIn = fn(LaserstreamConfig) -> (LaserstreamConfig, SubscribeOptions);
-
-/// Each opt-out of Geyser Archive replay with the headers it sends: intra-slot updates and, with `internal`, the deprecated archive flag.
-fn archive_opt_outs() -> Vec<(OptIn, Headers)> {
-    let intra_slot: (OptIn, Headers) = (|config| (config, SubscribeOptions::default().with_intra_slot_updates(true)), (Some("true"), None));
-    #[cfg(feature = "internal")]
-    #[allow(deprecated)]
-    return vec![
-        intra_slot,
-        (|config| (config.internal_disable_geyser_archive_fallback(), SubscribeOptions::default()), (Some("true"), Some("true"))),
-    ];
-    #[cfg(not(feature = "internal"))]
-    vec![intra_slot]
-}
-
 async fn assert_terminal(reply: Reply, code: Code, attempts: usize) {
-    for (opt_in, headers) in archive_opt_outs() {
-        let server = TestServer::start(reply).await;
-        let (config, options) = opt_in(server.config());
-        assert_terminal_with_config(&server, config, options, code, attempts, headers).await;
-    }
+    let server = TestServer::start(reply).await;
+    let options = SubscribeOptions::default().with_intra_slot_updates(true);
+    assert_terminal_with_config(&server, server.config(), options, code, attempts, (Some("true"), None)).await;
 }
 
 async fn assert_delivers_data(server: &TestServer, config: LaserstreamConfig, options: SubscribeOptions, headers: Headers) {
