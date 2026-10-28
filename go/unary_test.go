@@ -24,9 +24,13 @@ func TestSDKVersionFromDependencyBuildInfo(t *testing.T) {
 }
 
 func TestSDKVersionFromMainBuildInfo(t *testing.T) {
-	info := &debug.BuildInfo{Main: debug.Module{Path: goModulePath, Version: "v2.0.0"}}
+	info := &debug.BuildInfo{Main: debug.Module{Path: goModulePath + "/v2", Version: "v2.0.0"}}
 	if got := sdkVersionFromBuildInfo(info); got != "2.0.0" {
 		t.Fatalf("sdkVersionFromBuildInfo() = %q, want 2.0.0", got)
+	}
+	info.Main = debug.Module{Path: goModulePath + "/v3", Version: "v3.1.4"}
+	if got := sdkVersionFromBuildInfo(info); got != "3.1.4" {
+		t.Fatalf("sdkVersionFromBuildInfo() = %q, want 3.1.4", got)
 	}
 }
 

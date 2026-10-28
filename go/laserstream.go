@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/url"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -49,7 +50,7 @@ func detectSDKVersion() string {
 func sdkVersionFromBuildInfo(info *debug.BuildInfo) string {
 	modules := append([]*debug.Module{&info.Main}, info.Deps...)
 	for _, module := range modules {
-		if module.Path != goModulePath {
+		if !isSDKModulePath(module.Path) {
 			continue
 		}
 		if module.Replace != nil {
@@ -60,6 +61,14 @@ func sdkVersionFromBuildInfo(info *debug.BuildInfo) string {
 		}
 	}
 	return "devel"
+}
+
+func isSDKModulePath(path string) bool {
+	if path == goModulePath {
+		return true
+	}
+	major, err := strconv.Atoi(strings.TrimPrefix(path, goModulePath+"/v"))
+	return err == nil && major >= 2
 }
 
 // Commitment levels
