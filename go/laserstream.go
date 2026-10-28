@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -30,11 +32,44 @@ const (
 	ForkDepthSafetyMargin    = 31   // Max fork depth for processed commitment
 )
 
-// SDK metadata constants
-const (
-	SDKName    = "laserstream-go"
-	SDKVersion = "1.1.0"
-)
+const goModulePath = "github.com/helius-labs/laserstream-sdk/go"
+
+// SDK metadata values.
+const SDKName = "laserstream-go"
+
+var SDKVersion = detectSDKVersion()
+
+func detectSDKVersion() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "devel"
+	}
+	return sdkVersionFromBuildInfo(info)
+}
+
+func sdkVersionFromBuildInfo(info *debug.BuildInfo) string {
+	modules := append([]*debug.Module{&info.Main}, info.Deps...)
+	for _, module := range modules {
+		if !isSDKModulePath(module.Path) {
+			continue
+		}
+		if module.Replace != nil {
+			module = module.Replace
+		}
+		if module.Version != "" && module.Version != "(devel)" {
+			return strings.TrimPrefix(module.Version, "v")
+		}
+	}
+	return "devel"
+}
+
+func isSDKModulePath(path string) bool {
+	if path == goModulePath {
+		return true
+	}
+	major, err := strconv.Atoi(strings.TrimPrefix(path, goModulePath+"/v"))
+	return err == nil && major >= 2
+}
 
 // IntraSlotUpdatesHeader requests every write of each bank at confirmed and finalized.
 const IntraSlotUpdatesHeader = "x-intra-slot-updates"
