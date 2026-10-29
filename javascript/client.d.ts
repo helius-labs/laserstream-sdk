@@ -39,7 +39,7 @@ export {
 
 export declare enum CommitmentLevel {
   PROCESSED = 0,
-  /** @deprecated Use FINALIZED. CONFIRMED will be removed in v2. */
+  /** @deprecated Confirmed and Finalized are now equivalent. Please upgrade to Finalized. Confirmed will be removed in a future version. */
   CONFIRMED = 1,
   FINALIZED = 2
 }

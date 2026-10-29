@@ -26,7 +26,7 @@ type CommitmentLevel int32
 
 const (
 	CommitmentLevel_PROCESSED CommitmentLevel = 0
-	// Deprecated: use FINALIZED. CONFIRMED will be removed in v2.
+	// Deprecated: Confirmed and Finalized are now equivalent. Please upgrade to Finalized. Confirmed will be removed in a future version.
 	//
 	// Deprecated: Marked as deprecated in geyser.proto.
 	CommitmentLevel_CONFIRMED CommitmentLevel = 1
