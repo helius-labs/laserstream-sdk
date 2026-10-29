@@ -187,10 +187,10 @@ async fn unary_methods_round_trip() {
     );
     assert_eq!(client.get_block_height(None).await.unwrap().block_height, 900);
     let bh = client
-        .get_latest_blockhash(Some(CommitmentLevel::Confirmed))
+        .get_latest_blockhash(Some(CommitmentLevel::Finalized))
         .await
         .unwrap();
-    assert_eq!((bh.slot, bh.blockhash.as_str(), bh.last_valid_block_height), (1001, "hash", 7));
+    assert_eq!((bh.slot, bh.blockhash.as_str(), bh.last_valid_block_height), (1002, "hash", 7));
     assert!(client.is_blockhash_valid(&bh.blockhash, None).await.unwrap().valid);
     assert!(!client.is_blockhash_valid("other", None).await.unwrap().valid);
     assert_eq!(client.ping(7).await.unwrap().count, 7);

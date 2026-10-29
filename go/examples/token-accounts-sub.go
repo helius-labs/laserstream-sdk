@@ -46,7 +46,7 @@ func main() {
 		APIKey:   apiKey,
 	}
 
-	commitmentLevel := laserstream.CommitmentLevel_CONFIRMED
+	commitmentLevel := laserstream.CommitmentLevel_FINALIZED
 	vote := false
 	failed := false
 	subscriptionRequest := &laserstream.SubscribeRequest{

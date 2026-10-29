@@ -8,7 +8,7 @@ async function main() {
     timeoutMs: 10_000, // per-call deadline (default 30000)
   });
 
-  const { slot } = await client.getSlot(CommitmentLevel.CONFIRMED);
+  const { slot } = await client.getSlot(CommitmentLevel.FINALIZED);
   console.log('slot (confirmed): ', slot);
 
   const { blockHeight } = await client.getBlockHeight();

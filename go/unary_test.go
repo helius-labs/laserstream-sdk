@@ -119,9 +119,9 @@ func TestUnaryMethods(t *testing.T) {
 		t.Errorf("GetBlockHeight = %d", height.BlockHeight)
 	}
 
-	bh, err := client.GetLatestBlockhash(ctx, CommitmentLevel_CONFIRMED)
+	bh, err := client.GetLatestBlockhash(ctx, CommitmentLevel_FINALIZED)
 	must(err)
-	if bh.Slot != 1001 || bh.Blockhash != "hash" || bh.LastValidBlockHeight != 7 {
+	if bh.Slot != 1002 || bh.Blockhash != "hash" || bh.LastValidBlockHeight != 7 {
 		t.Errorf("GetLatestBlockhash = %+v", bh)
 	}
 

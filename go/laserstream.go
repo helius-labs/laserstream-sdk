@@ -77,6 +77,7 @@ const IntraSlotUpdatesHeader = "x-intra-slot-updates"
 // Commitment levels
 const (
 	CommitmentProcessed = 0
+	// Deprecated: Confirmed and Finalized are now equivalent. Please upgrade to Finalized. Confirmed will be removed in a future version.
 	CommitmentConfirmed = 1
 	CommitmentFinalized = 2
 )
@@ -844,6 +845,7 @@ type (
 // Commitment levels - re-export enum values
 const (
 	CommitmentLevel_PROCESSED = pb.CommitmentLevel_PROCESSED
+	// Deprecated: Confirmed and Finalized are now equivalent. Please upgrade to Finalized. Confirmed will be removed in a future version.
 	CommitmentLevel_CONFIRMED = pb.CommitmentLevel_CONFIRMED
 	CommitmentLevel_FINALIZED = pb.CommitmentLevel_FINALIZED
 )

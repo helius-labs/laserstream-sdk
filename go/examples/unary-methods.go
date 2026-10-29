@@ -30,7 +30,7 @@ func main() {
 	defer client.Close()
 	ctx := context.Background()
 
-	slot, err := client.GetSlot(ctx, laserstream.CommitmentLevel_CONFIRMED)
+	slot, err := client.GetSlot(ctx, laserstream.CommitmentLevel_FINALIZED)
 	if err != nil {
 		log.Fatalf("GetSlot: %v", err)
 	}

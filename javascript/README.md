@@ -23,7 +23,7 @@ async function main() {
     slots: {
       client: {}
     },
-    commitment: CommitmentLevel.CONFIRMED,
+    commitment: CommitmentLevel.FINALIZED,
   };
 
   const stream = await subscribe(
@@ -127,7 +127,7 @@ const request = {
       filters: []
     }
   },
-  commitment: CommitmentLevel.CONFIRMED,
+  commitment: CommitmentLevel.FINALIZED,
 };
 ```
 
@@ -150,7 +150,7 @@ const request = {
       failed: false
     }
   },
-  commitment: CommitmentLevel.CONFIRMED,
+  commitment: CommitmentLevel.FINALIZED,
 };
 ```
 
@@ -178,7 +178,7 @@ const request = {
       tokenAccounts: "balanceChanged",
     },
   },
-  commitment: CommitmentLevel.CONFIRMED,
+  commitment: CommitmentLevel.FINALIZED,
 };
 ```
 
@@ -204,7 +204,7 @@ const request = {
       matchMints: true,
     },
   },
-  commitment: CommitmentLevel.CONFIRMED,
+  commitment: CommitmentLevel.FINALIZED,
 };
 ```
 
@@ -220,7 +220,7 @@ const request = {
   blocksMeta: {
     "block-metadata": {}
   },
-  commitment: CommitmentLevel.CONFIRMED,
+  commitment: CommitmentLevel.FINALIZED,
 };
 ```
 
@@ -235,7 +235,7 @@ const request = {
       filterByCommitment: false
     }
   },
-  commitment: CommitmentLevel.CONFIRMED,
+  commitment: CommitmentLevel.FINALIZED,
 };
 ```
 
@@ -261,7 +261,7 @@ const request = {
   slots: {
     "slots": {}
   },
-  commitment: CommitmentLevel.CONFIRMED,
+  commitment: CommitmentLevel.FINALIZED,
 };
 ```
 
@@ -274,7 +274,7 @@ import { LaserstreamClient, CommitmentLevel } from 'helius-laserstream';
 
 const client = new LaserstreamClient({ apiKey: 'your-api-key', endpoint: 'your-endpoint' });
 
-const { slot } = await client.getSlot(CommitmentLevel.CONFIRMED);
+const { slot } = await client.getSlot(CommitmentLevel.FINALIZED);
 const { blockHeight } = await client.getBlockHeight();
 const bh = await client.getLatestBlockhash(); // { blockhash, slot, lastValidBlockHeight }
 const { valid } = await client.isBlockhashValid(bh.blockhash);
@@ -338,7 +338,7 @@ for (const pubkey of myTrackedPubkeys) {
 }
 
 // Attach the filter to the request (no explicit account list needed).
-const request = { accounts: {}, commitment: CommitmentLevel.CONFIRMED };
+const request = { accounts: {}, commitment: CommitmentLevel.FINALIZED };
 tracked.insertIntoSubscribeRequest(request, 'tracked_accounts');
 
 const stream = await subscribe(config, request, (update) => {
@@ -369,7 +369,7 @@ for (const pubkey of myTrackedPubkeys) {
   tracked.insert(pubkey);
 }
 
-const request = { transactions: {}, commitment: CommitmentLevel.CONFIRMED };
+const request = { transactions: {}, commitment: CommitmentLevel.FINALIZED };
 request.transactions['tracked_transactions'] = tracked.toTransactionFilter();
 
 const stream = await subscribe(config, request, (update) => {
@@ -446,7 +446,7 @@ const request = {
   commitment: CommitmentLevel.PROCESSED,
   
   // Confirmed by cluster majority
-  // commitment: CommitmentLevel.CONFIRMED,
+  // commitment: CommitmentLevel.FINALIZED,
   
   // Finalized, cannot be rolled back
   // commitment: CommitmentLevel.FINALIZED,
@@ -500,7 +500,7 @@ async function main() {
         failed: false
       }
     },
-    commitment: CommitmentLevel.CONFIRMED,
+    commitment: CommitmentLevel.FINALIZED,
   };
 
   try {

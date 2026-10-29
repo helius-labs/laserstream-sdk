@@ -20,7 +20,8 @@ service Geyser {
 
 enum CommitmentLevel {
   PROCESSED = 0;
-  CONFIRMED = 1;
+  // Deprecated: Confirmed and Finalized are now equivalent. Please upgrade to Finalized. Confirmed will be removed in a future version.
+  CONFIRMED = 1 [deprecated = true];
   FINALIZED = 2;
 }
 
