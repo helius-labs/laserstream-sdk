@@ -3437,7 +3437,7 @@ const file_geyser_proto_rawDesc = "" +
 	"\aGetSlot\x12\x16.geyser.GetSlotRequest\x1a\x17.geyser.GetSlotResponse\"\x00\x12W\n" +
 	"\x10IsBlockhashValid\x12\x1f.geyser.IsBlockhashValidRequest\x1a .geyser.IsBlockhashValidResponse\"\x00\x12E\n" +
 	"\n" +
-	"GetVersion\x12\x19.geyser.GetVersionRequest\x1a\x1a.geyser.GetVersionResponse\"\x00B1Z/github.com/helius-labs/laserstream-sdk/go/protoP\x01b\x06proto3"
+	"GetVersion\x12\x19.geyser.GetVersionRequest\x1a\x1a.geyser.GetVersionResponse\"\x00B4Z2github.com/helius-labs/laserstream-sdk/go/v2/protoP\x01b\x06proto3"
 
 var (
 	file_geyser_proto_rawDescOnce sync.Once
