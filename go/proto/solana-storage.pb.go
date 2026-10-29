@@ -1574,7 +1574,7 @@ const file_solana_storage_proto_rawDesc = "" +
 	"\n" +
 	"\x06Voting\x10\x04\x12\x14\n" +
 	"\x10DeactivatedStake\x10\x05\x12\f\n" +
-	"\bVATDebit\x10\x06B1Z/github.com/helius-labs/laserstream-sdk/go/protob\x06proto3"
+	"\bVATDebit\x10\x06B4Z2github.com/helius-labs/laserstream-sdk/go/v2/protob\x06proto3"
 
 var (
 	file_solana_storage_proto_rawDescOnce sync.Once
