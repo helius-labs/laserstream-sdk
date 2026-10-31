@@ -134,6 +134,7 @@ jobs:
       - run: npm run build:debug
       - run: npm run test:unary
       - run: npm run test:intra-slot
+      - run: npm run test:stream-end
       - run: npm run test:cuckoo
       - run: npm run test:v1-config
       - run: npm run test:update-parent
