@@ -15,6 +15,20 @@ export type SubscribeUpdateTransactionStatus = geyser.ISubscribeUpdateTransactio
 export type SubscribeUpdateBlockMeta = geyser.ISubscribeUpdateBlockMeta;
 export type SubscribeUpdateEntry = geyser.ISubscribeUpdateEntry;
 
+// Request inputs, bound the same way. Re-exporting these names from the
+// generated module silently produced `any`, so typos such as `acccount`
+// compiled. test/types/subscribe-request.mts guards against a regression.
+export type SubscribeRequest = geyser.ISubscribeRequest;
+export type SubscribeRequestFilterAccounts = geyser.ISubscribeRequestFilterAccounts;
+export type SubscribeRequestFilterAccountsFilter = geyser.ISubscribeRequestFilterAccountsFilter;
+export type SubscribeRequestFilterSlots = geyser.ISubscribeRequestFilterSlots;
+export type SubscribeRequestFilterTransactions = geyser.ISubscribeRequestFilterTransactions;
+export type SubscribeRequestFilterBlocks = geyser.ISubscribeRequestFilterBlocks;
+export type SubscribeRequestFilterBlocksMeta = geyser.ISubscribeRequestFilterBlocksMeta;
+export type SubscribeRequestFilterEntry = geyser.ISubscribeRequestFilterEntry;
+export type SubscribeRequestAccountsDataSlice = geyser.ISubscribeRequestAccountsDataSlice;
+export type SubscribeRequestPing = geyser.ISubscribeRequestPing;
+
 // Re-export gRPC types
 export { ChannelOptions } from '@grpc/grpc-js';
 
@@ -24,17 +38,6 @@ export {
   SubscribeUpdateTransactionInfo,
   SubscribeUpdatePing,
   SubscribeUpdatePong,
-  // Request types
-  SubscribeRequest,
-  SubscribeRequestFilterAccounts,
-  SubscribeRequestFilterAccountsFilter,
-  SubscribeRequestFilterSlots,
-  SubscribeRequestFilterTransactions,
-  SubscribeRequestFilterBlocks,
-  SubscribeRequestFilterBlocksMeta,
-  SubscribeRequestFilterEntry,
-  SubscribeRequestAccountsDataSlice,
-  SubscribeRequestPing,
   // Enums
   CommitmentLevel,
   SlotStatus,
@@ -234,6 +237,23 @@ declare module 'laserstream-core-proto-js/generated' {
     interface ISubscribeUpdateBlock { bankId?: (string | null); }
     interface ISubscribeUpdateBlockMeta { bankId?: (string | null); }
     interface ISubscribeUpdateEntry { bankId?: (string | null); }
+
+    // Accepted by JsAccountFilter in napi-src/client.rs but absent from the
+    // proto account filter, so declared here to keep existing callers compiling.
+    interface ISubscribeRequestFilterAccounts {
+      /** Not in the Helius docs; accepted by the native layer. */
+      accountInclude?: (string[] | null);
+      /** Not in the Helius docs; accepted by the native layer. */
+      accountExclude?: (string[] | null);
+      /** Not in the Helius docs; accepted by the native layer. */
+      accountRequired?: (string[] | null);
+      /**
+       * Compressed account (cuckoo) filter.
+       * Built client-side via {@link CompressedAccountFilterSet.insertIntoSubscribeRequest}.
+       */
+      cuckooAccountsFilter?: (import('./cuckoo').CuckooFilterProto | null);
+    }
+
     interface ISubscribeRequestFilterEntry {
       /**
        * Include {@link SubscribeUpdateEntryUpdateParent} updates (proto field #1).

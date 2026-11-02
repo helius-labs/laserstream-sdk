@@ -41,6 +41,7 @@
     "test:unary": "node test/unary-methods.test.js",
     "test:intra-slot": "node test/intra-slot-updates.test.js",
     "test:cuckoo-e2e": "node test/cuckoo-e2e-thorough.js",
+    "test:types": "tsc -p test/types",
     "perf:test": "ts-node performance/pump-raydium-performance-test.ts",
     "perf:slot": "ts-node performance/slot-performance-test.ts",
     "perf:token": "ts-node performance/token-performance-test.ts",

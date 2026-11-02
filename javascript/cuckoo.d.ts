@@ -1,6 +1,6 @@
 // TypeScript declarations for the cuckoo (compressed account) filter builder.
 
-import { SubscribeRequest } from 'laserstream-core-proto-js/generated';
+import type { SubscribeRequest } from './client';
 
 /** Default SipHash seed ("yllwstn!"). Always serialized on the wire. */
 export declare const DEFAULT_HASH_SEED: bigint;
