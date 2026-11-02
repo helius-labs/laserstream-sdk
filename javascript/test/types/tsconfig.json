@@ -1,0 +1,22 @@
+{
+  // Compile-only checks on the published declarations, resolved through the
+  // package's own "exports" map exactly as a consumer would see them.
+  //
+  // skipLibCheck stays on because other re-exports in client.d.ts are still
+  // unresolved; the assertions in this directory check the request types
+  // directly instead of relying on lib checking.
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "es2022",
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["./**/*.mts"]
+}
