@@ -185,10 +185,12 @@ export interface SubscribeRequestFilterBlockFooter {
 }
 
 /** Encoding of {@link BlockFooterVotesAggregate.signature}. Readers reject kinds they do not know. */
-export declare enum BlockFooterSignatureKind {
+export declare const BlockFooterSignatureKind: {
   /** 96 bytes. */
-  COMPRESSED_BLS12_381_G2 = 0
-}
+  readonly COMPRESSED_BLS12_381_G2: 0;
+};
+export type BlockFooterSignatureKind =
+  (typeof BlockFooterSignatureKind)[keyof typeof BlockFooterSignatureKind];
 
 /** An aggregate signature over one vote, and the validators that signed it. */
 export interface BlockFooterVotesAggregate {
