@@ -130,6 +130,8 @@ jobs:
           restore-keys: |
             js-tests-cargo-${{ runner.os }}-
       - run: npm install --ignore-scripts
+      # Compile-only checks on the published declarations; needs no native build.
+      - run: npm run test:types
       # Debug build: tests only need a loadable binding for the host platform.
       - run: npm run build:debug
       - run: npm run test:unary
