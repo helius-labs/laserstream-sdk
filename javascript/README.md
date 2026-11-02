@@ -224,6 +224,22 @@ const request = {
 };
 ```
 
+### Block Footer Certificates
+Alpenglow block footers carry the block's finalization and reward certificates when the footer filter sets `includeCertificates`. Omitted or `false` sends footer metadata only, with `blockFinalCert`, `skipRewardCert` and `notarRewardCert` set to `null`.
+```typescript
+const request = {
+  blockFooter: {
+    "footers": { includeCertificates: true }
+  },
+};
+
+// In the data callback:
+const cert = update.blockFooter?.blockFinalCert;
+if (cert) {
+  // cert.finalAggregate / cert.notarAggregate: { signatureKind, signature (96-byte compressed BLS), blockId, signerBitmap }
+}
+```
+
 ### Slot Subscriptions
 ```typescript
 const request = {

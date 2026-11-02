@@ -179,7 +179,48 @@ export {
  */
 export type TokenAccountsFilterMode = 'none' | 'balanceChanged' | 'all';
 
-export interface SubscribeRequestFilterBlockFooter {}
+export interface SubscribeRequestFilterBlockFooter {
+  /** Include available certificates (proto field #1). Omitted or false sends footer metadata only. */
+  includeCertificates?: (boolean | null);
+}
+
+/** Encoding of {@link BlockFooterVotesAggregate.signature}. Readers reject kinds they do not know. */
+export declare enum BlockFooterSignatureKind {
+  /** 96 bytes. */
+  COMPRESSED_BLS12_381_G2 = 0
+}
+
+/** An aggregate signature over one vote, and the validators that signed it. */
+export interface BlockFooterVotesAggregate {
+  signatureKind: BlockFooterSignatureKind;
+  signature: Uint8Array | Buffer;
+  /** Merkle root of the block's last data shred, not the PoH blockhash. Empty for votes on a slot. */
+  blockId: Uint8Array | Buffer;
+  /** solana-signer-store bitmap, verbatim: version byte, u16 LE bit count, payload. */
+  signerBitmap: Uint8Array | Buffer;
+}
+
+/**
+ * Proves that the block is finalized. Slow finalization: `finalAggregate` signs a finalize vote on
+ * the slot and `notarAggregate` a notarize vote on the block. Fast: `finalAggregate` alone, on the block.
+ */
+export interface BlockFooterFinalCert {
+  slot: string;
+  finalAggregate?: (BlockFooterVotesAggregate | null);
+  notarAggregate?: (BlockFooterVotesAggregate | null);
+}
+
+/** Records the validators that voted skip on the slot. */
+export interface BlockFooterSkipRewardCert {
+  slot: string;
+  aggregate?: (BlockFooterVotesAggregate | null);
+}
+
+/** Records the validators that voted notarize on the slot's block. */
+export interface BlockFooterNotarRewardCert {
+  slot: string;
+  aggregate?: (BlockFooterVotesAggregate | null);
+}
 
 export interface SubscribeUpdateBlockFooter {
   slot: string;
@@ -187,6 +228,10 @@ export interface SubscribeUpdateBlockFooter {
   bankHash: Uint8Array | Buffer;
   blockProducerTimeNanos: string;
   blockUserAgent: Uint8Array | Buffer;
+  /** Sent only when the footer filter sets `includeCertificates`. */
+  blockFinalCert?: (BlockFooterFinalCert | null);
+  skipRewardCert?: (BlockFooterSkipRewardCert | null);
+  notarRewardCert?: (BlockFooterNotarRewardCert | null);
 }
 
 /**

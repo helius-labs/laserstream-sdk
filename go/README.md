@@ -225,6 +225,23 @@ req := &laserstream.SubscribeRequest{
 }
 ```
 
+### Block Footer Certificates
+Alpenglow block footers carry the block's finalization and reward certificates when the footer filter sets `IncludeCertificates`. Omitted or `false` sends footer metadata only, with `BlockFinalCert`, `SkipRewardCert` and `NotarRewardCert` set to `nil`.
+```go
+includeCertificates := true
+req := &laserstream.SubscribeRequest{
+    BlockFooter: map[string]*laserstream.SubscribeRequestFilterBlockFooter{
+        "footers": {IncludeCertificates: &includeCertificates},
+    },
+}
+
+// In the data callback:
+if cert := update.GetBlockFooter().GetBlockFinalCert(); cert != nil {
+    // cert.FinalAggregate / cert.NotarAggregate: *laserstream.BlockFooterVotesAggregate
+    // {SignatureKind, Signature (96-byte compressed BLS), BlockId, SignerBitmap}
+}
+```
+
 ### Slot Subscriptions
 ```go
 filterByCommitment := true
