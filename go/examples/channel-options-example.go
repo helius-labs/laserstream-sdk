@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	laserstream "github.com/helius-labs/laserstream-sdk/go"
+	laserstream "github.com/helius-labs/laserstream-sdk/go/v2"
 
 	"github.com/joho/godotenv"
 )

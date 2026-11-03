@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	pb "github.com/helius-labs/laserstream-sdk/go/proto"
+	pb "github.com/helius-labs/laserstream-sdk/go/v2/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
