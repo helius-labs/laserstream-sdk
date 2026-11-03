@@ -28,7 +28,7 @@ High-performance gRPC client for streaming real-time Solana data. Built for deve
 
 ### Go SDK
 - **Location**: [`/go`](/go)  
-- **Install**: `go get github.com/helius-labs/laserstream-sdk/go`
+- **Install**: `go get github.com/helius-labs/laserstream-sdk/go/v2`
 - **Architecture**: Native Go implementation with goroutine safety
 
 ## 🔧 Core Concepts
@@ -104,7 +104,7 @@ let (stream, _handle) = subscribe(config, request);
 
 ### Go
 ```go
-import laserstream "github.com/helius-labs/laserstream-sdk/go"
+import laserstream "github.com/helius-labs/laserstream-sdk/go/v2"
 
 client := laserstream.NewClient(laserstream.LaserstreamConfig{
     Endpoint: endpoint, APIKey: apiKey,
