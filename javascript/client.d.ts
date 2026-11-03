@@ -1,19 +1,32 @@
 // TypeScript declarations for Laserstream client
 import type { CommitmentLevel } from 'laserstream-core-proto-js/generated';
-
 import type { geyser } from 'laserstream-core-proto-js/generated';
+import type Long = require('long');
 
-// The generated package exports a namespace, not these top-level aliases.
-// Bind update outputs locally so callback/decoder types carry bank IDs.
-export type SubscribeUpdate = geyser.ISubscribeUpdate;
-export type SubscribeUpdateAccount = geyser.ISubscribeUpdateAccount;
-export type SubscribeUpdateAccountInfo = geyser.ISubscribeUpdateAccountInfo;
-export type SubscribeUpdateBlock = geyser.ISubscribeUpdateBlock;
-export type SubscribeUpdateSlot = geyser.ISubscribeUpdateSlot;
-export type SubscribeUpdateTransaction = geyser.ISubscribeUpdateTransaction;
-export type SubscribeUpdateTransactionStatus = geyser.ISubscribeUpdateTransactionStatus;
-export type SubscribeUpdateBlockMeta = geyser.ISubscribeUpdateBlockMeta;
-export type SubscribeUpdateEntry = geyser.ISubscribeUpdateEntry;
+// protobufjs declarations model uint64 fields as `number | Long`, but the
+// public decoder uses `longs: String` to preserve all 64 bits. Recursively map
+// generated message inputs to the values users actually receive at runtime.
+type DecodedProto<T> = [Extract<NonNullable<T>, Long>] extends [never]
+  ? T extends readonly (infer U)[]
+    ? DecodedProto<U>[]
+    : T extends object
+      ? { [K in keyof T]: DecodedProto<T[K]> }
+      : T
+  : string | Extract<T, null | undefined>;
+
+type DecodedSubscribeUpdate = Omit<DecodedProto<geyser.ISubscribeUpdate>, 'createdAt'> & {
+  createdAt?: Date | null;
+};
+
+export type SubscribeUpdate = DecodedSubscribeUpdate;
+export type SubscribeUpdateAccount = DecodedProto<geyser.ISubscribeUpdateAccount>;
+export type SubscribeUpdateAccountInfo = DecodedProto<geyser.ISubscribeUpdateAccountInfo>;
+export type SubscribeUpdateBlock = DecodedProto<geyser.ISubscribeUpdateBlock>;
+export type SubscribeUpdateSlot = DecodedProto<geyser.ISubscribeUpdateSlot>;
+export type SubscribeUpdateTransaction = DecodedProto<geyser.ISubscribeUpdateTransaction>;
+export type SubscribeUpdateTransactionStatus = DecodedProto<geyser.ISubscribeUpdateTransactionStatus>;
+export type SubscribeUpdateBlockMeta = DecodedProto<geyser.ISubscribeUpdateBlockMeta>;
+export type SubscribeUpdateEntry = DecodedProto<geyser.ISubscribeUpdateEntry>;
 
 // Request inputs, bound the same way. Re-exporting these names from the
 // generated module silently produced `any`, so typos such as `acccount`
