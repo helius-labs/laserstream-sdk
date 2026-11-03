@@ -1,19 +1,46 @@
 // TypeScript declarations for Laserstream client
 import type { CommitmentLevel } from 'laserstream-core-proto-js/generated';
-
 import type { geyser } from 'laserstream-core-proto-js/generated';
+import type Long = require('long');
 
-// The generated package exports a namespace, not these top-level aliases.
-// Bind update outputs locally so callback/decoder types carry bank IDs.
-export type SubscribeUpdate = geyser.ISubscribeUpdate;
-export type SubscribeUpdateAccount = geyser.ISubscribeUpdateAccount;
-export type SubscribeUpdateAccountInfo = geyser.ISubscribeUpdateAccountInfo;
-export type SubscribeUpdateBlock = geyser.ISubscribeUpdateBlock;
-export type SubscribeUpdateSlot = geyser.ISubscribeUpdateSlot;
-export type SubscribeUpdateTransaction = geyser.ISubscribeUpdateTransaction;
-export type SubscribeUpdateTransactionStatus = geyser.ISubscribeUpdateTransactionStatus;
-export type SubscribeUpdateBlockMeta = geyser.ISubscribeUpdateBlockMeta;
-export type SubscribeUpdateEntry = geyser.ISubscribeUpdateEntry;
+// protobufjs declarations model uint64 fields as `number | Long`, but the
+// public decoder uses `longs: String` to preserve all 64 bits. Recursively map
+// generated message inputs to the values users actually receive at runtime.
+type DecodedProto<T> = [Extract<NonNullable<T>, Long>] extends [never]
+  ? T extends readonly (infer U)[]
+    ? DecodedProto<U>[]
+    : T extends object
+      ? { [K in keyof T]: DecodedProto<T[K]> }
+      : T
+  : string | Extract<T, null | undefined>;
+
+type DecodedSubscribeUpdate = Omit<DecodedProto<geyser.ISubscribeUpdate>, 'createdAt'> & {
+  createdAt?: Date | null;
+};
+
+export type SubscribeUpdate = DecodedSubscribeUpdate;
+export type SubscribeUpdateAccount = DecodedProto<geyser.ISubscribeUpdateAccount>;
+export type SubscribeUpdateAccountInfo = DecodedProto<geyser.ISubscribeUpdateAccountInfo>;
+export type SubscribeUpdateBlock = DecodedProto<geyser.ISubscribeUpdateBlock>;
+export type SubscribeUpdateSlot = DecodedProto<geyser.ISubscribeUpdateSlot>;
+export type SubscribeUpdateTransaction = DecodedProto<geyser.ISubscribeUpdateTransaction>;
+export type SubscribeUpdateTransactionStatus = DecodedProto<geyser.ISubscribeUpdateTransactionStatus>;
+export type SubscribeUpdateBlockMeta = DecodedProto<geyser.ISubscribeUpdateBlockMeta>;
+export type SubscribeUpdateEntry = DecodedProto<geyser.ISubscribeUpdateEntry>;
+
+// Request inputs, bound the same way. Re-exporting these names from the
+// generated module silently produced `any`, so typos such as `acccount`
+// compiled. test/types/subscribe-request.mts guards against a regression.
+export type SubscribeRequest = geyser.ISubscribeRequest;
+export type SubscribeRequestFilterAccounts = geyser.ISubscribeRequestFilterAccounts;
+export type SubscribeRequestFilterAccountsFilter = geyser.ISubscribeRequestFilterAccountsFilter;
+export type SubscribeRequestFilterSlots = geyser.ISubscribeRequestFilterSlots;
+export type SubscribeRequestFilterTransactions = geyser.ISubscribeRequestFilterTransactions;
+export type SubscribeRequestFilterBlocks = geyser.ISubscribeRequestFilterBlocks;
+export type SubscribeRequestFilterBlocksMeta = geyser.ISubscribeRequestFilterBlocksMeta;
+export type SubscribeRequestFilterEntry = geyser.ISubscribeRequestFilterEntry;
+export type SubscribeRequestAccountsDataSlice = geyser.ISubscribeRequestAccountsDataSlice;
+export type SubscribeRequestPing = geyser.ISubscribeRequestPing;
 
 // Re-export gRPC types
 export { ChannelOptions } from '@grpc/grpc-js';
@@ -24,17 +51,6 @@ export {
   SubscribeUpdateTransactionInfo,
   SubscribeUpdatePing,
   SubscribeUpdatePong,
-  // Request types
-  SubscribeRequest,
-  SubscribeRequestFilterAccounts,
-  SubscribeRequestFilterAccountsFilter,
-  SubscribeRequestFilterSlots,
-  SubscribeRequestFilterTransactions,
-  SubscribeRequestFilterBlocks,
-  SubscribeRequestFilterBlocksMeta,
-  SubscribeRequestFilterEntry,
-  SubscribeRequestAccountsDataSlice,
-  SubscribeRequestPing,
   // Enums
   CommitmentLevel,
   SlotStatus,
@@ -234,6 +250,23 @@ declare module 'laserstream-core-proto-js/generated' {
     interface ISubscribeUpdateBlock { bankId?: (string | null); }
     interface ISubscribeUpdateBlockMeta { bankId?: (string | null); }
     interface ISubscribeUpdateEntry { bankId?: (string | null); }
+
+    // Accepted by JsAccountFilter in napi-src/client.rs but absent from the
+    // proto account filter, so declared here to keep existing callers compiling.
+    interface ISubscribeRequestFilterAccounts {
+      /** Not in the Helius docs; accepted by the native layer. */
+      accountInclude?: (string[] | null);
+      /** Not in the Helius docs; accepted by the native layer. */
+      accountExclude?: (string[] | null);
+      /** Not in the Helius docs; accepted by the native layer. */
+      accountRequired?: (string[] | null);
+      /**
+       * Compressed account (cuckoo) filter.
+       * Built client-side via {@link CompressedAccountFilterSet.insertIntoSubscribeRequest}.
+       */
+      cuckooAccountsFilter?: (import('./cuckoo').CuckooFilterProto | null);
+    }
+
     interface ISubscribeRequestFilterEntry {
       /**
        * Include {@link SubscribeUpdateEntryUpdateParent} updates (proto field #1).
