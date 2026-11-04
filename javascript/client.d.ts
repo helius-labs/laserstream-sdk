@@ -7,11 +7,13 @@ import type Long = require('long');
 // public decoder uses `longs: String` to preserve all 64 bits. Recursively map
 // generated message inputs to the values users actually receive at runtime.
 type DecodedProto<T> = [Extract<NonNullable<T>, Long>] extends [never]
-  ? T extends readonly (infer U)[]
-    ? DecodedProto<U>[]
-    : T extends object
-      ? { [K in keyof T]: DecodedProto<T[K]> }
-      : T
+  ? T extends Uint8Array
+    ? T
+    : T extends readonly (infer U)[]
+      ? DecodedProto<U>[]
+      : T extends object
+        ? { [K in keyof T]: DecodedProto<T[K]> }
+        : T
   : string | Extract<T, null | undefined>;
 
 type DecodedSubscribeUpdate = Omit<DecodedProto<geyser.ISubscribeUpdate>, 'createdAt'> & {
