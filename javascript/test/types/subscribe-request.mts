@@ -18,6 +18,7 @@ import type {
   SubscribeRequestFilterTransactions,
   SubscribeRequestPing,
 } from 'helius-laserstream';
+import Long = require('long');
 
 // ---------------------------------------------------------------------------
 // Every request type must be a real type.
@@ -110,6 +111,41 @@ export const documentedFields: SubscribeRequest = {
   entry: { entries: { includeUpdateParent: true } },
   accountsDataSlice: [{ offset: 0, length: 64 }],
   fromSlot: 123,
+};
+
+// Native request parsing differs from protobufjs encoding: byte filters use a
+// base64 string, while every u64 request field uses a JavaScript number.
+export const nativeRequestInputs: SubscribeRequest = {
+  accounts: {
+    native: {
+      filters: [
+        { memcmp: { offset: 0, bytes: 'AQ==' } },
+        { datasize: 165 },
+        { lamports: { eq: 1, ne: 2, lt: 3, gt: 4 } },
+      ],
+    },
+  },
+  accountsDataSlice: [{ offset: 0, length: 64 }],
+  fromSlot: 42,
+};
+
+export const protobufByteInputIsRejected: SubscribeRequest = {
+  accounts: {
+    native: {
+      filters: [{
+        memcmp: {
+          offset: 0,
+          // @ts-expect-error: the native parser accepts base64 strings, not Uint8Array.
+          bytes: new Uint8Array([1]),
+        },
+      }],
+    },
+  },
+};
+
+export const protobufLongInputIsRejected: SubscribeRequest = {
+  // @ts-expect-error: the native parser accepts a JavaScript number, not protobufjs Long.
+  fromSlot: Long.fromNumber(42),
 };
 
 // Accepted by JsAccountFilter in napi-src/client.rs but not documented.
