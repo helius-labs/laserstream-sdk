@@ -5,7 +5,9 @@
 import type {
   SubscribeUpdate,
   SubscribeUpdateAccount,
+  SubscribeUpdateAccountInfo,
   SubscribeUpdateBlock,
+  SubscribeUpdateBlockFooter,
   SubscribeUpdateSlot,
   SubscribeUpdateTransaction,
 } from 'helius-laserstream';
@@ -22,6 +24,22 @@ export const nestedUpdate: SubscribeUpdate = {
   transaction: { slot: maxUint64 },
   createdAt: new Date(0),
 };
+
+// Byte fields are already decoded runtime values. Preserve their methods and
+// assignability rather than recursively mapping Uint8Array's object members.
+const accountBytes = new Uint8Array([1, 2, 3]);
+export const accountInfo: SubscribeUpdateAccountInfo = { data: accountBytes };
+export const accountData: Uint8Array | null | undefined = accountInfo.data;
+export const accountPrefix: Uint8Array | undefined = accountInfo.data?.subarray(0, 2);
+
+export const blockFooter: SubscribeUpdateBlockFooter = {
+  slot: '1',
+  bankId: '2',
+  bankHash: accountBytes,
+  blockProducerTimeNanos: '3',
+  blockUserAgent: accountBytes,
+};
+export const footerUpdate: SubscribeUpdate = { blockFooter };
 
 // @ts-expect-error: decoded uint64 values are never numbers.
 export const numericSlot: SubscribeUpdateSlot = { slot: 42 };
