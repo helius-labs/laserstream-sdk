@@ -38,6 +38,7 @@
     "test:cuckoo": "node test/cuckoo-vectors.test.js",
     "test:v1-config": "node test/v1-config-vectors.test.js",
     "test:update-parent": "node test/update-parent.test.js",
+    "test:uint64-output": "node test/uint64-output.test.js",
     "test:footer-certificates": "node test/footer-certificates.test.js",
     "test:unary": "node test/unary-methods.test.js",
     "test:intra-slot": "node test/intra-slot-updates.test.js",
@@ -106,6 +107,7 @@
   },
   "dependencies": {
     "laserstream-core-proto-js": "^9.0.2",
+    "long": "^5.3.2",
     "lz4js": "^0.2.0",
     "protobufjs": "^7.5.3"
   },
