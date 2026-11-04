@@ -28,18 +28,62 @@ export type SubscribeUpdateTransactionStatus = DecodedProto<geyser.ISubscribeUpd
 export type SubscribeUpdateBlockMeta = DecodedProto<geyser.ISubscribeUpdateBlockMeta>;
 export type SubscribeUpdateEntry = DecodedProto<geyser.ISubscribeUpdateEntry>;
 
-// Request inputs, bound the same way. Re-exporting these names from the
-// generated module silently produced `any`, so typos such as `acccount`
-// compiled. test/types/subscribe-request.mts guards against a regression.
-export type SubscribeRequest = geyser.ISubscribeRequest;
-export type SubscribeRequestFilterAccounts = geyser.ISubscribeRequestFilterAccounts;
-export type SubscribeRequestFilterAccountsFilter = geyser.ISubscribeRequestFilterAccountsFilter;
+// Request inputs use the JavaScript shapes consumed by napi-src/client.rs, not
+// protobufjs' encoder shapes. In particular, native u64 fields are numbers and
+// memcmp bytes are base64 strings.
+export type SubscribeRequestFilterAccountsFilterMemcmp = Omit<
+  geyser.ISubscribeRequestFilterAccountsFilterMemcmp,
+  'offset' | 'bytes'
+> & {
+  offset?: number | null;
+  bytes?: string | null;
+};
+
+export type SubscribeRequestFilterAccountsFilterLamports = Omit<
+  geyser.ISubscribeRequestFilterAccountsFilterLamports,
+  'eq' | 'ne' | 'lt' | 'gt'
+> & {
+  eq?: number | null;
+  ne?: number | null;
+  lt?: number | null;
+  gt?: number | null;
+};
+
+export type SubscribeRequestFilterAccountsFilter = Omit<
+  geyser.ISubscribeRequestFilterAccountsFilter,
+  'memcmp' | 'datasize' | 'lamports'
+> & {
+  memcmp?: SubscribeRequestFilterAccountsFilterMemcmp | null;
+  datasize?: number | null;
+  lamports?: SubscribeRequestFilterAccountsFilterLamports | null;
+};
+
+export type SubscribeRequestFilterAccounts = Omit<geyser.ISubscribeRequestFilterAccounts, 'filters'> & {
+  filters?: SubscribeRequestFilterAccountsFilter[] | null;
+};
+
+export type SubscribeRequestAccountsDataSlice = Omit<
+  geyser.ISubscribeRequestAccountsDataSlice,
+  'offset' | 'length'
+> & {
+  offset?: number | null;
+  length?: number | null;
+};
+
+export type SubscribeRequest = Omit<
+  geyser.ISubscribeRequest,
+  'accounts' | 'accountsDataSlice' | 'fromSlot'
+> & {
+  accounts?: { [key: string]: SubscribeRequestFilterAccounts } | null;
+  accountsDataSlice?: SubscribeRequestAccountsDataSlice[] | null;
+  fromSlot?: number | null;
+};
+
 export type SubscribeRequestFilterSlots = geyser.ISubscribeRequestFilterSlots;
 export type SubscribeRequestFilterTransactions = geyser.ISubscribeRequestFilterTransactions;
 export type SubscribeRequestFilterBlocks = geyser.ISubscribeRequestFilterBlocks;
 export type SubscribeRequestFilterBlocksMeta = geyser.ISubscribeRequestFilterBlocksMeta;
 export type SubscribeRequestFilterEntry = geyser.ISubscribeRequestFilterEntry;
-export type SubscribeRequestAccountsDataSlice = geyser.ISubscribeRequestAccountsDataSlice;
 export type SubscribeRequestPing = geyser.ISubscribeRequestPing;
 
 // Re-export gRPC types
