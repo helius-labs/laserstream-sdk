@@ -15,6 +15,64 @@ export type SubscribeUpdateTransactionStatus = geyser.ISubscribeUpdateTransactio
 export type SubscribeUpdateBlockMeta = geyser.ISubscribeUpdateBlockMeta;
 export type SubscribeUpdateEntry = geyser.ISubscribeUpdateEntry;
 
+// Request inputs use the JavaScript shapes consumed by napi-src/client.rs, not
+// protobufjs' encoder shapes. In particular, native u64 fields are numbers and
+// memcmp bytes are base64 strings.
+export type SubscribeRequestFilterAccountsFilterMemcmp = Omit<
+  geyser.ISubscribeRequestFilterAccountsFilterMemcmp,
+  'offset' | 'bytes'
+> & {
+  offset?: number | null;
+  bytes?: string | null;
+};
+
+export type SubscribeRequestFilterAccountsFilterLamports = Omit<
+  geyser.ISubscribeRequestFilterAccountsFilterLamports,
+  'eq' | 'ne' | 'lt' | 'gt'
+> & {
+  eq?: number | null;
+  ne?: number | null;
+  lt?: number | null;
+  gt?: number | null;
+};
+
+export type SubscribeRequestFilterAccountsFilter = Omit<
+  geyser.ISubscribeRequestFilterAccountsFilter,
+  'memcmp' | 'datasize' | 'lamports'
+> & {
+  memcmp?: SubscribeRequestFilterAccountsFilterMemcmp | null;
+  datasize?: number | null;
+  lamports?: SubscribeRequestFilterAccountsFilterLamports | null;
+};
+
+export type SubscribeRequestFilterAccounts = Omit<geyser.ISubscribeRequestFilterAccounts, 'filters'> & {
+  filters?: SubscribeRequestFilterAccountsFilter[] | null;
+};
+
+export type SubscribeRequestAccountsDataSlice = Omit<
+  geyser.ISubscribeRequestAccountsDataSlice,
+  'offset' | 'length'
+> & {
+  offset?: number | null;
+  length?: number | null;
+};
+
+export type SubscribeRequest = Omit<
+  geyser.ISubscribeRequest,
+  'accounts' | 'accountsDataSlice' | 'fromSlot'
+> & {
+  accounts?: { [key: string]: SubscribeRequestFilterAccounts } | null;
+  accountsDataSlice?: SubscribeRequestAccountsDataSlice[] | null;
+  fromSlot?: number | null;
+};
+
+export type SubscribeRequestFilterSlots = geyser.ISubscribeRequestFilterSlots;
+export type SubscribeRequestFilterTransactions = geyser.ISubscribeRequestFilterTransactions;
+export type SubscribeRequestFilterBlocks = geyser.ISubscribeRequestFilterBlocks;
+export type SubscribeRequestFilterBlocksMeta = geyser.ISubscribeRequestFilterBlocksMeta;
+export type SubscribeRequestFilterEntry = geyser.ISubscribeRequestFilterEntry;
+export type SubscribeRequestPing = geyser.ISubscribeRequestPing;
+
 // Re-export gRPC types
 export { ChannelOptions } from '@grpc/grpc-js';
 
@@ -24,17 +82,6 @@ export {
   SubscribeUpdateTransactionInfo,
   SubscribeUpdatePing,
   SubscribeUpdatePong,
-  // Request types
-  SubscribeRequest,
-  SubscribeRequestFilterAccounts,
-  SubscribeRequestFilterAccountsFilter,
-  SubscribeRequestFilterSlots,
-  SubscribeRequestFilterTransactions,
-  SubscribeRequestFilterBlocks,
-  SubscribeRequestFilterBlocksMeta,
-  SubscribeRequestFilterEntry,
-  SubscribeRequestAccountsDataSlice,
-  SubscribeRequestPing,
   // Enums
   CommitmentLevel,
   SlotStatus,
@@ -281,6 +328,23 @@ declare module 'laserstream-core-proto-js/generated' {
     interface ISubscribeUpdateBlock { bankId?: (string | null); }
     interface ISubscribeUpdateBlockMeta { bankId?: (string | null); }
     interface ISubscribeUpdateEntry { bankId?: (string | null); }
+
+    // Accepted by JsAccountFilter in napi-src/client.rs but absent from the
+    // proto account filter, so declared here to keep existing callers compiling.
+    interface ISubscribeRequestFilterAccounts {
+      /** Not in the Helius docs; accepted by the native layer. */
+      accountInclude?: (string[] | null);
+      /** Not in the Helius docs; accepted by the native layer. */
+      accountExclude?: (string[] | null);
+      /** Not in the Helius docs; accepted by the native layer. */
+      accountRequired?: (string[] | null);
+      /**
+       * Compressed account (cuckoo) filter.
+       * Built client-side via {@link CompressedAccountFilterSet.insertIntoSubscribeRequest}.
+       */
+      cuckooAccountsFilter?: (import('./cuckoo').CuckooFilterProto | null);
+    }
+
     interface ISubscribeRequestFilterEntry {
       /**
        * Include {@link SubscribeUpdateEntryUpdateParent} updates (proto field #1).
