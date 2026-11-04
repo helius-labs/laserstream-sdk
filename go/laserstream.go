@@ -912,3 +912,14 @@ type (
 	SubscribeUpdatePing              = pb.SubscribeUpdatePing
 	SubscribeUpdatePong              = pb.SubscribeUpdatePong
 )
+
+// Alpenglow block footer certificate types
+type (
+	BlockFooterFinalCert       = pb.BlockFooterFinalCert
+	BlockFooterSkipRewardCert  = pb.BlockFooterSkipRewardCert
+	BlockFooterNotarRewardCert = pb.BlockFooterNotarRewardCert
+	BlockFooterVotesAggregate  = pb.BlockFooterVotesAggregate
+	BlockFooterSignatureKind   = pb.BlockFooterSignatureKind
+)
+
+const BlockFooterSignatureKind_COMPRESSED_BLS12_381_G2 = pb.BlockFooterSignatureKind_COMPRESSED_BLS12_381_G2

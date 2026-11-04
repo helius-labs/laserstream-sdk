@@ -209,7 +209,8 @@ pub struct JsEntryFilter {
 
 #[derive(Deserialize, Debug)]
 pub struct JsBlockFooterFilter {
-    // Empty struct as per proto
+    #[serde(default, alias = "includeCertificates")]
+    pub include_certificates: Option<bool>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -500,8 +501,13 @@ impl ClientInner {
         // Handle block_footer
         if let Some(block_footer) = js_request.block_footer {
             let mut block_footer_map = HashMap::new();
-            for (key, _filter) in block_footer {
-                block_footer_map.insert(key, SubscribeRequestFilterBlockFooter::default());
+            for (key, filter) in block_footer {
+                block_footer_map.insert(
+                    key,
+                    SubscribeRequestFilterBlockFooter {
+                        include_certificates: filter.include_certificates,
+                    },
+                );
             }
             request.block_footer = block_footer_map;
         }
@@ -612,6 +618,26 @@ mod tests {
             .convert_js_subscribe_request(js_request)
             .expect("convert request");
 
-        assert!(request.block_footer.contains_key("footer-filter"));
+        assert_eq!(request.block_footer["footer-filter"].include_certificates, None);
+    }
+
+    #[test]
+    fn convert_js_request_passes_block_footer_include_certificates() {
+        let js_request: JsSubscribeRequest = serde_json::from_value(json!({
+            "blockFooter": {
+                "with-certs": { "includeCertificates": true },
+                "without-certs": { "includeCertificates": false },
+                "null-certs": { "includeCertificates": null }
+            }
+        }))
+        .expect("deserialize request");
+
+        let request = test_client()
+            .convert_js_subscribe_request(js_request)
+            .expect("convert request");
+
+        assert_eq!(request.block_footer["with-certs"].include_certificates, Some(true));
+        assert_eq!(request.block_footer["without-certs"].include_certificates, Some(false));
+        assert_eq!(request.block_footer["null-certs"].include_certificates, None);
     }
 }

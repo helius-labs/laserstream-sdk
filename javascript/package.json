@@ -38,6 +38,7 @@
     "test:cuckoo": "node test/cuckoo-vectors.test.js",
     "test:v1-config": "node test/v1-config-vectors.test.js",
     "test:update-parent": "node test/update-parent.test.js",
+    "test:footer-certificates": "node test/footer-certificates.test.js",
     "test:unary": "node test/unary-methods.test.js",
     "test:intra-slot": "node test/intra-slot-updates.test.js",
     "test:cuckoo-e2e": "node test/cuckoo-e2e-thorough.js",
