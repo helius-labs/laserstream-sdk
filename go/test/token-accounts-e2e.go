@@ -27,7 +27,7 @@ import (
 	"sync"
 	"time"
 
-	laserstream "github.com/helius-labs/laserstream-sdk/go"
+	laserstream "github.com/helius-labs/laserstream-sdk/go/v2"
 )
 
 const b58Alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"

@@ -5,7 +5,7 @@ import (
 	"net"
 	"testing"
 
-	pb "github.com/helius-labs/laserstream-sdk/go/proto"
+	pb "github.com/helius-labs/laserstream-sdk/go/v2/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 )
