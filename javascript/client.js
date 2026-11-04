@@ -10,6 +10,10 @@ const CompressionAlgorithms = {
   zstd: 3  // zstd is supported in our Rust NAPI bindings
 };
 
+const BlockFooterSignatureKind = {
+  COMPRESSED_BLS12_381_G2: 0,
+};
+
 // Initialize protobuf on module load
 let protobufInitialized = false;
 
@@ -103,6 +107,7 @@ module.exports = {
   LaserstreamClient,
   CommitmentLevel,
   CompressionAlgorithms,
+  BlockFooterSignatureKind,
   initProtobuf,
   decodeSubscribeUpdate,
   // re-export lifecycle helpers from native binding

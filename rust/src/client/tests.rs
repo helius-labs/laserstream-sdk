@@ -128,6 +128,32 @@ async fn default_client_still_retries_out_of_range() {
 }
 
 #[tokio::test]
+async fn footer_certificates_round_trip_through_the_client() {
+    let server = TestServer::start(Reply::Footer).await;
+    let request = SubscribeRequest {
+        block_footer: HashMap::from([(
+            "footer".to_owned(),
+            SubscribeRequestFilterBlockFooter {
+                include_certificates: Some(true),
+            },
+        )]),
+        ..Default::default()
+    };
+    let (stream, _handle) = subscribe(server.config(), request);
+    futures::pin_mut!(stream);
+    let update = tokio::time::timeout(Duration::from_secs(2), stream.next())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    assert_eq!(update, footer_with_certificates());
+    assert_eq!(
+        server.requests.lock().unwrap()[0].block_footer["footer"].include_certificates,
+        Some(true)
+    );
+}
+
+#[tokio::test]
 async fn unary_methods_round_trip() {
     let server = TestServer::start(Reply::Data).await;
     let mut config = server.config();
@@ -169,6 +195,7 @@ enum Reply {
     StreamOutOfRange,
     InitialOutOfRange,
     Data,
+    Footer,
     TransientThenOutOfRange,
 }
 
@@ -180,6 +207,7 @@ struct ObservedRequest {
     intra_slot_updates: Option<String>,
     disable_archive: Option<String>,
     from_slot: Option<u64>,
+    block_footer: HashMap<String, SubscribeRequestFilterBlockFooter>,
 }
 
 impl ObservedRequest {
@@ -221,6 +249,7 @@ impl geyser_server::Geyser for TestGeyser {
                 intra_slot_updates,
                 disable_archive,
                 from_slot: first.from_slot,
+                block_footer: first.block_footer,
             });
             requests.len()
         };
@@ -231,6 +260,7 @@ impl geyser_server::Geyser for TestGeyser {
             Reply::StreamOutOfRange => Err(Status::out_of_range(SLOT_TOO_OLD_MESSAGE)),
             Reply::TransientThenOutOfRange if attempt == 1 => Err(Status::unavailable("restart")),
             Reply::TransientThenOutOfRange => Err(Status::out_of_range(SLOT_TOO_OLD_MESSAGE)),
+            Reply::Footer => Ok(footer_with_certificates()),
             _ => Ok(SubscribeUpdate {
                 filters: vec!["accounts".into()],
                 update_oneof: Some(UpdateOneof::Account(SubscribeUpdateAccount {
@@ -361,6 +391,39 @@ fn request() -> SubscribeRequest {
     }
 }
 
+fn footer_with_certificates() -> SubscribeUpdate {
+    let aggregate = |fill: u8, block_id: Vec<u8>| BlockFooterVotesAggregate {
+        signature_kind: BlockFooterSignatureKind::CompressedBls12381G2 as i32,
+        signature: vec![fill; 96],
+        block_id,
+        signer_bitmap: vec![1, 3, 0, 0b101],
+    };
+    let block_id = vec![0xbb; 32];
+    SubscribeUpdate {
+        filters: vec!["footer".into()],
+        update_oneof: Some(UpdateOneof::BlockFooter(SubscribeUpdateBlockFooter {
+            slot: 42,
+            bank_id: 7,
+            bank_hash: vec![0xaa; 32],
+            block_producer_time_nanos: 1_700_000_000_000_000_000,
+            block_user_agent: b"agave/4.3".to_vec(),
+            block_final_cert: Some(BlockFooterFinalCert {
+                slot: 40,
+                final_aggregate: Some(aggregate(0x11, Vec::new())),
+                notar_aggregate: Some(aggregate(0x12, block_id.clone())),
+            }),
+            skip_reward_cert: Some(BlockFooterSkipRewardCert {
+                slot: 39,
+                aggregate: Some(aggregate(0x13, Vec::new())),
+            }),
+            notar_reward_cert: Some(BlockFooterNotarRewardCert {
+                slot: 41,
+                aggregate: Some(aggregate(0x14, block_id)),
+            }),
+        })),
+        ..Default::default()
+    }
+}
 async fn assert_terminal(reply: Reply, code: Code, attempts: usize) {
     let server = TestServer::start(reply).await;
     let options = SubscribeOptions::default().with_intra_slot_updates(true);
@@ -422,7 +485,7 @@ fn merge_subscribe_requests_replaces_footer_filters_and_keeps_internal_slot_trac
         )]),
         block_footer: HashMap::from([(
             "old-footer".to_owned(),
-            SubscribeRequestFilterBlockFooter {},
+            SubscribeRequestFilterBlockFooter::default(),
         )]),
         ..Default::default()
     };
@@ -430,7 +493,7 @@ fn merge_subscribe_requests_replaces_footer_filters_and_keeps_internal_slot_trac
     let modification = SubscribeRequest {
         block_footer: HashMap::from([(
             "new-footer".to_owned(),
-            SubscribeRequestFilterBlockFooter {},
+            SubscribeRequestFilterBlockFooter::default(),
         )]),
         ..Default::default()
     };
@@ -450,7 +513,7 @@ fn merge_subscribe_requests_can_remove_footer_filters() {
             internal_slot_sub_id.to_owned(),
             SubscribeRequestFilterSlots::default(),
         )]),
-        block_footer: HashMap::from([("footer".to_owned(), SubscribeRequestFilterBlockFooter {})]),
+        block_footer: HashMap::from([("footer".to_owned(), SubscribeRequestFilterBlockFooter::default())]),
         ..Default::default()
     };
 
@@ -474,6 +537,7 @@ fn footer_resume_slot_tracks_block_footer_updates() {
                 bank_hash: vec![1; 32],
                 block_producer_time_nanos: 123,
                 block_user_agent: b"agave".to_vec(),
+                ..Default::default()
             },
         )),
         ..Default::default()
