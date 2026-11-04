@@ -15,6 +15,7 @@ package main
 
 import (
     "log"
+    "os"
     "os/signal"
     "syscall"
     
@@ -68,11 +69,12 @@ config := laserstream.LaserstreamConfig{
 ### Advanced Configuration with Channel Options
 ```go
 maxAttempts := 10
+replay := true
 config := laserstream.LaserstreamConfig{
     Endpoint:             endpoint,
     APIKey:               apiKey,
     MaxReconnectAttempts: &maxAttempts,
-    Replay:               true, // Enable/disable replay
+    Replay:               &replay, // Enable/disable replay
     ChannelOptions: &laserstream.ChannelOptions{
         // Connection settings
         ConnectTimeoutSecs:    20,
@@ -98,14 +100,15 @@ config := laserstream.LaserstreamConfig{
 ### Replay Control
 ```go
 // Disable replay - start from current slot on reconnect
+replay := false
 config := laserstream.LaserstreamConfig{
     Endpoint: endpoint,
     APIKey:   apiKey,
-    Replay:   false, // Potential data gaps
+    Replay:   &replay, // Potential data gaps
 }
 
 // Enable replay (default) - resume from last processed slot
-config.Replay = true // No data loss
+config.Replay = nil // No data loss
 ```
 
 ### Intra-Slot Updates
@@ -336,14 +339,14 @@ if err != nil {
 err := client.Subscribe(req,
     func(update *laserstream.SubscribeUpdate) {
         // Handle different update types
-        if update.Account != nil {
-            log.Printf("Account update: %s", update.Account.Account.Pubkey)
+        if account := update.GetAccount(); account != nil {
+            log.Printf("Account update: %s", account.Account.Pubkey)
         }
-        if update.Transaction != nil {
-            log.Printf("Transaction: %s", update.Transaction.Transaction.Signature)
+        if tx := update.GetTransaction(); tx != nil {
+            log.Printf("Transaction: %s", tx.Transaction.Signature)
         }
-        if update.Slot != nil {
-            log.Printf("Slot: %d", update.Slot.Slot)
+        if slot := update.GetSlot(); slot != nil {
+            log.Printf("Slot: %d", slot.Slot)
         }
     },
     func(err error) {
@@ -418,10 +421,10 @@ func main() {
     // Subscribe with handlers
     err := client.Subscribe(req,
         func(update *laserstream.SubscribeUpdate) {
-            if update.Slot != nil {
+            if slot := update.GetSlot(); slot != nil {
                 log.Printf("Slot %d: parent=%d", 
-                    update.Slot.Slot, 
-                    update.Slot.Parent)
+                    slot.Slot, 
+                    slot.GetParent())
             }
         },
         func(err error) {
