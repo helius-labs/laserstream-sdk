@@ -529,7 +529,7 @@ def publish_go(sha: str) -> None:
     run(["git", "push", "origin", f"refs/tags/{tag}"])
 
 
-def verify_release(sha: str, attempts: int = 24, delay: int = 10) -> None:
+def verify_release(sha: str, attempts: int = 120, delay: int = 10) -> None:
     version = canonical_version()
     for attempt in range(attempts):
         npm_ok = all(

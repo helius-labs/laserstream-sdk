@@ -140,6 +140,7 @@ jobs:
       - run: npm run test:v1-config
       - run: npm run test:update-parent
       - run: npm run test:uint64-output
+      - run: npm run test:footer-certificates
 
   build:
     strategy:
