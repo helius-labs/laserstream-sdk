@@ -16,10 +16,10 @@ exclude = ["/Cargo.lock"]
 
 [dependencies]
 # DNM: use the Agave 4.4 release candidate until laserstream-core 14.0.0 is published.
-laserstream-core-proto = { version = "0.0.0", git = "https://github.com/helius-labs/yellowstone-grpc", rev = "6efd1d6371d18176486848b0c5c3b25e68af9e2e", default-features = false, features = ["tonic", "tonic-compression"] }
+laserstream-core-proto = { version = "0.0.0", git = "https://github.com/helius-labs/yellowstone-grpc", rev = "1a796f563999df58d0263e518251db0bd5cb89bb", default-features = false, features = ["tonic", "tonic-compression"] }
 # Pin proto + client together: the client bundles its own proto, so a mismatched
 # version would make `SubscribeRequest` a distinct type from the client's API.
-laserstream-core-client = { version = "0.0.0", git = "https://github.com/helius-labs/yellowstone-grpc", rev = "6efd1d6371d18176486848b0c5c3b25e68af9e2e" }
+laserstream-core-client = { version = "0.0.0", git = "https://github.com/helius-labs/yellowstone-grpc", rev = "1a796f563999df58d0263e518251db0bd5cb89bb" }
 tonic = { version = "0.12.1", features = ["transport", "tls", "zstd", "gzip"] }
 # RUSTSEC-2026-0258: floor h2 at the 0.4.19 fix so both the tonic 0.12 graph and
 # the core client's tonic 0.14 graph unify on a patched release.
