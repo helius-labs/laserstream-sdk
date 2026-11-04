@@ -623,7 +623,9 @@ impl StreamInner {
                     let _ = sender.send(ping_request).await;
                 },
                 // Handle incoming messages from the server (raw bytes via custom codec)
-                Some(result) = stream.next() => {
+                result = stream.next() => {
+                    // The server ended the stream: return so the caller reconnects
+                    let Some(result) = result else { break };
                     match result {
                         Ok(raw_bytes) => {
                             // Peek at protobuf wire format to classify message type without full decode
