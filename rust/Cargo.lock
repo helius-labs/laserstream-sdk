@@ -1163,7 +1163,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.6.5",
  "tokio",
  "tower-service",
  "tracing",
@@ -1393,8 +1393,9 @@ dependencies = [
 
 [[package]]
 name = "laserstream-core-client"
-version = "0.0.0"
-source = "git+https://github.com/helius-labs/yellowstone-grpc?rev=d4f81fa5035396369562ae86098268a7646bd98a#d4f81fa5035396369562ae86098268a7646bd98a"
+version = "13.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e62a70e8cadffb4b703670c8ba77338aa28196333b74801cb3d7979a34d0016e"
 dependencies = [
  "bytes",
  "futures",
@@ -1406,8 +1407,9 @@ dependencies = [
 
 [[package]]
 name = "laserstream-core-proto"
-version = "0.0.0"
-source = "git+https://github.com/helius-labs/yellowstone-grpc?rev=d4f81fa5035396369562ae86098268a7646bd98a#d4f81fa5035396369562ae86098268a7646bd98a"
+version = "13.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b347a007d1e8dcc77af2e9cfc9878c51b78496694605f177bba5f4fafe9e793"
 dependencies = [
  "anyhow",
  "bincode",
@@ -1949,7 +1951,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls",
- "socket2 0.5.10",
+ "socket2 0.6.5",
  "thiserror 2.0.19",
  "tokio",
  "tracing",
@@ -1987,7 +1989,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.5.10",
+ "socket2 0.6.5",
  "tracing",
  "windows-sys 0.61.2",
 ]
