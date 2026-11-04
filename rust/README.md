@@ -251,6 +251,32 @@ let request = SubscribeRequest {
 };
 ```
 
+### Block Footer Certificates
+Alpenglow block footers carry the block's finalization and reward certificates when the footer filter sets `include_certificates`. Omitted or `false` sends footer metadata only, with `block_final_cert`, `skip_reward_cert` and `notar_reward_cert` set to `None`.
+
+If a request has several footer filters and only some set `include_certificates`, each footer arrives as **two** updates: first one without certificates, whose `filters` lists the filters that did not opt in, then one with certificates, listing the filters that did. This matches Triton and is not a duplicate.
+```rust
+use helius_laserstream::grpc::{
+    subscribe_update::UpdateOneof, SubscribeRequest, SubscribeRequestFilterBlockFooter,
+};
+
+let request = SubscribeRequest {
+    block_footer: HashMap::from([(
+        "footers".to_string(),
+        SubscribeRequestFilterBlockFooter { include_certificates: Some(true) },
+    )]),
+    ..Default::default()
+};
+
+// In the stream loop:
+if let Some(UpdateOneof::BlockFooter(footer)) = update.update_oneof {
+    if let Some(cert) = footer.block_final_cert {
+        // cert.final_aggregate / cert.notar_aggregate: BlockFooterVotesAggregate
+        // { signature_kind, signature (96-byte compressed BLS), block_id, signer_bitmap }
+    }
+}
+```
+
 ### Slot Subscriptions
 ```rust
 use helius_laserstream::grpc::{SubscribeRequest, SubscribeRequestFilterSlots};

@@ -358,6 +358,8 @@ fn block_footer_slot(data: &[u8], replay: bool) -> std::io::Result<Option<u64>> 
                         3 | 5 => {
                             take_message(wire, &mut footer)?;
                         }
+                        // Certificates are nested messages that only the full decoder validates.
+                        9..=11 => return fallback(),
                         _ if wire == WireType::StartGroup => return fallback(),
                         _ => skip_field(wire, tag, &mut footer, DecodeContext::default())?,
                     }
@@ -800,6 +802,7 @@ mod tests {
                     bank_hash: vec![1; 32],
                     block_producer_time_nanos: 123,
                     block_user_agent: b"agave".to_vec(),
+                    ..Default::default()
                 },
             )),
             ..Default::default()
@@ -829,6 +832,9 @@ mod tests {
             &[0x62, 2, 8, 42, 0x0a, 1, 0xff],    // invalid filter UTF-8
             &[0x62, 2, 8, 42, 0x5a, 1, 8],       // invalid timestamp
             &[0x62, 2, 8, 42, 0x32, 1, 0],       // malformed final oneof is forwarded
+            &[0x62, 6, 8, 42, 0x4a, 2, 8, 40],   // final cert
+            &[0x62, 5, 8, 42, 0x4a, 1, 8],       // malformed final cert
+            &[0x62, 5, 8, 42, 0x5a, 1, 8],       // malformed notar reward cert
             &[
                 0x62, 11, 8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 1,
             ],
