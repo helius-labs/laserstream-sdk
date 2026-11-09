@@ -498,7 +498,7 @@ fn merge_subscribe_requests_replaces_footer_filters_and_keeps_internal_slot_trac
         ..Default::default()
     };
 
-    merge_subscribe_requests(&mut current, &modification, internal_slot_sub_id);
+    merge_subscribe_requests(&mut current, modification, internal_slot_sub_id);
 
     assert!(current.slots.contains_key(internal_slot_sub_id));
     assert!(current.block_footer.contains_key("new-footer"));
@@ -519,12 +519,79 @@ fn merge_subscribe_requests_can_remove_footer_filters() {
 
     merge_subscribe_requests(
         &mut current,
-        &SubscribeRequest::default(),
+        SubscribeRequest::default(),
         internal_slot_sub_id,
     );
 
     assert!(current.block_footer.is_empty());
     assert!(current.slots.contains_key(internal_slot_sub_id));
+}
+
+#[test]
+fn merge_subscribe_requests_replaces_every_map_and_keeps_connection_fields() {
+    let internal_slot_sub_id = "__internal_slot_tracker_test";
+    let mut current = SubscribeRequest {
+        accounts: HashMap::from([("old-acc".to_owned(), SubscribeRequestFilterAccounts::default())]),
+        slots: HashMap::from([
+            (internal_slot_sub_id.to_owned(), SubscribeRequestFilterSlots::default()),
+            ("old-slot".to_owned(), SubscribeRequestFilterSlots::default()),
+        ]),
+        transactions: HashMap::from([("old-tx".to_owned(), SubscribeRequestFilterTransactions::default())]),
+        transactions_status: HashMap::from([("old-tx-status".to_owned(), SubscribeRequestFilterTransactions::default())]),
+        blocks: HashMap::from([("old-block".to_owned(), SubscribeRequestFilterBlocks::default())]),
+        blocks_meta: HashMap::from([("old-block-meta".to_owned(), SubscribeRequestFilterBlocksMeta::default())]),
+        block_footer: HashMap::from([("old-footer".to_owned(), SubscribeRequestFilterBlockFooter::default())]),
+        entry: HashMap::from([("old-entry".to_owned(), SubscribeRequestFilterEntry::default())]),
+        accounts_data_slice: vec![SubscribeRequestAccountsDataSlice { offset: 1, length: 2 }],
+        commitment: Some(1),
+        from_slot: Some(99),
+        ping: Some(SubscribeRequestPing { id: 7 }),
+    };
+    let modification = SubscribeRequest {
+        accounts: HashMap::from([("new-acc".to_owned(), SubscribeRequestFilterAccounts::default())]),
+        slots: HashMap::from([("new-slot".to_owned(), SubscribeRequestFilterSlots::default())]),
+        transactions: HashMap::from([("new-tx".to_owned(), SubscribeRequestFilterTransactions::default())]),
+        transactions_status: HashMap::from([("new-tx-status".to_owned(), SubscribeRequestFilterTransactions::default())]),
+        blocks: HashMap::from([("new-block".to_owned(), SubscribeRequestFilterBlocks::default())]),
+        blocks_meta: HashMap::from([("new-block-meta".to_owned(), SubscribeRequestFilterBlocksMeta::default())]),
+        block_footer: HashMap::from([("new-footer".to_owned(), SubscribeRequestFilterBlockFooter::default())]),
+        entry: HashMap::from([("new-entry".to_owned(), SubscribeRequestFilterEntry::default())]),
+        accounts_data_slice: vec![SubscribeRequestAccountsDataSlice { offset: 10, length: 20 }],
+        commitment: Some(2),
+        from_slot: Some(1),
+        ping: Some(SubscribeRequestPing { id: 1 }),
+    };
+
+    merge_subscribe_requests(&mut current, modification, internal_slot_sub_id);
+
+    // Every subscription map is replaced by the modification's, not merged with the old one.
+    assert_eq!(current.accounts.keys().map(String::as_str).collect::<Vec<_>>(), ["new-acc"]);
+    assert_eq!(current.transactions.keys().map(String::as_str).collect::<Vec<_>>(), ["new-tx"]);
+    assert_eq!(
+        current.transactions_status.keys().map(String::as_str).collect::<Vec<_>>(),
+        ["new-tx-status"]
+    );
+    assert_eq!(current.blocks.keys().map(String::as_str).collect::<Vec<_>>(), ["new-block"]);
+    assert_eq!(
+        current.blocks_meta.keys().map(String::as_str).collect::<Vec<_>>(),
+        ["new-block-meta"]
+    );
+    assert_eq!(current.block_footer.keys().map(String::as_str).collect::<Vec<_>>(), ["new-footer"]);
+    assert_eq!(current.entry.keys().map(String::as_str).collect::<Vec<_>>(), ["new-entry"]);
+    assert_eq!(
+        current.accounts_data_slice,
+        [SubscribeRequestAccountsDataSlice { offset: 10, length: 20 }]
+    );
+
+    // Slots are replaced too, but the internal slot tracker survives.
+    let mut slots: Vec<_> = current.slots.keys().map(String::as_str).collect();
+    slots.sort_unstable();
+    assert_eq!(slots, [internal_slot_sub_id, "new-slot"]);
+
+    assert_eq!(current.commitment, Some(2));
+    // Connection-specific fields are never taken from the modification.
+    assert_eq!(current.from_slot, Some(99));
+    assert_eq!(current.ping, Some(SubscribeRequestPing { id: 7 }));
 }
 
 #[test]
