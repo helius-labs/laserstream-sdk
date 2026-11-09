@@ -151,7 +151,7 @@ pub fn subscribe_with_options(
             // Drain any pending write requests that arrived during reconnection delay.
             // This ensures writes sent while disconnected are included in the next connection.
             while let Ok(write_request) = write_rx.try_recv() {
-                merge_subscribe_requests(&mut current_request, &write_request, &internal_slot_sub_id);
+                merge_subscribe_requests(&mut current_request, write_request, &internal_slot_sub_id);
             }
 
             // Always update from_slot on current_request based on tracked_slot.
@@ -268,7 +268,7 @@ pub fn subscribe_with_options(
                             // Handle write requests from the user
                             Some(write_request) = write_rx.recv() => {
                                 // Merge the write_request into current_request so it persists across reconnections
-                                merge_subscribe_requests(&mut current_request, &write_request, &internal_slot_sub_id);
+                                merge_subscribe_requests(&mut current_request, write_request, &internal_slot_sub_id);
 
                                 // Send the merged current_request (which preserves the internal slot
                                 // tracker) instead of the raw write_request. Yellowstone gRPC replaces
@@ -441,31 +441,27 @@ async fn connect_and_subscribe_once(
 /// `from_slot` and `ping` are not replaced as they are connection-specific.
 fn merge_subscribe_requests(
     current: &mut SubscribeRequest,
-    modification: &SubscribeRequest,
+    modification: SubscribeRequest,
     internal_slot_sub_id: &str,
 ) {
-    // Save the internal slot tracker before replacing slots
-    let internal_tracker = current
-        .slots
-        .get(internal_slot_sub_id)
-        .cloned();
+    // Take the internal slot tracker out before replacing slots (no clone).
+    let internal_tracker = current.slots.remove_entry(internal_slot_sub_id);
 
-    // Replace all subscription types (Yellowstone gRPC replaces, not merges)
-    current.accounts = modification.accounts.clone();
-    current.slots = modification.slots.clone();
-    current.transactions = modification.transactions.clone();
-    current.transactions_status = modification.transactions_status.clone();
-    current.blocks = modification.blocks.clone();
-    current.blocks_meta = modification.blocks_meta.clone();
-    current.block_footer.clone_from(&modification.block_footer);
-    current.entry = modification.entry.clone();
-    current.accounts_data_slice = modification.accounts_data_slice.clone();
+    // Replace all subscription types (Yellowstone gRPC replaces, not merges).
+    // The modification is owned, so its maps are moved rather than deep-cloned.
+    current.accounts = modification.accounts;
+    current.slots = modification.slots;
+    current.transactions = modification.transactions;
+    current.transactions_status = modification.transactions_status;
+    current.blocks = modification.blocks;
+    current.blocks_meta = modification.blocks_meta;
+    current.block_footer = modification.block_footer;
+    current.entry = modification.entry;
+    current.accounts_data_slice = modification.accounts_data_slice;
 
     // Restore the internal slot tracker if it existed
-    if let Some(value) = internal_tracker {
-        current
-            .slots
-            .insert(internal_slot_sub_id.to_string(), value);
+    if let Some((key, value)) = internal_tracker {
+        current.slots.insert(key, value);
     }
 
     // Update commitment if specified in the modification
