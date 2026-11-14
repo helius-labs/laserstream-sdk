@@ -434,9 +434,6 @@ impl StreamInner {
             // Determine effective max attempts
             let effective_max_attempts = max_reconnect_attempts.min(HARD_CAP_RECONNECT_ATTEMPTS);
 
-            // Extract commitment level for reconnection logic
-            let commitment_level = current_request.lock().commitment.unwrap_or(0); // 0 = Processed, 1 = Confirmed, 2 = Finalized
-
             loop {
                 let tracked_slot_clone = tracked_slot.clone();
                 let ts_callback_clone = ts_callback.clone();
@@ -504,6 +501,10 @@ impl StreamInner {
 
                         // Only use from_slot when replay is enabled
                         if last_tracked_slot > 0 && replay {
+                            // Read the commitment level per reconnect: write() can change it
+                            // (merge_subscribe_requests) while the stream is connected.
+                            let commitment_level = current_request.lock().commitment.unwrap_or(0); // 0 = Processed, 1 = Confirmed, 2 = Finalized
+
                             // Always calculate from_slot based on current tracked_slot and commitment level
                             let from_slot = match commitment_level {
                                 // Processed – always rewind by 31 slots for fork safety
