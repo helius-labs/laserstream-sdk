@@ -6,7 +6,7 @@ High-performance gRPC client for streaming real-time Solana data. Built for deve
 
 - **Auto Reconnection**: Robust reconnection with configurable retry limits  
 - **Slot Tracking**: Automatic replay from last processed slot on reconnect (no data loss)
-- **Historical Replay**: Backfill missed data up to 3000 slots (~20 minutes)
+- **Historical Replay**: Backfill missed data up to ~48 hours (~864,000 slots), per the [historical replay docs](https://www.helius.dev/docs/laserstream/historical-replay)
 - **Channel Options**: Fine-tune gRPC performance, compression, timeouts, buffer sizes
 - **Stream Write**: Dynamic subscription updates without reconnecting
 - **Replay Control**: Enable/disable slot replay behavior for different use cases
