@@ -1,6 +1,7 @@
 // A write() that changes commitment must also change the fork-safety rewind on the
 // next reconnect: PROCESSED rewinds 31 slots, CONFIRMED resumes at the tracked slot.
-// In-process mock gRPC server. Run: npm run test:reconnect-commitment
+// Both directions are covered, because a stale level gets one of them wrong.
+// In-process mock gRPC server. Run: npm run test:reconnect-commitment [down|up]
 const assert = require('assert');
 const http2 = require('http2');
 const path = require('path');
@@ -20,13 +21,10 @@ function grpcFrame(payload) {
   return Buffer.concat([header, payload]);
 }
 
-async function main() {
-  const root = await protobuf.load([
-    path.join(__dirname, '..', 'proto', 'geyser.proto'),
-    path.join(__dirname, '..', 'proto', 'solana-storage.proto'),
-  ]);
-  const SubscribeUpdate = root.lookupType('geyser.SubscribeUpdate');
-  const SubscribeRequest = root.lookupType('geyser.SubscribeRequest');
+// Subscribes at one commitment, switches to the other with write(), cuts the
+// connection, and returns the request the client resumes with.
+async function exercise(types, startCommitment, writeCommitment) {
+  const { SubscribeUpdate, SubscribeRequest } = types;
 
   // One decoded request list per gRPC stream, in connection order.
   const perConnection = [];
@@ -79,38 +77,82 @@ async function main() {
 
   const handle = await subscribe(
     { endpoint, apiKey: '', replay: true },
-    { accounts: { accounts: {} }, commitment: CONFIRMED },
+    { accounts: { accounts: {} }, commitment: startCommitment },
     () => signalUpdate(),
     () => {},
   );
 
-  await firstUpdate;
-  await sleep(100); // let the client store the tracked slot
+  try {
+    await firstUpdate;
+    await sleep(100); // let the client store the tracked slot
 
-  await handle.write({ accounts: { accounts: {} }, commitment: PROCESSED });
-  await writeReachedServer;
+    await handle.write({ accounts: { accounts: {} }, commitment: writeCommitment });
+    await writeReachedServer;
 
-  const deadline = Date.now() + 20000;
-  while (perConnection.length < 2 && Date.now() < deadline) await sleep(200);
-  assert.ok(perConnection[1], 'client did not reconnect within 20s');
-  const reconnect = perConnection[1][0];
-  const fromSlot = Number(reconnect.fromSlot);
+    const deadline = Date.now() + 20000;
+    while (perConnection.length < 2 && Date.now() < deadline) await sleep(200);
+    assert.ok(perConnection[1], 'client did not reconnect within 20s');
+    const reconnect = perConnection[1][0];
+    return { fromSlot: Number(reconnect.fromSlot), commitment: reconnect.commitment };
+  } finally {
+    handle.cancel();
+    for (const socket of sockets) socket.destroy();
+    server.close();
+  }
+}
 
-  assert.strictEqual(
-    reconnect.commitment,
-    PROCESSED,
-    'reconnect must request the commitment set by write(), not the one from subscribe()',
-  );
-  assert.strictEqual(
-    fromSlot,
-    TRACKED_SLOT - FORK_DEPTH_SAFETY_MARGIN,
-    `PROCESSED reconnect must rewind ${FORK_DEPTH_SAFETY_MARGIN} slots (expected 969, got ${fromSlot})`,
-  );
+const scenarios = {
+  // CONFIRMED -> PROCESSED is the dangerous direction: the client has to start
+  // rewinding, and a cached level leaves it resuming on the tracked slot where a
+  // fork may have replaced the update.
+  down: {
+    startCommitment: CONFIRMED,
+    writeCommitment: PROCESSED,
+    expectedFromSlot: TRACKED_SLOT - FORK_DEPTH_SAFETY_MARGIN,
+    why: `PROCESSED reconnect must rewind ${FORK_DEPTH_SAFETY_MARGIN} slots`,
+  },
+  // PROCESSED -> CONFIRMED has to stop rewinding. A cached level keeps the 31 slot
+  // rewind, which replays slots the caller no longer asked for.
+  up: {
+    startCommitment: PROCESSED,
+    writeCommitment: CONFIRMED,
+    expectedFromSlot: TRACKED_SLOT,
+    why: 'CONFIRMED reconnect must resume at the tracked slot, not rewind',
+  },
+};
 
-  handle.cancel();
-  for (const socket of sockets) socket.destroy();
-  server.close();
-  console.log(`reconnect-commitment: resumed at ${fromSlot} with commitment ${reconnect.commitment}`);
+async function main() {
+  const only = process.argv[2];
+  assert.ok(!only || scenarios[only], `unknown scenario ${only}, use down or up`);
+  const selected = only ? [only] : Object.keys(scenarios);
+
+  const root = await protobuf.load([
+    path.join(__dirname, '..', 'proto', 'geyser.proto'),
+    path.join(__dirname, '..', 'proto', 'solana-storage.proto'),
+  ]);
+  const types = {
+    SubscribeUpdate: root.lookupType('geyser.SubscribeUpdate'),
+    SubscribeRequest: root.lookupType('geyser.SubscribeRequest'),
+  };
+
+  for (const name of selected) {
+    const scenario = scenarios[name];
+    const result = await exercise(types, scenario.startCommitment, scenario.writeCommitment);
+
+    assert.strictEqual(
+      result.commitment,
+      scenario.writeCommitment,
+      'reconnect must request the commitment set by write(), not the one from subscribe()',
+    );
+    assert.strictEqual(
+      result.fromSlot,
+      scenario.expectedFromSlot,
+      `${scenario.why} (expected ${scenario.expectedFromSlot}, got ${result.fromSlot})`,
+    );
+    console.log(
+      `reconnect-commitment (${name}): resumed at ${result.fromSlot} with commitment ${result.commitment}`,
+    );
+  }
 }
 
 main().catch((error) => {
