@@ -25,7 +25,7 @@ fn update_parent_proto_is_available() {
                 slot: 42,
                 cleared_bank_id: 7,
                 parent_slot: 41,
-                parent_block_id: parent_block_id.clone(),
+                parent_block_id: parent_block_id.clone().into(),
             },
         )),
         ..Default::default()
@@ -394,9 +394,9 @@ fn request() -> SubscribeRequest {
 fn footer_with_certificates() -> SubscribeUpdate {
     let aggregate = |fill: u8, block_id: Vec<u8>| BlockFooterVotesAggregate {
         signature_kind: BlockFooterSignatureKind::CompressedBls12381G2 as i32,
-        signature: vec![fill; 96],
-        block_id,
-        signer_bitmap: vec![1, 3, 0, 0b101],
+        signature: vec![fill; 96].into(),
+        block_id: block_id.into(),
+        signer_bitmap: vec![1, 3, 0, 0b101].into(),
     };
     let block_id = vec![0xbb; 32];
     SubscribeUpdate {
@@ -404,9 +404,9 @@ fn footer_with_certificates() -> SubscribeUpdate {
         update_oneof: Some(UpdateOneof::BlockFooter(SubscribeUpdateBlockFooter {
             slot: 42,
             bank_id: 7,
-            bank_hash: vec![0xaa; 32],
+            bank_hash: vec![0xaa; 32].into(),
             block_producer_time_nanos: 1_700_000_000_000_000_000,
-            block_user_agent: b"agave/4.3".to_vec(),
+            block_user_agent: b"agave/4.3".to_vec().into(),
             block_final_cert: Some(BlockFooterFinalCert {
                 slot: 40,
                 final_aggregate: Some(aggregate(0x11, Vec::new())),
@@ -534,9 +534,9 @@ fn footer_resume_slot_tracks_block_footer_updates() {
             SubscribeUpdateBlockFooter {
                 slot: 42,
                 bank_id: 7,
-                bank_hash: vec![1; 32],
+                bank_hash: vec![1; 32].into(),
                 block_producer_time_nanos: 123,
-                block_user_agent: b"agave".to_vec(),
+                block_user_agent: b"agave".to_vec().into(),
                 ..Default::default()
             },
         )),
@@ -559,4 +559,14 @@ fn footer_resume_slot_ignores_non_footer_updates() {
     };
 
     assert_eq!(footer_resume_slot(&update), None);
+}
+
+/// Compile-time check of the `zero-copy` feature: `bytes` fields are `Bytes` with it, `Vec<u8>` without.
+#[test]
+fn bytes_fields_follow_zero_copy_feature() {
+    let info = laserstream_core_proto::geyser::SubscribeUpdateAccountInfo::default();
+    #[cfg(feature = "zero-copy")]
+    let _: &laserstream_core_proto::prost::bytes::Bytes = &info.data;
+    #[cfg(not(feature = "zero-copy"))]
+    let _: &Vec<u8> = &info.data;
 }

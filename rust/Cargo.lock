@@ -1641,8 +1641,6 @@ dependencies = [
 [[package]]
 name = "laserstream-core-client"
 version = "14.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43430adbb45768018a228dc8421118fb45fd3d981cbc9345769374cc6edb5e4c"
 dependencies = [
  "bytes",
  "futures",
@@ -1655,8 +1653,6 @@ dependencies = [
 [[package]]
 name = "laserstream-core-proto"
 version = "14.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7466846992b35ebabe770f41fb1571e0145afbfacbce0e1bfa1ea7216b224732"
 dependencies = [
  "anyhow",
  "bincode",

@@ -57,7 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(update) => {
                 if let Some(UpdateOneof::Account(account_update)) = update.update_oneof {
                     if let Some(info) = account_update.account {
-                        let pk = Pubkey::try_from(info.pubkey.as_slice()).ok();
+                        let pk = Pubkey::try_from(&info.pubkey[..]).ok();
                         // Re-check locally: drop server-side false positives.
                         match pk {
                             Some(pk) if set.contains(pk) => {

@@ -1,0 +1,441 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+import public "solana-storage.proto";
+
+option go_package = "github.com/rpcpool/yellowstone-grpc/examples/golang/proto";
+
+package geyser;
+
+service Geyser {
+  rpc Subscribe(stream SubscribeRequest) returns (stream SubscribeUpdate) {}
+  rpc SubscribePreprocessed(stream SubscribePreprocessedRequest) returns (stream SubscribePreprocessedUpdate) {}
+  rpc SubscribeReplayInfo(SubscribeReplayInfoRequest) returns (SubscribeReplayInfoResponse) {}
+  rpc Ping(PingRequest) returns (PongResponse) {}
+  rpc GetLatestBlockhash(GetLatestBlockhashRequest) returns (GetLatestBlockhashResponse) {}
+  rpc GetBlockHeight(GetBlockHeightRequest) returns (GetBlockHeightResponse) {}
+  rpc GetSlot(GetSlotRequest) returns (GetSlotResponse) {}
+  rpc IsBlockhashValid(IsBlockhashValidRequest) returns (IsBlockhashValidResponse) {}
+  rpc GetVersion(GetVersionRequest) returns (GetVersionResponse) {}
+}
+
+// Subscriptions to Preprocessed transactions
+message SubscribePreprocessedRequest {
+  map<string, SubscribePreprocessedRequestFilterTransactions> transactions = 1;
+  optional SubscribeRequestPing ping = 2;
+
+}
+
+message SubscribePreprocessedRequestFilterTransactions {
+  optional bool vote = 1;
+  optional string signature = 2;
+  repeated string account_include = 3;
+  repeated string account_exclude = 4;
+  repeated string account_required = 5;
+  optional uint64 from_slot = 20;
+}
+
+message SubscribePreprocessedUpdate {
+  repeated string filters = 1;
+  oneof update_oneof {
+    SubscribePreprocessedTransaction transaction = 2;
+    SubscribeUpdatePing ping = 3;
+    SubscribeUpdatePong pong = 4;
+  }
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message SubscribePreprocessedTransaction {
+  SubscribePreprocessedTransactionInfo transaction = 1;
+  uint64 slot = 2;
+}
+
+message SubscribePreprocessedTransactionInfo {
+  bytes signature = 1;
+  bool is_vote = 2;
+  solana.storage.ConfirmedBlock.Transaction transaction = 3;
+}
+
+enum CommitmentLevel {
+  PROCESSED = 0;
+  CONFIRMED = 1;
+  FINALIZED = 2;
+}
+
+enum SlotStatus {
+  SLOT_PROCESSED = 0;
+  SLOT_CONFIRMED = 1;
+  SLOT_FINALIZED = 2;
+  SLOT_FIRST_SHRED_RECEIVED = 3;
+  SLOT_COMPLETED = 4;
+  SLOT_CREATED_BANK = 5;
+  SLOT_DEAD = 6;
+}
+
+message SubscribeRequest {
+  map<string, SubscribeRequestFilterAccounts> accounts = 1;
+  map<string, SubscribeRequestFilterSlots> slots = 2;
+  map<string, SubscribeRequestFilterTransactions> transactions = 3;
+  map<string, SubscribeRequestFilterTransactions> transactions_status = 10;
+  map<string, SubscribeRequestFilterBlocks> blocks = 4;
+  map<string, SubscribeRequestFilterBlocksMeta> blocks_meta = 5;
+  map<string, SubscribeRequestFilterEntry> entry = 8;
+  optional CommitmentLevel commitment = 6;
+  repeated SubscribeRequestAccountsDataSlice accounts_data_slice = 7;
+  optional SubscribeRequestPing ping = 9;
+  optional uint64 from_slot = 11;
+  map<string, SubscribeRequestFilterBlockFooter> block_footer = 12;
+}
+
+message SubscribeRequestFilterAccounts {
+  repeated string account = 2;
+  repeated string owner = 3;
+  repeated SubscribeRequestFilterAccountsFilter filters = 4;
+  optional bool nonempty_txn_signature = 5;
+  optional CuckooFilter cuckoo_accounts_filter = 6;
+  // Tag 31 was the deprecated no-op notify_on opt-in; removed once Agave 4.2
+  // made write-only delivery the default at the source.
+  reserved 31;
+  reserved "notify_on";
+}
+
+// Hash algorithm for a CuckooFilter (on the wire for forward-compat).
+enum CuckooHashAlgorithm {
+  SIP_HASH = 0;
+}
+
+// Compact probabilistic account filter: fingerprints, not pubkeys. No false negatives, <1% false positives.
+message CuckooFilter {
+  bytes data = 1;
+  uint32 bucket_count = 2;
+  uint32 entries_per_bucket = 3;
+  uint32 fingerprint_bits = 4;
+  uint64 hash_seed = 5;
+  CuckooHashAlgorithm hash_algorithm = 6;
+}
+
+message SubscribeRequestFilterAccountsFilter {
+  oneof filter {
+    SubscribeRequestFilterAccountsFilterMemcmp memcmp = 1;
+    uint64 datasize = 2;
+    bool token_account_state = 3;
+    SubscribeRequestFilterAccountsFilterLamports lamports = 4;
+  }
+}
+
+message SubscribeRequestFilterAccountsFilterMemcmp {
+  uint64 offset = 1;
+  oneof data {
+    bytes bytes = 2;
+    string base58 = 3;
+    string base64 = 4;
+  }
+}
+
+message SubscribeRequestFilterAccountsFilterLamports {
+  oneof cmp {
+    uint64 eq = 1;
+    uint64 ne = 2;
+    uint64 lt = 3;
+    uint64 gt = 4;
+  }
+}
+
+message SubscribeRequestFilterSlots {
+  optional bool filter_by_commitment = 1;
+  optional bool interslot_updates = 2;
+}
+
+message SubscribeRequestFilterTransactions {
+  optional bool vote = 1;
+  optional bool failed = 2;
+  optional string signature = 5;
+  repeated string account_include = 3;
+  repeated string account_exclude = 4;
+  repeated string account_required = 6;
+  // Helius extension: compact cuckoo filter for account_include, OR-combined
+  // with the explicit account_include set. Field 31 keeps clear of upstream
+  // Triton's lower field numbers to avoid future collisions.
+  optional CuckooFilter cuckoo_account_include = 31;
+  // Helius extension: ATA / token-account expansion control. When set,
+  // account_include / account_exclude / account_required also match
+  // against owners of pre/post token balances on each transaction.
+  // Absent = no expansion.
+  optional TokenAccountExpansionControlFlag token_accounts = 30;
+  // Also match the account lists against pre/post token-balance mints.
+  bool match_mints = 32;
+}
+
+// Helius extension: discriminator for `SubscribeRequestFilterTransactions.token_accounts`.
+enum TokenAccountExpansionControlFlag {
+  // Match an owner if it owns a pre OR post token balance on the tx.
+  ALL = 0;
+  // Match an owner whose token balance changed in amount (per
+  // `account_index`) or whose token account was closed.
+  BALANCE_CHANGED = 1;
+}
+
+message SubscribeRequestFilterBlocks {
+  repeated string account_include = 1;
+  optional bool include_transactions = 2;
+  optional bool include_accounts = 3;
+  optional bool include_entries = 4;
+}
+
+message SubscribeRequestFilterBlocksMeta {}
+
+message SubscribeRequestFilterEntry {
+  // Include SubscribeUpdateEntryUpdateParent updates. Omitted or false sends entries only.
+  optional bool include_update_parent = 1;
+}
+
+message SubscribeRequestFilterBlockFooter {
+  // Include available certificates. Omitted or false sends footer metadata only.
+  optional bool include_certificates = 1;
+}
+
+message SubscribeRequestAccountsDataSlice {
+  uint64 offset = 1;
+  uint64 length = 2;
+}
+
+message SubscribeRequestPing {
+  int32 id = 1;
+}
+
+message SubscribeUpdate {
+  repeated string filters = 1;
+  oneof update_oneof {
+    SubscribeUpdateAccount account = 2;
+    SubscribeUpdateSlot slot = 3;
+    SubscribeUpdateTransaction transaction = 4;
+    SubscribeUpdateTransactionStatus transaction_status = 10;
+    SubscribeUpdateBlock block = 5;
+    SubscribeUpdatePing ping = 6;
+    SubscribeUpdatePong pong = 9;
+    SubscribeUpdateBlockMeta block_meta = 7;
+    SubscribeUpdateEntry entry = 8;
+    SubscribeUpdateBlockFooter block_footer = 12;
+    SubscribeUpdateEntryUpdateParent entry_update_parent = 13;
+  }
+  google.protobuf.Timestamp created_at = 11;
+}
+
+message SubscribeUpdateBatch {
+  repeated SubscribeUpdate updates = 1;
+}
+
+message SubscribeUpdateAccount {
+  SubscribeUpdateAccountInfo account = 1;
+  uint64 slot = 2;
+  bool is_startup = 3;
+  optional uint64 bank_id = 4;
+}
+
+message SubscribeUpdateAccountInfo {
+  bytes pubkey = 1;
+  uint64 lamports = 2;
+  bytes owner = 3;
+  bool executable = 4;
+  uint64 rent_epoch = 5;
+  bytes data = 6;
+  uint64 write_version = 7;
+  optional bytes txn_signature = 8;
+}
+
+message SubscribeUpdateSlot {
+  uint64 slot = 1;
+  optional uint64 parent = 2;
+  SlotStatus status = 3;
+  optional string dead_error = 4;
+  optional uint64 bank_id = 5;
+}
+
+message SubscribeUpdateTransaction {
+  SubscribeUpdateTransactionInfo transaction = 1;
+  uint64 slot = 2;
+  uint64 bank_id = 3;
+}
+
+message SubscribeUpdateTransactionInfo {
+  bytes signature = 1;
+  bool is_vote = 2;
+  solana.storage.ConfirmedBlock.Transaction transaction = 3;
+  solana.storage.ConfirmedBlock.TransactionStatusMeta meta = 4;
+  uint64 index = 5;
+}
+
+message SubscribeUpdateTransactionStatus {
+  uint64 slot = 1;
+  bytes signature = 2;
+  bool is_vote = 3;
+  uint64 index = 4;
+  solana.storage.ConfirmedBlock.TransactionError err = 5;
+  uint64 bank_id = 6;
+}
+
+message SubscribeUpdateBlock {
+  uint64 slot = 1;
+  string blockhash = 2;
+  solana.storage.ConfirmedBlock.Rewards rewards = 3;
+  solana.storage.ConfirmedBlock.UnixTimestamp block_time = 4;
+  solana.storage.ConfirmedBlock.BlockHeight block_height = 5;
+  uint64 parent_slot = 7;
+  string parent_blockhash = 8;
+  uint64 executed_transaction_count = 9;
+  repeated SubscribeUpdateTransactionInfo transactions = 6;
+  uint64 updated_account_count = 10;
+  repeated SubscribeUpdateAccountInfo accounts = 11;
+  uint64 entries_count = 12;
+  repeated SubscribeUpdateEntry entries = 13;
+  uint64 bank_id = 14;
+}
+
+message SubscribeUpdateBlockMeta {
+  uint64 slot = 1;
+  string blockhash = 2;
+  solana.storage.ConfirmedBlock.Rewards rewards = 3;
+  solana.storage.ConfirmedBlock.UnixTimestamp block_time = 4;
+  solana.storage.ConfirmedBlock.BlockHeight block_height = 5;
+  uint64 parent_slot = 6;
+  string parent_blockhash = 7;
+  uint64 executed_transaction_count = 8;
+  uint64 entries_count = 9;
+  uint64 bank_id = 10;
+}
+
+// Reports a bank cleared by an Alpenglow UpdateParent marker. Messages already
+// delivered for cleared_bank_id describe a bank that no longer exists: replay
+// restarts from the marker's FEC set and the new bank carries a different id.
+// Field numbers match rpcpool/yellowstone-grpc.
+message SubscribeUpdateEntryUpdateParent {
+  uint64 slot = 1;
+  uint64 cleared_bank_id = 2;
+  uint64 parent_slot = 3;
+  bytes parent_block_id = 4;
+}
+
+message SubscribeUpdateBlockFooter {
+  uint64 slot = 1;
+  uint64 bank_id = 2;
+  bytes bank_hash = 3;
+  uint64 block_producer_time_nanos = 4;
+  bytes block_user_agent = 5;
+  reserved 6, 7, 8;
+
+  // The Alpenglow certificates. Sent only when the filter sets include_certificates.
+  BlockFooterFinalCert block_final_cert = 9;
+  BlockFooterSkipRewardCert skip_reward_cert = 10;
+  BlockFooterNotarRewardCert notar_reward_cert = 11;
+}
+
+// Encoding of BlockFooterVotesAggregate.signature. Readers reject kinds they do not know.
+enum BlockFooterSignatureKind {
+  // 96 bytes.
+  COMPRESSED_BLS12_381_G2 = 0;
+}
+
+// An aggregate signature over one vote, and the validators that signed it.
+message BlockFooterVotesAggregate {
+  BlockFooterSignatureKind signature_kind = 1;
+  bytes signature = 2;
+  // Merkle root of the block's last data shred, not the PoH blockhash. Empty for votes on a slot.
+  bytes block_id = 3;
+  // solana-signer-store bitmap, verbatim: version byte, u16 LE bit count, payload. Bit i is the
+  // validator at rank i in the cert slot's epoch, ordered by stake descending then BLS pubkey.
+  bytes signer_bitmap = 4;
+}
+
+// Proves that the block is finalized. Slow finalization: final_aggregate signs a finalize vote on
+// the slot and notar_aggregate a notarize vote on the block. Fast: final_aggregate alone, on the block.
+message BlockFooterFinalCert {
+  uint64 slot = 1;
+  BlockFooterVotesAggregate final_aggregate = 2;
+  BlockFooterVotesAggregate notar_aggregate = 3;
+}
+
+// Records the validators that voted skip on the slot.
+message BlockFooterSkipRewardCert {
+  uint64 slot = 1;
+  BlockFooterVotesAggregate aggregate = 2;
+}
+
+// Records the validators that voted notarize on the slot's block.
+message BlockFooterNotarRewardCert {
+  uint64 slot = 1;
+  BlockFooterVotesAggregate aggregate = 2;
+}
+
+message SubscribeUpdateEntry {
+  uint64 slot = 1;
+  uint64 index = 2;
+  uint64 num_hashes = 3;
+  bytes hash = 4;
+  uint64 executed_transaction_count = 5;
+  uint64 starting_transaction_index = 6; // added in v1.18, for solana 1.17 value is always 0
+  uint64 bank_id = 7;
+}
+
+message SubscribeUpdatePing {}
+
+message SubscribeUpdatePong {
+  int32 id = 1;
+}
+
+// non-streaming methods
+
+message SubscribeReplayInfoRequest {}
+
+message SubscribeReplayInfoResponse {
+  optional uint64 first_available = 1;
+}
+
+message PingRequest {
+  int32 count = 1;
+}
+
+message PongResponse {
+  int32 count = 1;
+}
+
+message GetLatestBlockhashRequest {
+  optional CommitmentLevel commitment = 1;
+}
+
+message GetLatestBlockhashResponse {
+  uint64 slot = 1;
+  string blockhash = 2;
+  uint64 last_valid_block_height = 3;
+}
+
+message GetBlockHeightRequest {
+  optional CommitmentLevel commitment = 1;
+}
+
+message GetBlockHeightResponse {
+  uint64 block_height = 1;
+}
+
+message GetSlotRequest {
+  optional CommitmentLevel commitment = 1;
+}
+
+message GetSlotResponse {
+  uint64 slot = 1;
+}
+
+message GetVersionRequest {}
+
+message GetVersionResponse {
+  string version = 1;
+}
+
+message IsBlockhashValidRequest {
+  string blockhash = 1;
+  optional CommitmentLevel commitment = 2;
+}
+
+message IsBlockhashValidResponse {
+  uint64 slot = 1;
+  bool valid = 2;
+}
