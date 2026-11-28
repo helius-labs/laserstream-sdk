@@ -89,8 +89,8 @@ impl ChannelConfig {
             });
 
             Self {
-                max_send_msg_size: opts.grpc_max_send_message_length.map(|v| v as usize).unwrap_or(64 * 1024 * 1024),
-                max_recv_msg_size: opts.grpc_max_receive_message_length.map(|v| v as usize).unwrap_or(1_000_000_000),
+                max_send_msg_size: opts.max_encoding_message_size.or(opts.grpc_max_send_message_length.map(|v| v as usize)).unwrap_or(64 * 1024 * 1024),
+                max_recv_msg_size: opts.max_decoding_message_size.or(opts.grpc_max_receive_message_length.map(|v| v as usize)).unwrap_or(1_000_000_000),
                 send_compression,
                 accept_compression: send_compression,
             }
@@ -163,12 +163,19 @@ pub(crate) fn configure_endpoint(
 
         // Apply sensible defaults for options not specified
         endpoint = endpoint
-            .connect_timeout(Duration::from_secs(10))
-            .timeout(Duration::from_secs(30))
-            .http2_adaptive_window(true)
-            .tcp_nodelay(true)
-            .initial_stream_window_size(Some(4 * 1024 * 1024))
-            .initial_connection_window_size(Some(8 * 1024 * 1024));
+            .connect_timeout(Duration::from_secs(opts.connect_timeout_secs.unwrap_or(10)))
+            .timeout(Duration::from_secs(opts.timeout_secs.unwrap_or(30)))
+            .http2_adaptive_window(opts.http2_adaptive_window.unwrap_or(true))
+            .tcp_nodelay(opts.tcp_nodelay.unwrap_or(true))
+            .initial_stream_window_size(opts.initial_stream_window_size.or(Some(4 * 1024 * 1024)))
+            .initial_connection_window_size(opts.initial_connection_window_size.or(Some(8 * 1024 * 1024)));
+
+        // Documented camelCase fields without a hardcoded default win over grpc.* keys
+        if let Some(v) = opts.http2_keep_alive_interval_secs { endpoint = endpoint.http2_keep_alive_interval(Duration::from_secs(v)); }
+        if let Some(v) = opts.keep_alive_timeout_secs { endpoint = endpoint.keep_alive_timeout(Duration::from_secs(v)); }
+        if let Some(v) = opts.keep_alive_while_idle { endpoint = endpoint.keep_alive_while_idle(v); }
+        if let Some(v) = opts.tcp_keepalive_secs { endpoint = endpoint.tcp_keepalive(Some(Duration::from_secs(v))); }
+        if let Some(v) = opts.buffer_size { endpoint = endpoint.buffer_size(Some(v)); }
     } else {
         // Apply performance defaults even without explicit channel_options.
         // tcp_nodelay disables Nagle's algorithm (critical for H2 WINDOW_UPDATE latency).
@@ -790,7 +797,30 @@ impl StreamInner {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
     use std::collections::HashMap;
+
+    #[test]
+    fn channel_options_parse_camelcase_and_grpc_keys() {
+        let opts: ChannelOptions = serde_json::from_value(json!({
+            "connectTimeoutSecs": 2, "timeoutSecs": 60, "maxDecodingMessageSize": 3,
+            "maxEncodingMessageSize": 4, "http2KeepAliveIntervalSecs": 5, "keepAliveTimeoutSecs": 6,
+            "keepAliveWhileIdle": true, "initialStreamWindowSize": 7, "initialConnectionWindowSize": 8,
+            "http2AdaptiveWindow": false, "tcpNodelay": false, "tcpKeepaliveSecs": 9, "bufferSize": 10
+        }))
+        .expect("deserialize options");
+        assert_eq!(opts.connect_timeout_secs, Some(2));
+        assert_eq!(opts.timeout_secs, Some(60));
+        assert_eq!(opts.buffer_size, Some(10));
+        assert!(opts.other.is_empty(), "documented fields must not fall into the catch-all");
+
+        let opts: ChannelOptions = serde_json::from_value(json!({
+            "grpc.keepalive_time_ms": 20000, "grpc.client_idle_timeout_ms": 3000
+        }))
+        .expect("deserialize options");
+        assert_eq!(opts.grpc_keepalive_time_ms, Some(20000));
+        assert_eq!(opts.other["grpc.client_idle_timeout_ms"], json!(3000));
+    }
 
     #[test]
     fn peek_update_type_detects_block_footer() {
