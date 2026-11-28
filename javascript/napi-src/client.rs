@@ -50,7 +50,23 @@ pub struct ClientInner {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ChannelOptions {
+    // Documented camelCase channel options (README, examples/channel-options-example.ts)
+    pub connect_timeout_secs: Option<u64>,
+    pub timeout_secs: Option<u64>,
+    pub max_decoding_message_size: Option<usize>,
+    pub max_encoding_message_size: Option<usize>,
+    pub http2_keep_alive_interval_secs: Option<u64>,
+    pub keep_alive_timeout_secs: Option<u64>,
+    pub keep_alive_while_idle: Option<bool>,
+    pub initial_stream_window_size: Option<u32>,
+    pub initial_connection_window_size: Option<u32>,
+    pub http2_adaptive_window: Option<bool>,
+    pub tcp_nodelay: Option<bool>,
+    pub tcp_keepalive_secs: Option<u64>,
+    pub buffer_size: Option<usize>,
+
     // gRPC standard channel options
     #[serde(rename = "grpc.max_send_message_length")]
     pub grpc_max_send_message_length: Option<i32>,
