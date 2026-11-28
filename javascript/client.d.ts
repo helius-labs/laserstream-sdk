@@ -88,8 +88,28 @@ export type SubscribeRequestFilterBlocksMeta = geyser.ISubscribeRequestFilterBlo
 export type SubscribeRequestFilterEntry = geyser.ISubscribeRequestFilterEntry;
 export type SubscribeRequestPing = geyser.ISubscribeRequestPing;
 
-// Re-export gRPC types
-export { ChannelOptions } from '@grpc/grpc-js';
+// Channel options consumed by the native layer (napi-src/client.rs). The
+// camelCase fields are the documented interface.
+export interface ChannelOptions {
+  // Times in seconds, sizes in bytes.
+  connectTimeoutSecs?: number;
+  timeoutSecs?: number;
+  maxDecodingMessageSize?: number;
+  maxEncodingMessageSize?: number;
+  http2KeepAliveIntervalSecs?: number;
+  keepAliveTimeoutSecs?: number;
+  keepAliveWhileIdle?: boolean;
+  initialStreamWindowSize?: number;
+  initialConnectionWindowSize?: number;
+  http2AdaptiveWindow?: boolean;
+  tcpNodelay?: boolean;
+  tcpKeepaliveSecs?: number;
+  bufferSize?: number;
+  // The native parser accepts any grpc.* key into its catch-all map; unknown
+  // ones are ignored at runtime. Documented camelCase fields win when both are set.
+  'grpc-node.max_session_memory'?: number;
+  [key: `grpc.${string}`]: number | string | boolean | undefined;
+}
 
 // Re-export all proto types from laserstream-core-proto-js
 export {
